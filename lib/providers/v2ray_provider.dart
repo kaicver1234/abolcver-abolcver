@@ -5,10 +5,12 @@ import '../models/v2ray_config.dart';
 import '../models/subscription.dart';
 import '../services/v2ray_service.dart';
 import '../services/server_service.dart';
+import '../services/analytics_service.dart';
 
 class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   final V2RayService _v2rayService = V2RayService();
   final ServerService _serverService = ServerService();
+  final AnalyticsService _analyticsService = AnalyticsService();
   bool statusPingOnly = false;
   List<V2RayConfig> _configs = [];
   List<Subscription> _subscriptions = [];
@@ -60,13 +62,12 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       // Load saved selected server
       await _loadSelectedServer();
 
-      // Fetch the current notification status to sync with the app
-      await fetchNotificationStatus();
-
-      // If we have an active config and it's in the saved list, ensure its status is correct
+      // IMPROVED: Check actual VPN status first before syncing configs
+      final isActuallyConnected = await _v2rayService.isActuallyConnected();
       final activeConfig = _v2rayService.activeConfig;
-      if (activeConfig != null) {
-        // Active config found
+      // IMPROVED: Only mark as connected if actually connected
+      if (activeConfig != null && isActuallyConnected) {
+        // VPN is truly connected, update configs
         bool configFound = false;
 
         for (var config in _configs) {
@@ -103,7 +104,14 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           activeConfig.isConnected = true;
           _selectedConfig = activeConfig;
         }
-      } else if (_selectedConfig == null && _configs.isNotEmpty) {
+      } else {
+        // VPN not connected or config not found, ensure all are marked disconnected
+        for (var config in _configs) {
+          config.isConnected = false;
+        }
+      }
+      
+      if (_selectedConfig == null && _configs.isNotEmpty) {
         // If no active connection and no saved selection, select first server
         _selectedConfig = _configs.first;
         await _saveSelectedServer();
@@ -707,6 +715,17 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
             // Don't fail the connection for this
           }
 
+          // Log analytics event for successful connection
+          try {
+            await _analyticsService.logVpnConnect(
+              serverName: config.remark,
+              country: config.address,
+              protocol: config.configType,
+            );
+          } catch (e) {
+            // Analytics logging failed, ignore
+          }
+          
           // Successfully connected
         } catch (e) {
           // Error in post-connection setup
@@ -732,6 +751,19 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
 
     try {
+      // Log analytics event for disconnection
+      final activeConfig = _v2rayService.activeConfig;
+      if (activeConfig != null) {
+        try {
+          await _analyticsService.logVpnDisconnect(
+            serverName: activeConfig.remark,
+            durationSeconds: _v2rayService.connectedSeconds,
+          );
+        } catch (e) {
+          // Analytics logging failed, ignore
+        }
+      }
+      
       await _v2rayService.disconnect();
       statusPingOnly = false;
       // Update config status
@@ -820,9 +852,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
 
     // Handle app lifecycle changes
     if (state == AppLifecycleState.resumed) {
-      // When app is resumed, check connection status after a delay
-      // This allows the VPN connection time to stabilize
-      Future.delayed(const Duration(milliseconds: 1000), () {
+      // When app is resumed, check connection status immediately
+      // This ensures the UI reflects the actual VPN state
+      Future.delayed(const Duration(milliseconds: 500), () {
         // App resumed, checking VPN status
         fetchNotificationStatus();
       });

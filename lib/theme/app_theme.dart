@@ -5,16 +5,16 @@ import '../providers/language_provider.dart';
 
 class AppTheme {
   // Primary colors
-  static const Color primaryGreen = Color(0xFF00C853);
+  static const Color primaryGreen = Color(0xFF10B981); // Softer green
   static const Color primaryDark = Color(0xFF121212);
   static const Color primaryDarker = Color(0xFF0A0A0A);
   static const Color secondaryDark = Color(0xFF1E1E1E);
   static const Color cardDark = Color(0xFF252525);
 
   // Accent colors
-  static const Color accentGreen = Color(0xFF69F0AE);
-  static const Color disconnectedRed = Color(0xFFFF5252);
-  static const Color connectingYellow = Color(0xFFFFD740);
+  static const Color accentGreen = Color(0xFF34D399); // Softer accent green
+  static const Color disconnectedRed = Color(0xFFEF4444); // Softer red
+  static const Color connectingYellow = Color(0xFFF59E0B); // Softer orange/yellow
 
   // Text colors
   static const Color textLight = Color(0xFFFFFFFF);
@@ -24,7 +24,7 @@ class AppTheme {
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [primaryGreen, Color(0xFF00E676)],
+    colors: [primaryGreen, accentGreen],
   );
 
   static const LinearGradient darkGradient = LinearGradient(

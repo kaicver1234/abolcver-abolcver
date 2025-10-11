@@ -228,16 +228,25 @@ class _EmptyServerCard extends StatelessWidget {
                     listen: false,
                   );
                   try {
-                    // Since we no longer have default servers, we'll show a message
+                    // Show loading message
                     ErrorSnackbar.show(
                       context,
-                      context.tr(TranslationKeys.serverSelectorAddSubscription),
+                      'Refreshing servers...',
                     );
+                    
+                    // Actually refresh all subscriptions
+                    await provider.updateAllSubscriptions();
 
                     // Check if there was an error
                     if (provider.errorMessage.isNotEmpty) {
                       ErrorSnackbar.show(context, provider.errorMessage);
                       provider.clearError();
+                    } else {
+                      // Show success message
+                      ErrorSnackbar.show(
+                        context,
+                        'Servers refreshed successfully!',
+                      );
                     }
                   } catch (e) {
                     ErrorSnackbar.show(

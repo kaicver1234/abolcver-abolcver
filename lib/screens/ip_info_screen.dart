@@ -355,24 +355,6 @@ class _IpInfoScreenState extends State<IpInfoScreen>
             ],
             delay: 400,
           ),
-          
-          const SizedBox(height: 16),
-          
-          // Security Card
-          _buildInfoCard(
-            title: 'Security',
-            icon: Icons.security,
-            color: const Color(0xFFEF4444),
-            items: [
-              _InfoItem('Proxy', _ipData!['proxy'] == true ? 'Detected' : 'Not Detected', 
-                isWarning: _ipData!['proxy'] == true),
-              _InfoItem('VPN', _ipData!['proxy'] == true ? 'Active' : 'Not Active',
-                isSuccess: _ipData!['proxy'] == true),
-              _InfoItem('Mobile', _ipData!['mobile'] == true ? 'Yes' : 'No'),
-              _InfoItem('Hosting', _ipData!['hosting'] == true ? 'Yes' : 'No'),
-            ],
-            delay: 600,
-          ),
         ],
       ),
     );
@@ -515,12 +497,8 @@ class _IpInfoScreenState extends State<IpInfoScreen>
             child: Text(
               item.value,
               textAlign: TextAlign.right,
-              style: TextStyle(
-                color: item.isWarning
-                    ? Colors.orange
-                    : item.isSuccess
-                        ? Colors.green
-                        : Colors.white,
+              style: const TextStyle(
+                color: Colors.white,
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
               ),
@@ -535,10 +513,8 @@ class _IpInfoScreenState extends State<IpInfoScreen>
 class _InfoItem {
   final String label;
   final String value;
-  final bool isWarning;
-  final bool isSuccess;
 
-  _InfoItem(this.label, this.value, {this.isWarning = false, this.isSuccess = false});
+  _InfoItem(this.label, this.value);
 }
 
 class _FloatingParticle extends StatefulWidget {

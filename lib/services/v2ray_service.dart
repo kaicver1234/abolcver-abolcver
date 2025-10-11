@@ -762,20 +762,33 @@ class V2RayService extends ChangeNotifier {
   // Public method to force check connection status
   Future<bool> isActuallyConnected() async {
     try {
-      final delay = await _flutterV2ray.getConnectedServerDelay();
-      final isConnected = delay != null && delay >= 0;
+      // IMPROVED: Better connection status detection
+      // First check if we have an active config
+      if (_activeConfig == null) {
+        return false;
+      }
 
-      // Don't automatically clear the active config or call onDisconnected
-      // This prevents false disconnections when switching between apps
-      // Only report the actual connection status
+      // Check the current V2Ray status
+      if (_currentStatus?.state == 'CONNECTED') {
+        return true;
+      }
 
-      return isConnected;
+      // Try to get connected server delay as final verification
+      try {
+        final delay = await _flutterV2ray.getConnectedServerDelay()
+            .timeout(const Duration(seconds: 3));
+        final isConnected = delay != null && delay >= 0;
+        return isConnected;
+      } catch (timeoutError) {
+        // Timeout or error getting delay
+        // If we have active config and current status shows connected,
+        // assume still connected
+        return _currentStatus?.state == 'CONNECTED';
+      }
     } catch (e) {
-      // Error in force connection check
-      // Don't automatically clear the active config or call onDisconnected
-      // Just report the error but maintain the connection state
-      return _activeConfig !=
-          null; // Assume still connected if we have an active config
+      // Error in connection check
+      // Be more conservative - only return true if we're certain
+      return false;
     }
   }
 
@@ -942,8 +955,13 @@ class V2RayService extends ChangeNotifier {
 
   @override
   void dispose() {
+    // IMPROVED: Ensure all timers are properly cancelled
     _stopStatusMonitoring();
     _stopUsageMonitoring();
+    _statusCheckTimer?.cancel();
+    _usageStatsTimer?.cancel();
+    _statusCheckTimer = null;
+    _usageStatsTimer = null;
     // Cleanup native ping service
     NativePingService.cleanup();
     super.dispose();

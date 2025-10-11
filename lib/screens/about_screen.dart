@@ -356,6 +356,16 @@ class _AboutScreenState extends State<AboutScreen>
               ),
             ],
           ),
+          
+          const SizedBox(height: 16),
+          
+          _buildOfficialPageButton(
+            icon: Icons.location_city,
+            label: AppLocalizations.of(context).translate('about.tiksar_village_page'),
+            gradient: const [Color(0xFF667EEA), Color(0xFF764BA2)],
+            onTap: () => _launchUrl('https://instagram.com/tiksaar_leyl_gilan'),
+            delay: 1000,
+          ),
         ],
       ),
     );
@@ -394,6 +404,54 @@ class _AboutScreenState extends State<AboutScreen>
             const SizedBox(width: 10),
             Text(
               label,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).animate()
+        .fadeIn(delay: Duration(milliseconds: delay))
+        .scale(delay: Duration(milliseconds: delay));
+  }
+
+  Widget _buildOfficialPageButton({
+    required IconData icon,
+    required String label,
+    required List<Color> gradient,
+    required VoidCallback onTap,
+    required int delay,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: gradient),
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: gradient[0].withOpacity(0.4),
+              blurRadius: 15,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: Colors.white,
+              size: 24,
+            ),
+            const SizedBox(width: 10),
+            Text(
+              label,
+              textAlign: TextAlign.center,
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,

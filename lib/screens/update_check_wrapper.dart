@@ -44,7 +44,7 @@ class _UpdateCheckWrapperState extends State<UpdateCheckWrapper> {
         }
       }
     } catch (e) {
-      print('Error checking for update: $e');
+      // Error checking for update - silently continue
       if (mounted) {
         setState(() {
           _isCheckingUpdate = false;
@@ -59,8 +59,8 @@ class _UpdateCheckWrapperState extends State<UpdateCheckWrapper> {
     await showDialog(
       context: context,
       barrierDismissible: !_updateInfo!.isForced,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => !_updateInfo!.isForced,
+      builder: (context) => PopScope(
+        canPop: !_updateInfo!.isForced,
         child: UpdateDialog(updateInfo: _updateInfo!),
       ),
     );

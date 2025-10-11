@@ -21,17 +21,12 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> {
   bool _isConnecting = false;
-  late AnimationController _backgroundAnimationController;
   
   @override
   void initState() {
     super.initState();
-    _backgroundAnimationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 15),
-    )..repeat();
     
     // Initialize provider data
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -44,16 +39,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       }
     });
   }
-  
-  @override
-  void dispose() {
-    _backgroundAnimationController.dispose();
-    super.dispose();
-  }
 
   Future<void> _handleConnectionToggle() async {
     if (_isConnecting) return;
 
+    if (!mounted) return;
     setState(() {
       _isConnecting = true;
     });
@@ -69,17 +59,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           _showSnackBar('Please select a server first', Colors.red);
         } else {
           await provider.connectToServer(provider.selectedConfig!, false);
-          if (provider.activeConfig != null) {
+          if (mounted && provider.activeConfig != null) {
             // _showSnackBar('Connected Successfully', Colors.green);
           }
         }
       }
     } catch (e) {
-      _showSnackBar('Connection failed: $e', Colors.red);
+      if (mounted) {
+        _showSnackBar('Connection failed: $e', Colors.red);
+      }
     } finally {
-      setState(() {
-        _isConnecting = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isConnecting = false;
+        });
+      }
     }
   }
 
@@ -768,11 +762,21 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   listen: false,
                 );
                 
-                _showSnackBar(AppLocalizations.of(context).translate('home.updating_subscriptions'), Colors.blue);
+                // Show loading message
+                _showSnackBar(
+                  AppLocalizations.of(context).translate('home.updating_subscriptions'), 
+                  Colors.blue,
+                );
+                
+                // Actually refresh all subscriptions and get fresh servers
                 await provider.updateAllSubscriptions();
                 
+                // Show result based on success or error
                 if (provider.errorMessage.isEmpty) {
-                  _showSnackBar(AppLocalizations.of(context).translate('home.subscriptions_updated'), Colors.green);
+                  _showSnackBar(
+                    AppLocalizations.of(context).translate('home.subscriptions_updated'), 
+                    Colors.green,
+                  );
                 } else {
                   _showSnackBar(provider.errorMessage, Colors.red);
                   provider.clearError();

@@ -9,20 +9,32 @@ import 'screens/main_navigation_screen.dart';
 import 'screens/privacy_welcome_screen.dart';
 import 'screens/language_selection_screen.dart';
 import 'screens/update_check_wrapper.dart';
-import 'theme/app_theme.dart';
 import 'services/notification_service.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_analytics/firebase_analytics.dart';
+import 'firebase_options.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // Initialize Firebase first
-  await Firebase.initializeApp();
   
-  // Initialize notification service
-  await NotificationService().initialize();
-
-  // Initialize language provider
+  // Firebase initialization with proper configuration
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    
+    // Initialize Firebase Analytics
+    FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+    await analytics.setAnalyticsCollectionEnabled(true);
+    
+    // Initialize notification service
+    await NotificationService().initialize();
+  } catch (e) {
+    // Firebase initialization failed, log error
+    debugPrint('Firebase initialization error: $e');
+  }
+  
   final languageProvider = LanguageProvider();
   await languageProvider.initialize();
 
@@ -54,6 +66,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // Firebase Analytics observer for route tracking
+    final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+    final FirebaseAnalyticsObserver observer = 
+        FirebaseAnalyticsObserver(analytics: analytics);
+    
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: languageProvider),
@@ -67,6 +84,7 @@ class MyApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme(languageProvider.currentLanguage.code),
             locale: languageProvider.locale,
+            navigatorObservers: [observer], // Analytics tracking
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,

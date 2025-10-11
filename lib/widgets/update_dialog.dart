@@ -16,8 +16,8 @@ class UpdateDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     // For forced updates, make it full screen and non-dismissible
     if (updateInfo.isForced) {
-      return WillPopScope(
-        onWillPop: () async => false,
+      return PopScope(
+        canPop: false,
         child: Scaffold(
           backgroundColor: const Color(0xFF1E293B),
           body: Center(
@@ -32,8 +32,8 @@ class UpdateDialog extends StatelessWidget {
     }
     
     // For optional updates, show as dialog
-    return WillPopScope(
-      onWillPop: () async => true,
+    return PopScope(
+      canPop: true,
       child: Dialog(
         backgroundColor: Colors.transparent,
         elevation: 0,

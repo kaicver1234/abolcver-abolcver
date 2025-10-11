@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
-import 'dart:ui';
 
-class ModernAnimatedBackground extends StatefulWidget {
+/// Ultra-lightweight background with no animations for maximum performance
+/// Simple gradient background that uses minimal resources
+class ModernAnimatedBackground extends StatelessWidget {
   final Widget child;
   final bool isConnected;
   
@@ -13,126 +13,71 @@ class ModernAnimatedBackground extends StatefulWidget {
   });
 
   @override
-  State<ModernAnimatedBackground> createState() => _ModernAnimatedBackgroundState();
-}
-
-class _ModernAnimatedBackgroundState extends State<ModernAnimatedBackground>
-    with TickerProviderStateMixin {
-  late AnimationController _controller1;
-  late AnimationController _controller2;
-  late AnimationController _controller3;
-  late Animation<double> _animation1;
-  late Animation<double> _animation2;
-  late Animation<double> _animation3;
-
-  @override
-  void initState() {
-    super.initState();
-    
-    _controller1 = AnimationController(
-      duration: const Duration(seconds: 15),
-      vsync: this,
-    )..repeat();
-    
-    _controller2 = AnimationController(
-      duration: const Duration(seconds: 20),
-      vsync: this,
-    )..repeat();
-    
-    _controller3 = AnimationController(
-      duration: const Duration(seconds: 25),
-      vsync: this,
-    )..repeat();
-    
-    _animation1 = Tween<double>(
-      begin: 0.0,
-      end: 2 * math.pi,
-    ).animate(CurvedAnimation(
-      parent: _controller1,
-      curve: Curves.linear,
-    ));
-    
-    _animation2 = Tween<double>(
-      begin: 0.0,
-      end: 2 * math.pi,
-    ).animate(CurvedAnimation(
-      parent: _controller2,
-      curve: Curves.linear,
-    ));
-    
-    _animation3 = Tween<double>(
-      begin: 0.0,
-      end: 2 * math.pi,
-    ).animate(CurvedAnimation(
-      parent: _controller3,
-      curve: Curves.linear,
-    ));
-  }
-
-  @override
-  void dispose() {
-    _controller1.dispose();
-    _controller2.dispose();
-    _controller3.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        // Gradient Background
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: widget.isConnected
-                  ? [
-                      const Color(0xFF0D2E4B),
-                      const Color(0xFF1A3A52),
-                      const Color(0xFF0F1F3A),
-                    ]
-                  : [
-                      const Color(0xFF1A1A2E),
-                      const Color(0xFF16213E),
-                      const Color(0xFF0F1123),
-                    ],
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0F172A), // Slate dark
+            Color(0xFF1E293B), // Slate medium
+            Color(0xFF0F172A), // Slate dark
+          ],
+          stops: [0.0, 0.5, 1.0],
+        ),
+      ),
+      child: Stack(
+        children: [
+          // Subtle grid pattern overlay
+          Positioned.fill(
+            child: CustomPaint(
+              painter: _GridPatternPainter(),
             ),
           ),
-        ),
-        
-        // Animated Mesh Background
-        AnimatedBuilder(
-          animation: Listenable.merge([_animation1, _animation2, _animation3]),
-          builder: (context, child) {
-            return CustomPaint(
-              size: MediaQuery.of(context).size,
-              painter: MeshBackgroundPainter(
-                animation1: _animation1.value,
-                animation2: _animation2.value,
-                animation3: _animation3.value,
-                isConnected: widget.isConnected,
-              ),
-            );
-          },
-        ),
-        
-        // Glass Morphism Overlay
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 0.5, sigmaY: 0.5),
-          child: Container(
-            color: Colors.black.withOpacity(0.1),
-          ),
-        ),
-        
-        // Content
-        widget.child,
-      ],
+          child,
+        ],
+      ),
     );
   }
 }
 
+// Simple grid pattern painter (no animation, very lightweight)
+class _GridPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF334155).withValues(alpha: 0.05)
+      ..strokeWidth = 1
+      ..style = PaintingStyle.stroke;
+
+    const gridSize = 50.0;
+    
+    // Draw vertical lines
+    for (double x = 0; x < size.width; x += gridSize) {
+      canvas.drawLine(
+        Offset(x, 0),
+        Offset(x, size.height),
+        paint,
+      );
+    }
+    
+    // Draw horizontal lines
+    for (double y = 0; y < size.height; y += gridSize) {
+      canvas.drawLine(
+        Offset(0, y),
+        Offset(size.width, y),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// Legacy code below - kept for potential future use but not active
+/*
 class MeshBackgroundPainter extends CustomPainter {
   final double animation1;
   final double animation2;
@@ -148,10 +93,6 @@ class MeshBackgroundPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.fill
-      ..strokeWidth = 1.5;
-
     // Draw animated gradient orbs
     _drawGradientOrb(
       canvas,
@@ -189,8 +130,8 @@ class MeshBackgroundPainter extends CustomPainter {
       0.10,
     );
 
-    // Draw geometric patterns
-    _drawGeometricPattern(canvas, size);
+    // Geometric patterns disabled for performance
+    // _drawGeometricPattern(canvas, size);
     
     // Draw floating particles
     _drawFloatingParticles(canvas, size);
@@ -257,7 +198,8 @@ class MeshBackgroundPainter extends CustomPainter {
           .withOpacity(0.3);
 
     final random = math.Random(42); // Fixed seed for consistent particles
-    for (int i = 0; i < 30; i++) {
+    // Reduced particle count for better performance
+    for (int i = 0; i < 10; i++) {
       final x = random.nextDouble() * size.width;
       final baseY = random.nextDouble() * size.height;
       final speed = random.nextDouble() * 0.5 + 0.5;
@@ -270,7 +212,11 @@ class MeshBackgroundPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(MeshBackgroundPainter oldDelegate) {
+    // Only repaint if animation values changed significantly
+    return (animation1 - oldDelegate.animation1).abs() > 0.01 ||
+           isConnected != oldDelegate.isConnected;
+  }
 }
 
 // Animated gradient wave widget for additional effects
@@ -342,5 +288,9 @@ class WavePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => true;
+  bool shouldRepaint(WavePainter oldDelegate) {
+    // Only repaint if animation value changed
+    return (waveAnimation - oldDelegate.waveAnimation).abs() > 0.01;
+  }
 }
+*/

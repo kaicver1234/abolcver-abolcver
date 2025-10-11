@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
+import '../widgets/modern_animated_background.dart';
 
 class HostCheckerScreen extends StatefulWidget {
   const HostCheckerScreen({Key? key}) : super(key: key);
@@ -151,92 +152,24 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
         return Directionality(
           textDirection: languageProvider.textDirection,
           child: Scaffold(
-            body: Stack(
-              children: [
-                // Animated gradient background
-                Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        const Color(0xFF0F172A),
-                        const Color(0xFF1E293B),
-                        const Color(0xFF334155).withOpacity(0.8),
-                      ],
+            body: ModernAnimatedBackground(
+              isConnected: false,
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    // App Bar
+                    _buildAppBar(context),
+                    
+                    // Input Section
+                    _buildInputSection(),
+                    
+                    // Results Section
+                    Expanded(
+                      child: _buildResults(),
                     ),
-                  ),
+                  ],
                 ),
-                
-                // Animated circles for visual effect
-                Positioned(
-                  top: -100,
-                  right: -100,
-                  child: TweenAnimationBuilder(
-                    duration: const Duration(seconds: 4),
-                    tween: Tween<double>(begin: 0, end: 1),
-                    builder: (context, double value, child) {
-                      return Container(
-                        width: 300,
-                        height: 300,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              const Color(0xFF6366F1).withOpacity(0.3 * value),
-                              const Color(0xFF6366F1).withOpacity(0.1 * value),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                
-                Positioned(
-                  bottom: -150,
-                  left: -150,
-                  child: TweenAnimationBuilder(
-                    duration: const Duration(seconds: 5),
-                    tween: Tween<double>(begin: 0, end: 1),
-                    builder: (context, double value, child) {
-                      return Container(
-                        width: 400,
-                        height: 400,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: RadialGradient(
-                            colors: [
-                              const Color(0xFF8B5CF6).withOpacity(0.3 * value),
-                              const Color(0xFF8B5CF6).withOpacity(0.1 * value),
-                              Colors.transparent,
-                            ],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                
-                // Main content
-                SafeArea(
-                  child: Column(
-                    children: [
-                      // App Bar
-                      _buildAppBar(context),
-                      
-                      // Input Section
-                      _buildInputSection(),
-                      
-                      // Results Section
-                      Expanded(
-                        child: _buildResults(),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         );

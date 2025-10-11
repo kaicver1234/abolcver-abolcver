@@ -58,6 +58,7 @@ dependencies:
   html: ^0.15.4
   firebase_core: ^3.8.0
   firebase_messaging: ^15.1.6
+  firebase_analytics: ^11.3.3
   flutter_local_notifications: ^17.2.0
   package_info_plus: ^8.0.0
   file_picker: ^10.3.2

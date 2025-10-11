@@ -2,7 +2,8 @@ import 'package:flutter/foundation.dart';
 
 /// A centralized logger for the application that only logs in debug mode
 class Logger {
-  static const bool _enableLogging = kDebugMode;
+  // لگ‌ها فقط در حالت debug فعال هستند
+  static const bool _enableLogging = kDebugMode; // فعال در debug mode
   
   /// Log an error message
   static void error(String message, [dynamic error, StackTrace? stackTrace]) {

@@ -359,8 +359,25 @@ class _ServerSelectionScreenState
             onTap: () async {
               final provider = Provider.of<V2RayProvider>(context, listen: false);
               _showSnackBar('Refreshing servers...', Colors.blue);
+              
+              // Clear old ping results before refreshing
+              setState(() {
+                _serverPings.clear();
+              });
+              
+              // Update all subscriptions to get fresh server list
               await provider.updateAllSubscriptions();
-              _showSnackBar('Servers updated', Colors.green);
+              
+              if (provider.errorMessage.isEmpty) {
+                _showSnackBar('Servers updated successfully!', Colors.green);
+                
+                // Optionally auto-test pings after refresh
+                // Uncomment the line below if you want automatic ping test after refresh
+                // await _testAllServersPing();
+              } else {
+                _showSnackBar(provider.errorMessage, Colors.red);
+                provider.clearError();
+              }
             },
             child: Container(
               padding: const EdgeInsets.all(10),

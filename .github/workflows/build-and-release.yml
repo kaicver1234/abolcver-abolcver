@@ -22,7 +22,7 @@ jobs:
         uses: actions/setup-java@v3
         with:
           distribution: 'zulu'
-          java-version: '21'
+          java-version: '17'
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -42,10 +42,10 @@ jobs:
       - name: Rename APKs
         run: |
           mkdir -p release
-          copy build\app\outputs\flutter-apk\app-release.apk release\proxycloud-universal.apk
-          copy build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk release\proxycloud-armeabi-v7a.apk
-          copy build\app\outputs\flutter-apk\app-arm64-v8a-release.apk release\proxycloud-arm64-v8a.apk
-          copy build\app\outputs\flutter-apk\app-x86_64-release.apk release\proxycloud-x86_64.apk
+          copy build\app\outputs\flutter-apk\app-release.apk release\TiksarVPN-universal.apk
+          copy build\app\outputs\flutter-apk\app-armeabi-v7a-release.apk release\TiksarVPN-armeabi-v7a.apk
+          copy build\app\outputs\flutter-apk\app-arm64-v8a-release.apk release\TiksarVPN-arm64-v8a.apk
+          copy build\app\outputs\flutter-apk\app-x86_64-release.apk release\TiksarVPN-x86_64.apk
         shell: cmd
 
       - name: Get tag name
@@ -67,10 +67,10 @@ jobs:
           draft: false
           prerelease: false
           files: |
-            release/proxycloud-universal.apk
-            release/proxycloud-armeabi-v7a.apk
-            release/proxycloud-arm64-v8a.apk
-            release/proxycloud-x86_64.apk
+            release/TiksarVPN-universal.apk
+            release/TiksarVPN-armeabi-v7a.apk
+            release/TiksarVPN-arm64-v8a.apk
+            release/TiksarVPN-x86_64.apk
           body: |
             ## Installation
             

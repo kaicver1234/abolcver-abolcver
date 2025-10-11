@@ -107,8 +107,6 @@ class _RenderParallaxFlow extends RenderProxyBox {
       Offset.zero,
       ancestor: scrollableBox,
     );
-    final viewportHeight = _scrollable.position.viewportDimension;
-    final scrollPosition = _scrollable.position.pixels;
     final parallaxMainOffset = scrollableOffset.dy * _parallaxOffset;
 
     context.pushTransform(
