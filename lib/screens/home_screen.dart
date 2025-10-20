@@ -236,6 +236,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             ),
             // Tab Bar moved to bottom
             bottomNavigationBar: _buildBottomTabBar(),
+          ),
         );
       },
     );
