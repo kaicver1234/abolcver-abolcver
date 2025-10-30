@@ -3,9 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
-import '../widgets/connection_button.dart';
 import '../widgets/modern_animated_background.dart';
-import '../screens/language_settings_screen.dart';
 import '../models/app_language.dart';
 import '../utils/app_localizations.dart';
 import '../screens/server_selection_screen.dart';
@@ -21,28 +19,20 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> {
   bool _isConnecting = false;
-  late TabController _tabController;
+  late PageController _pageController;
+  int _currentPage = 0;
   
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    
-    // Add listener to TabController to update UI when tab changes
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        setState(() {
-          // Update the UI when tab changes
-        });
-      }
-    });
+    _pageController = PageController();
   }
   
   @override
   void dispose() {
-    _tabController.dispose();
+    _pageController.dispose();
     super.dispose();
   }
 
@@ -61,6 +51,11 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         await provider.disconnect();
         // _showSnackBar('Disconnected Successfully', Colors.orange);
       } else {
+        // Auto-select first server if none selected
+        if (provider.selectedConfig == null && provider.configs.isNotEmpty) {
+          await provider.selectConfig(provider.configs.first);
+        }
+        
         if (provider.selectedConfig == null) {
           _showSnackBar('Please select a server first', Colors.red);
         } else {
@@ -218,15 +213,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                     // Modern App Bar
                     _buildModernAppBar(context),
                     
-                    // Tab View Content
+                    // Page View Content with swipe support
                     Expanded(
-                      child: AnimatedBuilder(
-                        animation: _tabController,
-                        builder: (context, child) {
-                          return _tabController.index == 0
-                              ? _buildVPNTab(v2rayProvider)
-                              : _buildToolsTab(context);
+                      child: PageView(
+                        controller: _pageController,
+                        onPageChanged: (index) {
+                          setState(() {
+                            _currentPage = index;
+                          });
                         },
+                        children: [
+                          _buildVPNTab(v2rayProvider),
+                          _buildToolsTab(context),
+                        ],
                       ),
                     ),
                   ],
@@ -342,70 +341,101 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildBottomTabBar() {
-    return SafeArea(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: Colors.white.withOpacity(0.15),
-            width: 1,
-          ),
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0F172A), 
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.15),
+          width: 1,
         ),
-        child: TabBar(
-          controller: _tabController,
-          indicator: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildTabButton(
+              icon: Icons.vpn_key,
+              label: AppLocalizations.of(context).translate('navigation.vpn'),
+              isActive: _currentPage == 0,
+              onTap: () {
+                _pageController.animateToPage(
+                  0,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              },
             ),
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFF6366F1).withOpacity(0.4),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
-              ),
-            ],
           ),
-          indicatorSize: TabBarIndicatorSize.tab,
-          dividerColor: Colors.transparent,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white.withOpacity(0.6),
-          labelStyle: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w600,
-            letterSpacing: 0.5,
-          ),
-          unselectedLabelStyle: const TextStyle(
-            fontSize: 15,
-            fontWeight: FontWeight.w500,
-          ),
-          tabs: [
-            Tab(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.vpn_key, size: 18),
-                  const SizedBox(width: 6),
-                  Text(AppLocalizations.of(context).translate('navigation.vpn')),
-                ],
-              ),
+          Expanded(
+            child: _buildTabButton(
+              icon: Icons.build,
+              label: AppLocalizations.of(context).translate('navigation.tools'),
+              isActive: _currentPage == 1,
+              onTap: () {
+                _pageController.animateToPage(
+                  1,
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                );
+              },
             ),
-            Tab(
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.build, size: 18),
-                  const SizedBox(width: 6),
-                  Text(AppLocalizations.of(context).translate('navigation.tools')),
-                ],
+          ),
+        ],
+      ),
+    ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2, end: 0);
+  }
+  
+  Widget _buildTabButton({
+    required IconData icon,
+    required String label,
+    required bool isActive,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          gradient: isActive
+              ? const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                )
+              : null,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF6366F1).withOpacity(0.4),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isActive ? Colors.white : const Color(0xFF94A3B8),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+                letterSpacing: 0.5,
+                color: isActive ? Colors.white : const Color(0xFF94A3B8),
               ),
             ),
           ],
         ),
-      ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2, end: 0),
+      ),
     );
   }
 
@@ -421,9 +451,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             // Main Connection Button
             _buildConnectionButton(provider),
             
-            const SizedBox(height: 24),
+            const SizedBox(height: 30),
             
-            // Server Selection Card
+            // Server Selection Card - پایین‌تر
             _buildServerCard(provider),
             
             const SizedBox(height: 20),

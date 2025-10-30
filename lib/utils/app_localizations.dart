@@ -702,28 +702,6 @@ class TranslationKeys {
       'subscription_management.url_with_configs';
   static const String subscriptionManagementAgo = 'subscription_management.ago';
 
-  // Telegram Proxy Screen
-  static const String telegramProxyTitle = 'telegram_proxy.title';
-  static const String telegramProxyRefresh = 'telegram_proxy.refresh';
-  static const String telegramProxyErrorLoading =
-      'telegram_proxy.error_loading';
-  static const String telegramProxyTryAgain = 'telegram_proxy.try_again';
-  static const String telegramProxyNoProxies = 'telegram_proxy.no_proxies';
-  static const String telegramProxyPort = 'telegram_proxy.port';
-  static const String telegramProxyCountry = 'telegram_proxy.country';
-  static const String telegramProxyProvider = 'telegram_proxy.provider';
-  static const String telegramProxyPing = 'telegram_proxy.ping';
-  static const String telegramProxyUptime = 'telegram_proxy.uptime';
-  static const String telegramProxyCopyDetails = 'telegram_proxy.copy_details';
-  static const String telegramProxyCopyUrl = 'telegram_proxy.copy_url';
-  static const String telegramProxyDetailsCopied =
-      'telegram_proxy.details_copied';
-  static const String telegramProxyUrlCopied = 'telegram_proxy.url_copied';
-  static const String telegramProxyConnect = 'telegram_proxy.connect';
-  static const String telegramProxyLaunchError = 'telegram_proxy.launch_error';
-  static const String telegramProxyNotInstalled =
-      'telegram_proxy.not_installed';
-
   // Wallpaper Settings Screen
   static const String wallpaperSettingsTitle = 'wallpaper_settings.title';
   static const String wallpaperSettingsCurrent = 'wallpaper_settings.current';

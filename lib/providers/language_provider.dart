@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import '../models/app_language.dart';
 import '../services/language_service.dart';
+import '../services/analytics_service.dart';
 
 class LanguageProvider extends ChangeNotifier {
   final LanguageService _languageService = LanguageService();
+  final AnalyticsService _analyticsService = AnalyticsService();
 
   AppLanguage _currentLanguage = AppLanguage.getByCode('en');
   Map<String, dynamic> _translations = {};
@@ -43,6 +45,7 @@ class LanguageProvider extends ChangeNotifier {
   Future<bool> changeLanguage(AppLanguage language) async {
     if (_currentLanguage == language) return true;
 
+    final oldLanguage = _currentLanguage.code;
     _isLoading = true;
     notifyListeners();
 
@@ -59,6 +62,17 @@ class LanguageProvider extends ChangeNotifier {
       await _loadTranslations(language.code);
 
       _currentLanguage = language;
+      
+      // Log language change analytics
+      try {
+        await _analyticsService.logLanguageChange(
+          fromLanguage: oldLanguage,
+          toLanguage: language.code,
+        );
+      } catch (e) {
+        // Analytics logging failed, ignore
+      }
+      
       _isLoading = false;
       notifyListeners();
       return true;

@@ -1,4 +1,6 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class AnalyticsService {
   static final AnalyticsService _instance = AnalyticsService._internal();
@@ -6,13 +8,41 @@ class AnalyticsService {
   AnalyticsService._internal();
 
   final FirebaseAnalytics _analytics = FirebaseAnalytics.instance;
+  bool _isInitialized = false;
 
   FirebaseAnalytics get analytics => _analytics;
+
+  /// Initialize Analytics with app info
+  Future<void> initialize() async {
+    if (_isInitialized) return;
+    
+    try {
+      await _analytics.setAnalyticsCollectionEnabled(true);
+      
+      // Set app version as user property
+      final packageInfo = await PackageInfo.fromPlatform();
+      await setUserProperty(
+        name: 'app_version',
+        value: packageInfo.version,
+      );
+      await setUserProperty(
+        name: 'build_number',
+        value: packageInfo.buildNumber,
+      );
+      
+      _isInitialized = true;
+      debugPrint('✅ Analytics initialized successfully');
+    } catch (e) {
+      debugPrint('❌ Analytics initialization failed: $e');
+    }
+  }
 
   /// Log VPN connection event
   Future<void> logVpnConnect({
     required String serverName,
-    required String country,
+    required String serverAddress,
+    required int serverPort,
+    String? country,
     String? protocol,
   }) async {
     try {
@@ -20,13 +50,35 @@ class AnalyticsService {
         name: 'vpn_connect',
         parameters: {
           'server_name': serverName,
-          'country': country,
-          'protocol': protocol ?? 'unknown',
+          'server_address': serverAddress,
+          'server_port': serverPort,
+          'country': country ?? 'unknown',
+          'protocol': protocol ?? 'vmess',
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          'connection_method': 'manual',
+        },
+      );
+      debugPrint('📊 Analytics: VPN Connect - $serverName');
+    } catch (e) {
+      debugPrint('⚠️ Analytics error: $e');
+    }
+  }
+
+  /// Log auto-connect event
+  Future<void> logAutoConnect({
+    required String serverName,
+  }) async {
+    try {
+      await _analytics.logEvent(
+        name: 'vpn_auto_connect',
+        parameters: {
+          'server_name': serverName,
           'timestamp': DateTime.now().millisecondsSinceEpoch,
         },
       );
+      debugPrint('📊 Analytics: Auto Connect - $serverName');
     } catch (e) {
-      // Silently fail
+      debugPrint('⚠️ Analytics error: $e');
     }
   }
 
@@ -34,6 +86,9 @@ class AnalyticsService {
   Future<void> logVpnDisconnect({
     required String serverName,
     required int durationSeconds,
+    required int uploadBytes,
+    required int downloadBytes,
+    String? disconnectReason,
   }) async {
     try {
       await _analytics.logEvent(
@@ -41,11 +96,36 @@ class AnalyticsService {
         parameters: {
           'server_name': serverName,
           'duration_seconds': durationSeconds,
+          'upload_bytes': uploadBytes,
+          'download_bytes': downloadBytes,
+          'total_bytes': uploadBytes + downloadBytes,
+          'disconnect_reason': disconnectReason ?? 'user_action',
           'timestamp': DateTime.now().millisecondsSinceEpoch,
         },
       );
+      debugPrint('📊 Analytics: VPN Disconnect - Duration: ${durationSeconds}s, Data: ${(uploadBytes + downloadBytes) / 1024 / 1024}MB');
     } catch (e) {
-      // Silently fail
+      debugPrint('⚠️ Analytics error: $e');
+    }
+  }
+
+  /// Log connection failure
+  Future<void> logConnectionFailure({
+    required String serverName,
+    required String errorMessage,
+  }) async {
+    try {
+      await _analytics.logEvent(
+        name: 'vpn_connection_failure',
+        parameters: {
+          'server_name': serverName,
+          'error_message': errorMessage,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        },
+      );
+      debugPrint('📊 Analytics: Connection Failure - $serverName');
+    } catch (e) {
+      debugPrint('⚠️ Analytics error: $e');
     }
   }
 
@@ -53,6 +133,7 @@ class AnalyticsService {
   Future<void> logSubscriptionAdded({
     required String subscriptionName,
     required int serverCount,
+    required String subscriptionType,
   }) async {
     try {
       await _analytics.logEvent(
@@ -60,10 +141,13 @@ class AnalyticsService {
         parameters: {
           'subscription_name': subscriptionName,
           'server_count': serverCount,
+          'subscription_type': subscriptionType,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
         },
       );
+      debugPrint('📊 Analytics: Subscription Added - $serverCount servers');
     } catch (e) {
-      // Silently fail
+      debugPrint('⚠️ Analytics error: $e');
     }
   }
 
@@ -151,10 +235,103 @@ class AnalyticsService {
           'error_type': errorType,
           'error_message': errorMessage,
           if (serverName != null) 'server_name': serverName,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        },
+      );
+      debugPrint('📊 Analytics: Connection Error - $errorType');
+    } catch (e) {
+      debugPrint('⚠️ Analytics error: $e');
+    }
+  }
+
+  /// Log server ping test
+  Future<void> logServerPing({
+    required String serverName,
+    required int pingMs,
+    required bool success,
+  }) async {
+    try {
+      await _analytics.logEvent(
+        name: 'server_ping_test',
+        parameters: {
+          'server_name': serverName,
+          'ping_ms': pingMs,
+          'success': success,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
         },
       );
     } catch (e) {
-      // Silently fail
+      debugPrint('⚠️ Analytics error: $e');
+    }
+  }
+
+  /// Log server selection
+  Future<void> logServerSelection({
+    required String serverName,
+    required String selectionMethod,
+  }) async {
+    try {
+      await _analytics.logEvent(
+        name: 'server_selection',
+        parameters: {
+          'server_name': serverName,
+          'selection_method': selectionMethod, // 'manual', 'auto', 'fastest'
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        },
+      );
+      debugPrint('📊 Analytics: Server Selected - $serverName ($selectionMethod)');
+    } catch (e) {
+      debugPrint('⚠️ Analytics error: $e');
+    }
+  }
+
+  /// Log app feature usage
+  Future<void> logFeatureUsage({
+    required String featureName,
+    Map<String, dynamic>? additionalParams,
+  }) async {
+    try {
+      await _analytics.logEvent(
+        name: 'feature_usage',
+        parameters: {
+          'feature_name': featureName,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+          if (additionalParams != null) ...additionalParams,
+        },
+      );
+      debugPrint('📊 Analytics: Feature Used - $featureName');
+    } catch (e) {
+      debugPrint('⚠️ Analytics error: $e');
+    }
+  }
+
+  /// Log user session
+  Future<void> logAppOpen() async {
+    try {
+      await _analytics.logAppOpen();
+      debugPrint('📊 Analytics: App Opened');
+    } catch (e) {
+      debugPrint('⚠️ Analytics error: $e');
+    }
+  }
+
+  /// Log settings change
+  Future<void> logSettingsChange({
+    required String settingName,
+    required String newValue,
+  }) async {
+    try {
+      await _analytics.logEvent(
+        name: 'settings_change',
+        parameters: {
+          'setting_name': settingName,
+          'new_value': newValue,
+          'timestamp': DateTime.now().millisecondsSinceEpoch,
+        },
+      );
+      debugPrint('📊 Analytics: Setting Changed - $settingName: $newValue');
+    } catch (e) {
+      debugPrint('⚠️ Analytics error: $e');
     }
   }
 

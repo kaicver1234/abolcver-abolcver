@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'providers/telegram_proxy_provider.dart';
 import 'providers/v2ray_provider.dart';
 import 'providers/language_provider.dart';
 import 'screens/main_navigation_screen.dart';
@@ -24,15 +23,20 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     
-    // Initialize Firebase Analytics
-    FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+    // Initialize Firebase Analytics with app info
+    final analytics = FirebaseAnalytics.instance;
     await analytics.setAnalyticsCollectionEnabled(true);
     
     // Initialize notification service
     await NotificationService().initialize();
+    
+    // Log app open
+    await analytics.logAppOpen();
+    
+    debugPrint('✅ Firebase initialized successfully');
   } catch (e) {
     // Firebase initialization failed, log error
-    debugPrint('Firebase initialization error: $e');
+    debugPrint('❌ Firebase initialization error: $e');
   }
   
   final languageProvider = LanguageProvider();
@@ -75,7 +79,6 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider.value(value: languageProvider),
         ChangeNotifierProvider(create: (context) => V2RayProvider()),
-        ChangeNotifierProvider(create: (context) => TelegramProxyProvider()),
       ],
       child: Consumer<LanguageProvider>(
         builder: (context, languageProvider, child) {

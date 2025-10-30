@@ -102,14 +102,14 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         // Ignore subscription update errors but continue initialization
       }
 
+      // Load saved selected server first
+      await _loadSelectedServer();
+      
       // CRITICAL FIX: Enhanced synchronization with actual VPN service state
       await _enhancedSyncWithVpnServiceState();
       
-      // Load saved selected server
-      await _loadSelectedServer();
-      
+      // Auto-select first server if none selected
       if (_selectedConfig == null && _configs.isNotEmpty) {
-        // If no active connection and no saved selection, select first server
         _selectedConfig = _configs.first;
         await _saveSelectedServer();
       }
@@ -232,7 +232,8 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         for (var config in _configs) {
           config.isConnected = false;
         }
-        _selectedConfig = null;
+        // Keep _selectedConfig so user can reconnect to the same server
+        // Only clear isConnected flag, not the selection itself
         
         // Don't call disconnect if not connected - prevents errors
         // Just clear the state
@@ -813,7 +814,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           try {
             await _analyticsService.logVpnConnect(
               serverName: config.remark,
-              country: config.address,
+              serverAddress: config.address,
+              serverPort: config.port,
+              country: config.remark.split('-').first.trim(),
               protocol: config.configType,
             );
           } catch (e) {
@@ -852,6 +855,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           await _analyticsService.logVpnDisconnect(
             serverName: activeConfig.remark,
             durationSeconds: _v2rayService.connectedSeconds,
+            uploadBytes: _v2rayService.uploadBytes,
+            downloadBytes: _v2rayService.downloadBytes,
+            disconnectReason: 'user_action',
           );
         } catch (e) {
           // Analytics logging failed, ignore
@@ -889,6 +895,17 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     await _v2rayService.saveSelectedConfig(config);
     // Also save to SharedPreferences for persistence across app restarts
     await _saveSelectedServer();
+    
+    // Log server selection analytics
+    try {
+      await _analyticsService.logServerSelection(
+        serverName: config.remark,
+        selectionMethod: 'manual',
+      );
+    } catch (e) {
+      // Analytics logging failed, ignore
+    }
+    
     notifyListeners();
   }
 

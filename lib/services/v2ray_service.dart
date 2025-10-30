@@ -72,8 +72,8 @@ class V2RayService extends ChangeNotifier {
   int _connectedSeconds = 0;
   Timer? _usageStatsTimer;
 
-  // Ping cache
-  final Map<String, int?> _pingCache = {};
+  // Ping cache with timestamp
+  final Map<String, ({int? delay, DateTime timestamp})> _pingCache = {};
   final Map<String, bool> _pingInProgress = {};
 
   // Get list of installed apps (Android only)
@@ -498,23 +498,24 @@ class V2RayService extends ChangeNotifier {
     }
   }
 
-  // Get server delay/ping for a specific config using custom native implementation
+  // Get server delay/ping for a specific config using V2Ray's built-in method
   Future<int?> getServerDelay(V2RayConfig config) async {
     final configId = config.id;
     final hostKey = '${config.address}:${config.port}';
 
     try {
-      // Return cached ping if available - first check by host, then by configId
+      // Return cached ping if available and not expired (30 seconds)
       if (_pingCache.containsKey(hostKey)) {
-        final cachedValue = _pingCache[hostKey];
-        // Check if cached value is not too old (30 seconds)
-        if (cachedValue != null) {
-          return cachedValue;
+        final cached = _pingCache[hostKey];
+        final ageSeconds = DateTime.now().difference(cached!.timestamp).inSeconds;
+        if (ageSeconds < 30) {
+          return cached.delay;
         }
       } else if (_pingCache.containsKey(configId)) {
-        final cachedValue = _pingCache[configId];
-        if (cachedValue != null) {
-          return cachedValue;
+        final cached = _pingCache[configId];
+        final ageSeconds = DateTime.now().difference(cached!.timestamp).inSeconds;
+        if (ageSeconds < 30) {
+          return cached.delay;
         }
       }
 
@@ -529,7 +530,7 @@ class V2RayService extends ChangeNotifier {
           await Future.delayed(const Duration(milliseconds: 200));
           attempts++;
         }
-        return _pingCache[hostKey] ?? _pingCache[configId];
+        return _pingCache[hostKey]?.delay ?? _pingCache[configId]?.delay;
       }
 
       // Mark this host and config as having ping in progress
@@ -537,61 +538,41 @@ class V2RayService extends ChangeNotifier {
       _pingInProgress[configId] = true;
 
       try {
-        // Use custom native ping service for better accuracy
-        final pingResult = await NativePingService.pingHost(
-          host: config.address,
-          port: config.port,
-          timeoutMs: 8000, // 8 second timeout
-          useIcmp: true,
-          useTcp: true,
-          useCache: false, // We handle our own caching
-        );
+        // Use V2Ray's built-in ping method for better accuracy
+        await initialize();
 
-        final int? delay = pingResult.success ? pingResult.latency : null;
+        final parser = FlutterV2ray.parseFromURL(config.fullConfig);
+        final delay = await _flutterV2ray
+            .getServerDelay(config: parser.getFullConfiguration())
+            .timeout(
+              const Duration(seconds: 10),
+              onTimeout: () {
+                throw Exception('V2Ray ping timeout');
+              },
+            );
 
-        // Log the ping result for debugging
-        // Removed verbose ping logging
+        // Cache the result by both host and config ID with timestamp
+        if (delay >= -1 && delay < 10000) {
+          final now = DateTime.now();
+          _pingCache[hostKey] = (delay: delay, timestamp: now);
+          _pingCache[configId] = (delay: delay, timestamp: now);
 
-        // Cache the result by both host and config ID
-        _pingCache[hostKey] = delay;
-        _pingCache[configId] = delay;
+          _pingInProgress[hostKey] = false;
+          _pingInProgress[configId] = false;
 
-        _pingInProgress[hostKey] = false;
-        _pingInProgress[configId] = false;
-
-        return delay;
-      } catch (e) {
-        // Error with native ping
-
-        // Fallback to V2Ray's built-in ping if native ping fails
-        try {
-          await initialize();
-
-          final parser = FlutterV2ray.parseFromURL(config.fullConfig);
-          final delay = await _flutterV2ray
-              .getServerDelay(config: parser.getFullConfiguration())
-              .timeout(
-                const Duration(seconds: 10),
-                onTimeout: () {
-                  // V2Ray ping timeout
-                  throw Exception('V2Ray ping timeout');
-                },
-              );
-
-          // Cache the fallback result
-          if (delay >= -1 && delay < 10000) {
-            _pingCache[hostKey] = delay;
-            _pingCache[configId] = delay;
-            return delay;
-          }
-        } catch (fallbackError) {
-          // Fallback V2Ray ping also failed
+          return delay;
+        } else {
+          _pingInProgress[hostKey] = false;
+          _pingInProgress[configId] = false;
+          _pingCache.remove(hostKey);
+          _pingCache.remove(configId);
+          return null;
         }
-
+      } catch (e) {
         _pingInProgress[hostKey] = false;
         _pingInProgress[configId] = false;
-        _pingCache[hostKey] = null;
-        _pingCache[configId] = null;
+        _pingCache.remove(hostKey);
+        _pingCache.remove(configId);
         return null;
       }
     } catch (e) {
@@ -966,66 +947,28 @@ class V2RayService extends ChangeNotifier {
     }
   }
 
-  /// Batch ping multiple servers for server selection
-  Future<Map<String, int?>> batchPingServers(List<V2RayConfig> configs) async {
-    try {
-      final hosts = configs
-          .map((config) => (host: config.address, port: config.port))
-          .toList();
-
-      final results = await NativePingService.pingMultipleHosts(
-        hosts: hosts,
-        timeoutMs: 6000,
-        useIcmp: true,
-        useTcp: true,
-      );
-
-      final Map<String, int?> configResults = {};
-
-      for (final config in configs) {
-        final key = '${config.address}:${config.port}';
-        final pingResult = results[key];
-        final latency = pingResult?.success == true
-            ? pingResult!.latency
-            : null;
-
-        configResults[config.id] = latency;
-
-        // Also cache the result
-        _pingCache[key] = latency;
-        _pingCache[config.id] = latency;
-      }
-
-      return configResults;
-    } catch (e) {
-      // Error in batch ping servers
-      return {};
-    }
-  }
-
-  /// Get fastest server from a list of configs
+  /// Get fastest server from a list of configs using V2Ray ping
   Future<V2RayConfig?> getFastestServer(List<V2RayConfig> configs) async {
     if (configs.isEmpty) return null;
 
     try {
-      final pingResults = await batchPingServers(configs);
-
       V2RayConfig? fastestConfig;
       int? lowestLatency;
 
+      // Ping each config sequentially using V2Ray's built-in method
       for (final config in configs) {
-        final latency = pingResults[config.id];
-        if (latency != null && latency > 0) {
-          if (lowestLatency == null || latency < lowestLatency) {
-            lowestLatency = latency;
-            fastestConfig = config;
-          }
+        final latency = await getServerDelay(config);
+        if (latency != null &&
+            latency > 0 &&
+            (lowestLatency == null || latency < lowestLatency)) {
+          lowestLatency = latency;
+          fastestConfig = config;
         }
       }
 
       return fastestConfig;
     } catch (e) {
-      // Error finding fastest server
+      // Error getting fastest server
       return null;
     }
   }
