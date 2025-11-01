@@ -4,7 +4,6 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
-import '../theme/app_theme.dart';
 
 class SpeedTestScreen extends StatefulWidget {
   const SpeedTestScreen({Key? key}) : super(key: key);
@@ -15,12 +14,18 @@ class SpeedTestScreen extends StatefulWidget {
 
 class _SpeedTestScreenState extends State<SpeedTestScreen> {
   late final WebViewController _controller;
-  bool _isLoading = true;
+  final ValueNotifier<bool> _isLoading = ValueNotifier<bool>(true);
 
   @override
   void initState() {
     super.initState();
     _initWebView();
+  }
+
+  @override
+  void dispose() {
+    _isLoading.dispose();
+    super.dispose();
   }
 
   void _initWebView() {
@@ -29,21 +34,20 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onProgress: (int progress) {
-            if (progress == 100) {
-              setState(() {
-                _isLoading = false;
-              });
+            // Only update on complete to reduce rebuilds
+            if (progress == 100 && _isLoading.value) {
+              _isLoading.value = false;
             }
           },
           onPageStarted: (String url) {
-            setState(() {
-              _isLoading = true;
-            });
+            if (!_isLoading.value) {
+              _isLoading.value = true;
+            }
           },
           onPageFinished: (String url) {
-            setState(() {
-              _isLoading = false;
-            });
+            if (_isLoading.value) {
+              _isLoading.value = false;
+            }
           },
           onNavigationRequest: (NavigationRequest request) {
             // Handle external links
@@ -103,21 +107,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
                         children: [
                           GestureDetector(
                             onTap: () => Navigator.pop(context),
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.2),
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.arrow_back,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ),
+                            child: const _BackButton(),
                           ).animate().fadeIn().slideX(),
                           
                           const SizedBox(width: 16),
@@ -136,23 +126,10 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
                           
                           GestureDetector(
                             onTap: () {
+                              _isLoading.value = true;
                               _controller.reload();
                             },
-                            child: Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.2),
-                                ),
-                              ),
-                              child: const Icon(
-                                Icons.refresh,
-                                color: Colors.white,
-                                size: 22,
-                              ),
-                            ),
+                            child: const _RefreshButton(),
                           ).animate().fadeIn().scale(delay: 200.ms),
                         ],
                       ),
@@ -181,29 +158,34 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
                           child: Stack(
                             children: [
                               WebViewWidget(controller: _controller),
-                              if (_isLoading)
-                                Container(
-                                  color: const Color(0xFF1E293B),
-                                  child: Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        CircularProgressIndicator(
-                                          color: const Color(0xFF6366F1),
-                                          strokeWidth: 3,
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          'Loading Speed Test...',
-                                          style: TextStyle(
-                                            color: Colors.white.withOpacity(0.7),
-                                            fontSize: 14,
+                              ValueListenableBuilder<bool>(
+                                valueListenable: _isLoading,
+                                builder: (context, isLoading, child) {
+                                  if (!isLoading) return const SizedBox.shrink();
+                                  return Container(
+                                    color: const Color(0xFF1E293B),
+                                    child: const Center(
+                                      child: Column(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          CircularProgressIndicator(
+                                            color: Color(0xFF6366F1),
+                                            strokeWidth: 3,
                                           ),
-                                        ),
-                                      ],
+                                          SizedBox(height: 16),
+                                          Text(
+                                            'Loading Speed Test...',
+                                            style: TextStyle(
+                                              color: Color(0xB3FFFFFF),
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
                                     ),
-                                  ),
-                                ),
+                                  );
+                                },
+                              ),
                             ],
                           ),
                         ),
@@ -216,6 +198,53 @@ class _SpeedTestScreenState extends State<SpeedTestScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+// Const widgets to prevent unnecessary rebuilds
+class _BackButton extends StatelessWidget {
+  const _BackButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+        ),
+      ),
+      child: const Icon(
+        Icons.arrow_back,
+        color: Colors.white,
+        size: 22,
+      ),
+    );
+  }
+}
+
+class _RefreshButton extends StatelessWidget {
+  const _RefreshButton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.2),
+        ),
+      ),
+      child: const Icon(
+        Icons.refresh,
+        color: Colors.white,
+        size: 22,
+      ),
     );
   }
 }

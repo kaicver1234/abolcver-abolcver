@@ -54,14 +54,22 @@ class _HomeScreenState extends State<HomeScreen> {
         // Auto-select first server if none selected
         if (provider.selectedConfig == null && provider.configs.isNotEmpty) {
           await provider.selectConfig(provider.configs.first);
+          // Force UI update after auto-selection
+          if (mounted) {
+            setState(() {});
+          }
         }
         
         if (provider.selectedConfig == null) {
           _showSnackBar('Please select a server first', Colors.red);
         } else {
           await provider.connectToServer(provider.selectedConfig!, false);
-          if (mounted && provider.activeConfig != null) {
-            // _showSnackBar('Connected Successfully', Colors.green);
+          // Force UI refresh after connection
+          if (mounted) {
+            setState(() {});
+            // Small delay to ensure state is fully propagated
+            await Future.delayed(const Duration(milliseconds: 300));
+            setState(() {});
           }
         }
       }
@@ -345,12 +353,8 @@ class _HomeScreenState extends State<HomeScreen> {
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A), 
+        color: Colors.transparent, 
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: Colors.white.withOpacity(0.15),
-          width: 1,
-        ),
       ),
       child: Row(
         children: [

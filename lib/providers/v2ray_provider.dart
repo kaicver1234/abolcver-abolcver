@@ -112,6 +112,8 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       if (_selectedConfig == null && _configs.isNotEmpty) {
         _selectedConfig = _configs.first;
         await _saveSelectedServer();
+        // Notify UI that first server is selected
+        notifyListeners();
       }
 
       notifyListeners();
@@ -793,6 +795,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
             }
           }
           _selectedConfig = config;
+          
+          // Notify UI immediately after state change
+          notifyListeners();
 
           // Persist the changes with error handling
           try {
@@ -822,6 +827,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           } catch (e) {
             // Analytics logging failed, ignore
           }
+          
+          // Final sync to ensure UI is up to date
+          await Future.delayed(const Duration(milliseconds: 500));
+          notifyListeners();
           
           // Successfully connected
         } catch (e) {
