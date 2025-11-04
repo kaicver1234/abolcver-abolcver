@@ -29,11 +29,35 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _pageController = PageController();
+    
+    // Add listener to provider to force UI rebuild when connection state changes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<V2RayProvider>(context, listen: false);
+      provider.addListener(_onProviderChanged);
+    });
+  }
+  
+  void _onProviderChanged() {
+    // Force rebuild when provider changes
+    if (mounted) {
+      final provider = Provider.of<V2RayProvider>(context, listen: false);
+      debugPrint('🔄 Provider changed - activeConfig: ${provider.activeConfig?.remark}, error: ${provider.errorMessage}');
+      setState(() {});
+    }
   }
   
   @override
   void dispose() {
     _pageController.dispose();
+    
+    // Remove listener from provider
+    try {
+      final provider = Provider.of<V2RayProvider>(context, listen: false);
+      provider.removeListener(_onProviderChanged);
+    } catch (e) {
+      // Provider might already be disposed
+    }
+    
     super.dispose();
   }
 
@@ -55,34 +79,36 @@ class _HomeScreenState extends State<HomeScreen> {
         // Auto-select first server if none selected
         if (provider.selectedConfig == null && provider.configs.isNotEmpty) {
           await provider.selectConfig(provider.configs.first);
-          // Force UI update after auto-selection
-          if (mounted) {
-            setState(() {});
-          }
         }
         
         if (provider.selectedConfig == null) {
           _showSnackBar('Please select a server first', Colors.red);
         } else {
+          // Connect to server
+          debugPrint('🚀 Starting connection to: ${provider.selectedConfig!.remark}');
           await provider.connectToServer(provider.selectedConfig!, false);
           
-          // Multiple UI refreshes to ensure state is shown
-          if (mounted) {
+          // Check if connection was successful
+          if (mounted && provider.activeConfig != null) {
+            debugPrint('✅ Connection successful - activeConfig: ${provider.activeConfig!.remark}');
+            
+            // Clear any previous error messages
+            if (provider.errorMessage.isNotEmpty) {
+              provider.clearError();
+            }
+            
+            // Force UI rebuild after connection
             setState(() {});
             
-            // Wait for provider to finish all updates
-            await Future.delayed(const Duration(milliseconds: 500));
-            if (mounted) setState(() {});
-            
-            await Future.delayed(const Duration(milliseconds: 500));
-            if (mounted) setState(() {});
-            
-            // Check if actually connected and show appropriate message
-            if (mounted && provider.activeConfig != null) {
-              // Successfully connected
-            } else if (mounted && provider.errorMessage.isNotEmpty) {
-              _showSnackBar(provider.errorMessage, Colors.red);
-            }
+            // Also schedule a rebuild after provider finishes updating
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                setState(() {});
+              }
+            });
+          } else if (mounted && provider.errorMessage.isNotEmpty) {
+            debugPrint('❌ Connection failed: ${provider.errorMessage}');
+            _showSnackBar(provider.errorMessage, Colors.red);
           }
         }
       }
@@ -262,16 +288,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   
   // Helper method to determine background status from VPN state
+  // User wants background to stay same, NOT change when connected/connecting
+  // But show error if there's an error
   VPNBackgroundStatus _getBackgroundStatus(V2RayProvider provider) {
-    if (provider.isConnecting) {
-      return VPNBackgroundStatus.connecting;
-    } else if (provider.activeConfig != null) {
-      return VPNBackgroundStatus.connected;
-    } else if (provider.errorMessage.isNotEmpty) {
+    // Show error background if there's an error
+    if (provider.errorMessage.isNotEmpty) {
       return VPNBackgroundStatus.error;
-    } else {
-      return VPNBackgroundStatus.disconnected;
     }
+    
+    // Otherwise always return disconnected - user doesn't want background to change
+    // Only the connect button should change color, not the background
+    return VPNBackgroundStatus.disconnected;
   }
 
   Widget _buildModernAppBar(BuildContext context) {
@@ -603,7 +630,6 @@ class _HomeScreenState extends State<HomeScreen> {
         'icon': Icons.info_outline,
         'label': AppLocalizations.of(context).translate('home.ip_info'),
         'subtitle': AppLocalizations.of(context).translate('tools.ip_information_desc'),
-        'color': const Color(0xFF21AD86), // defyxVPN connected color
         'onTap': () {
           Navigator.push(
             context,
@@ -615,7 +641,6 @@ class _HomeScreenState extends State<HomeScreen> {
         'icon': Icons.speed,
         'label': AppLocalizations.of(context).translate('home.speed_test'),
         'subtitle': AppLocalizations.of(context).translate('tools.speed_test_desc'),
-        'color': const Color(0xFF23499C), // defyxVPN connecting color
         'onTap': () {
           Navigator.push(
             context,
@@ -627,7 +652,6 @@ class _HomeScreenState extends State<HomeScreen> {
         'icon': Icons.dns,
         'label': AppLocalizations.of(context).translate('home.host_checker'),
         'subtitle': AppLocalizations.of(context).translate('tools.host_checker_desc'),
-        'color': const Color(0xFFD9B639), // defyxVPN warning color
         'onTap': () {
           Navigator.push(
             context,
@@ -639,7 +663,6 @@ class _HomeScreenState extends State<HomeScreen> {
         'icon': Icons.refresh,
         'label': AppLocalizations.of(context).translate('home.refresh'),
         'subtitle': AppLocalizations.of(context).translate('subscription_management.update_all'),
-        'color': const Color(0xFF72D9FF), // defyxVPN upload color
         'onTap': () async {
           final provider = Provider.of<V2RayProvider>(context, listen: false);
           _showSnackBar(
@@ -670,7 +693,6 @@ class _HomeScreenState extends State<HomeScreen> {
           icon: tool['icon'] as IconData,
           label: tool['label'] as String,
           subtitle: tool['subtitle'] as String,
-          color: tool['color'] as Color,
           onTap: tool['onTap'] as VoidCallback,
           delay: (index * 100),
         );
@@ -682,7 +704,6 @@ class _HomeScreenState extends State<HomeScreen> {
     required IconData icon,
     required String label,
     required String subtitle,
-    required Color color,
     required VoidCallback onTap,
     required int delay,
   }) {
@@ -696,52 +717,27 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  color.withOpacity(0.25),
-                  color.withOpacity(0.08),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
+              // Simple transparent background like VPNGradientBackground
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: color.withOpacity(0.4),
-                width: 1.5,
+                color: Colors.white.withValues(alpha: 0.1),
+                width: 1,
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withOpacity(0.2),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                  spreadRadius: 2,
-                ),
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
             ),
             child: Row(
               children: [
+                // Simple icon container
                 Container(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.25),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: color.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    color: Colors.white.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
                     icon,
-                    color: color,
-                    size: 28,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    size: 24,
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -762,7 +758,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Text(
                         subtitle,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.6),
+                          color: Colors.white.withValues(alpha: 0.6),
                           fontSize: 13,
                         ),
                       ),
@@ -771,8 +767,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 Icon(
                   Icons.arrow_forward_ios,
-                  color: color.withOpacity(0.5),
-                  size: 18,
+                  color: Colors.white.withValues(alpha: 0.4),
+                  size: 16,
                 ),
               ],
             ),
