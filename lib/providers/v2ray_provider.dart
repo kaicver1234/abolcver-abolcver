@@ -116,17 +116,36 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       case 'connected':
         // VPN connected from native side
         debugPrint('✅ Native reports VPN connected');
-        // Sync state to ensure UI shows connected
-        Future.delayed(const Duration(milliseconds: 500), () async {
-          await _enhancedSyncWithVpnServiceState();
-          notifyListeners();
-        });
+        
+        // If we're already in connection process, skip sync to avoid UI reset
+        if (_isConnecting) {
+          debugPrint('⏭️ Skipping sync - already in connection process');
+          break;
+        }
+        
+        // Only sync if we think we're disconnected but native says connected
+        // This handles cases where app was backgrounded during connection
+        if (_v2rayService.activeConfig == null) {
+          debugPrint('🔄 Syncing state - native connected but we think disconnected');
+          Future.delayed(const Duration(milliseconds: 500), () async {
+            await _enhancedSyncWithVpnServiceState();
+            notifyListeners();
+          });
+        }
         break;
         
       case 'disconnected':
       case 'stopped':
         // VPN disconnected from native side
         debugPrint('❌ Native reports VPN disconnected');
+        
+        // IMPORTANT: Ignore native disconnect events during connection process
+        // to prevent UI from resetting while we're connecting
+        if (_isConnecting) {
+          debugPrint('⏭️ Ignoring native disconnect event during connection process');
+          break;
+        }
+        
         // Only update if we think we're connected
         if (_configs.any((c) => c.isConnected)) {
           // Run async operation properly with error handling

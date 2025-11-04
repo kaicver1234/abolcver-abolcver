@@ -29,35 +29,11 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _pageController = PageController();
-    
-    // Add listener to provider to force UI rebuild when connection state changes
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = Provider.of<V2RayProvider>(context, listen: false);
-      provider.addListener(_onProviderChanged);
-    });
-  }
-  
-  void _onProviderChanged() {
-    // Force rebuild when provider changes
-    if (mounted) {
-      final provider = Provider.of<V2RayProvider>(context, listen: false);
-      debugPrint('🔄 Provider changed - activeConfig: ${provider.activeConfig?.remark}, error: ${provider.errorMessage}');
-      setState(() {});
-    }
   }
   
   @override
   void dispose() {
     _pageController.dispose();
-    
-    // Remove listener from provider
-    try {
-      final provider = Provider.of<V2RayProvider>(context, listen: false);
-      provider.removeListener(_onProviderChanged);
-    } catch (e) {
-      // Provider might already be disposed
-    }
-    
     super.dispose();
   }
 
@@ -88,27 +64,15 @@ class _HomeScreenState extends State<HomeScreen> {
           debugPrint('🚀 Starting connection to: ${provider.selectedConfig!.remark}');
           await provider.connectToServer(provider.selectedConfig!, false);
           
-          // Check if connection was successful
-          if (mounted && provider.activeConfig != null) {
-            debugPrint('✅ Connection successful - activeConfig: ${provider.activeConfig!.remark}');
-            
-            // Clear any previous error messages
-            if (provider.errorMessage.isNotEmpty) {
-              provider.clearError();
+          // Check result after connection attempt
+          if (mounted) {
+            if (provider.activeConfig != null) {
+              debugPrint('✅ Connection successful - activeConfig: ${provider.activeConfig!.remark}');
+              // Consumer2 will rebuild automatically, no need for manual setState
+            } else if (provider.errorMessage.isNotEmpty) {
+              debugPrint('❌ Connection failed: ${provider.errorMessage}');
+              _showSnackBar(provider.errorMessage, Colors.red);
             }
-            
-            // Force UI rebuild after connection
-            setState(() {});
-            
-            // Also schedule a rebuild after provider finishes updating
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                setState(() {});
-              }
-            });
-          } else if (mounted && provider.errorMessage.isNotEmpty) {
-            debugPrint('❌ Connection failed: ${provider.errorMessage}');
-            _showSnackBar(provider.errorMessage, Colors.red);
           }
         }
       }
@@ -152,16 +116,21 @@ class _HomeScreenState extends State<HomeScreen> {
         ];
         
         return AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
+          backgroundColor: const Color(0xFF0A0A0A).withValues(alpha: 0.95),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(
+              color: Colors.white.withValues(alpha: 0.08),
+              width: 1,
+            ),
           ),
           title: Text(
             AppLocalizations.of(context).translate('language_settings.select_language'),
             style: const TextStyle(
               color: Colors.white,
               fontSize: 20,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -0.5,
             ),
           ),
           content: Container(
@@ -186,41 +155,43 @@ class _HomeScreenState extends State<HomeScreen> {
                     _showSnackBar(AppLocalizations.of(context).translate('language_settings.language_changed'), Colors.green);
                   },
                   child: Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(12),
+                    margin: const EdgeInsets.only(bottom: 10),
+                    padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
                       color: isSelected 
-                          ? const Color(0xFF6366F1).withOpacity(0.2)
-                          : Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(12),
+                          ? Colors.white.withValues(alpha: 0.12)
+                          : Colors.white.withValues(alpha: 0.03),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
                         color: isSelected 
-                            ? const Color(0xFF6366F1)
-                            : Colors.white.withOpacity(0.1),
+                            ? Colors.white.withValues(alpha: 0.2)
+                            : Colors.white.withValues(alpha: 0.06),
+                        width: 1,
                       ),
                     ),
                     child: Row(
                       children: [
                         Text(
                           lang['flag']!,
-                          style: const TextStyle(fontSize: 24),
+                          style: const TextStyle(fontSize: 28),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 16),
                         Expanded(
                           child: Text(
                             lang['name']!,
                             style: TextStyle(
                               color: Colors.white,
                               fontSize: 16,
-                              fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                              letterSpacing: 0.2,
                             ),
                           ),
                         ),
                         if (isSelected)
-                          const Icon(
-                            Icons.check_circle,
-                            color: Color(0xFF6366F1),
-                            size: 20,
+                          Icon(
+                            Icons.check_circle_rounded,
+                            color: Colors.white.withValues(alpha: 0.9),
+                            size: 22,
                           ),
                       ],
                     ),
@@ -232,9 +203,16 @@ class _HomeScreenState extends State<HomeScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text(
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              ),
+              child: Text(
                 'Cancel',
-                style: TextStyle(color: Colors.white70),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.6),
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
             ),
           ],
@@ -403,33 +381,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBottomTabBar() {
     return Container(
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(6),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
-        // Glassmorphism effect to blend with background
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFF1E293B).withOpacity(0.4),
-            const Color(0xFF0F172A).withOpacity(0.5),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(20),
+        // Darker background to blend better with app background
+        color: const Color(0xFF0A0A0A).withValues(alpha: 0.8),
+        borderRadius: BorderRadius.circular(24),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.06),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 20,
-            offset: const Offset(0, 10),
+            color: Colors.black.withValues(alpha: 0.3),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+            spreadRadius: 0,
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(24),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
           child: Row(
             children: [
               Expanded(
@@ -446,7 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   },
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
               Expanded(
                 child: _buildTabButton(
                   icon: Icons.build,
@@ -479,39 +453,19 @@ class _HomeScreenState extends State<HomeScreen> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 12),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         decoration: BoxDecoration(
-          gradient: isActive
-              ? const LinearGradient(
-                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : LinearGradient(
-                  colors: [
-                    Colors.white.withOpacity(0.05),
-                    Colors.white.withOpacity(0.02),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-          borderRadius: BorderRadius.circular(16),
+          // Darker and more subtle colors
+          color: isActive
+              ? Colors.white.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive 
-                ? const Color(0xFF6366F1).withOpacity(0.3)
-                : Colors.white.withOpacity(0.05),
+                ? Colors.white.withValues(alpha: 0.15)
+                : Colors.transparent,
             width: 1,
           ),
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFF6366F1).withOpacity(0.5),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                    spreadRadius: 0,
-                  ),
-                ]
-              : null,
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -519,16 +473,16 @@ class _HomeScreenState extends State<HomeScreen> {
             Icon(
               icon,
               size: 20,
-              color: isActive ? Colors.white : const Color(0xFF94A3B8),
+              color: isActive ? Colors.white : const Color(0xFF6B7280),
             ),
             const SizedBox(width: 8),
             Text(
               label,
               style: TextStyle(
-                fontSize: 15,
+                fontSize: 14,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                letterSpacing: 0.3,
-                color: isActive ? Colors.white : const Color(0xFF94A3B8),
+                letterSpacing: 0.2,
+                color: isActive ? Colors.white : const Color(0xFF6B7280),
               ),
             ),
           ],

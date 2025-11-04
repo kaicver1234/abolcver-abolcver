@@ -17,16 +17,21 @@ class CloudflareSpeedTestService {
   final List<double> _uploadSpeeds = [];
   final List<int> _latencies = [];
   
-  // Measurement configuration - exactly like defyxVPN
+  // Optimized measurement configuration - 60 seconds total
+  // 5s latency + 30s download + 25s upload = ~60s
   static const List<Map<String, dynamic>> measurements = [
-    {'type': 'latency', 'numPackets': 1},
-    {'type': 'download', 'bytes': 100000, 'count': 1},
-    {'type': 'latency', 'numPackets': 20},
-    {'type': 'download', 'bytes': 100000, 'count': 9},
-    {'type': 'download', 'bytes': 1000000, 'count': 8},
-    {'type': 'upload', 'bytes': 100000, 'count': 8},
-    {'type': 'upload', 'bytes': 1000000, 'count': 6},
-    {'type': 'download', 'bytes': 10000000, 'count': 6},
+    // Quick latency test (5 seconds)
+    {'type': 'latency', 'numPackets': 10, 'delay': 500}, // 10 packets × 500ms = 5s
+    
+    // Download test - 30 seconds with progressive sizes for accuracy
+    {'type': 'download', 'bytes': 500000, 'count': 5},      // 5 × 500KB (warm up)
+    {'type': 'download', 'bytes': 2000000, 'count': 6},     // 6 × 2MB (medium)
+    {'type': 'download', 'bytes': 5000000, 'count': 4},     // 4 × 5MB (large)
+    
+    // Upload test - 25 seconds with progressive sizes
+    {'type': 'upload', 'bytes': 500000, 'count': 5},        // 5 × 500KB (warm up)
+    {'type': 'upload', 'bytes': 2000000, 'count': 5},       // 5 × 2MB (medium)
+    {'type': 'upload', 'bytes': 5000000, 'count': 3},       // 3 × 5MB (large)
   ];
   
   CloudflareSpeedTestService() {
@@ -141,9 +146,10 @@ class CloudflareSpeedTestService {
     }
   }
   
-  /// Test latency - exactly like defyxVPN
+  /// Test latency with configurable delay
   Future<void> _runLatencyMeasurement(Map<String, dynamic> config) async {
     final numPackets = config['numPackets'] as int;
+    final delayMs = config['delay'] as int? ?? 100; // Default 100ms
     
     for (int i = 0; i < numPackets; i++) {
       if (_isCancelled) return;
@@ -163,13 +169,14 @@ class CloudflareSpeedTestService {
         final latency = stopwatch.elapsedMilliseconds;
         _latencies.add(latency);
         
-        debugPrint('   🏓 Ping: $latency ms');
+        debugPrint('   🏓 Ping ${i + 1}/$numPackets: $latency ms');
       } catch (e) {
         debugPrint('   ❌ Latency test failed: $e');
       }
       
+      // Wait between packets
       if (i < numPackets - 1) {
-        await Future.delayed(const Duration(milliseconds: 10));
+        await Future.delayed(Duration(milliseconds: delayMs));
       }
     }
   }
@@ -347,23 +354,24 @@ class CloudflareSpeedTestService {
     }
   }
   
-  /// Calculate final results - exactly like defyxVPN (90th percentile)
+  /// Calculate final results - accurate median with outlier removal
   SpeedTestResult _calculateFinalResults() {
-    // Calculate 90th percentile for download & upload (like defyxVPN)
+    // Use median instead of 90th percentile for more accurate results
+    // Remove outliers (top and bottom 10%) for better accuracy
     final downloadSpeed = _downloadSpeeds.isNotEmpty
-        ? _calculatePercentile(_downloadSpeeds, 0.9)
+        ? _calculateAccurateSpeed(_downloadSpeeds)
         : 0.0;
     
     final uploadSpeed = _uploadSpeeds.isNotEmpty
-        ? _calculatePercentile(_uploadSpeeds, 0.9)
+        ? _calculateAccurateSpeed(_uploadSpeeds)
         : 0.0;
     
-    // Calculate average ping
+    // Calculate median ping (more accurate than average)
     final ping = _latencies.isNotEmpty
-        ? (_latencies.reduce((a, b) => a + b) / _latencies.length).round()
+        ? _calculatePercentile(_latencies.map((e) => e.toDouble()).toList(), 0.5).round()
         : 0;
     
-    // Calculate jitter
+    // Calculate jitter (standard deviation of latencies)
     int jitter = 0;
     if (_latencies.length >= 2) {
       int jitterSum = 0;
@@ -379,6 +387,25 @@ class CloudflareSpeedTestService {
       ping: ping,
       jitter: jitter,
     );
+  }
+  
+  /// Calculate accurate speed by removing outliers and using median
+  double _calculateAccurateSpeed(List<double> speeds) {
+    if (speeds.isEmpty) return 0.0;
+    if (speeds.length < 3) return speeds.reduce((a, b) => a + b) / speeds.length;
+    
+    // Sort speeds
+    final sorted = List<double>.from(speeds)..sort();
+    
+    // Remove outliers (bottom 10% and top 10%)
+    final outlierCount = (sorted.length * 0.1).ceil();
+    final filteredSpeeds = sorted.sublist(
+      outlierCount,
+      sorted.length - outlierCount,
+    );
+    
+    // Return median of filtered speeds
+    return _calculatePercentile(filteredSpeeds, 0.5);
   }
   
   /// Calculate percentile - exactly like defyxVPN
