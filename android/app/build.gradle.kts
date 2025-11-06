@@ -55,10 +55,15 @@ android {
 
     buildTypes {
         release {
-            // ✅ Now using production release key for signing (if available)
-            if (keystorePropertiesFile.exists() && keystoreProperties.isNotEmpty()) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            // ⚠️ TEMPORARY: Using debug key for compatibility with existing installation
+            // Change this back to release key after users update or reinstall
+            signingConfig = signingConfigs.getByName("debug")
+            
+            // Uncomment below to use production release key:
+            // if (keystorePropertiesFile.exists() && keystoreProperties.isNotEmpty()) {
+            //     signingConfig = signingConfigs.getByName("release")
+            // }
+            
             isMinifyEnabled = false
             isShrinkResources = false
         }
