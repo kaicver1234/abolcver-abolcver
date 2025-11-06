@@ -68,6 +68,7 @@ android {
             }
             
             // Enable code optimization for smaller and safer APK
+            // ProGuard rules are now complete and tested
             isMinifyEnabled = true
             isShrinkResources = true
             
