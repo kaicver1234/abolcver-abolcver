@@ -23,6 +23,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   bool _isLoadingServers = false;
   bool _isProxyMode = false;
   bool _isInitializing = true; // Track initialization state
+  DateTime? _lastSuccessfulConnection; // Track last successful connection time
   
   // Method channel for VPN control
   static const platform = MethodChannel('com.tiksarvpn.app/vpn_control');
@@ -111,6 +112,16 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   /// Handle VPN status changes from native side
   void _handleNativeVpnStatusChange(String status) {
     debugPrint('🔄 Handling native VPN status change: $status');
+    
+    // IMPORTANT: Ignore ALL native events for 3 seconds after successful connection
+    // This prevents race conditions where native sends stale events that reset UI
+    if (_lastSuccessfulConnection != null) {
+      final timeSinceConnection = DateTime.now().difference(_lastSuccessfulConnection!);
+      if (timeSinceConnection.inSeconds < 3) {
+        debugPrint('⏭️ Ignoring native event (within 3s grace period after connection)');
+        return;
+      }
+    }
     
     switch (status.toLowerCase()) {
       case 'connected':
@@ -214,27 +225,24 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         // Ignore subscription update errors but continue initialization
       }
 
-      // Load saved selected server first
-      await _loadSelectedServer();
-      debugPrint('✅ Selected server loaded: ${_selectedConfig?.remark ?? "none"}');
-      
       // CRITICAL FIX: Enhanced synchronization with actual VPN service state
       // This method checks VPN status and updates all configs accordingly
       await _enhancedSyncWithVpnServiceState();
       
-      // After sync, check if we need to auto-select first server
-      // Only if nothing is selected AND not connected
-      if (_selectedConfig == null && _configs.isNotEmpty) {
-        // Check if any config is connected after sync
+      // Always auto-select first server (unless already connected)
+      if (_configs.isNotEmpty) {
         final hasConnectedConfig = _configs.any((c) => c.isConnected);
         
-        if (!hasConnectedConfig) {
-          // No connection and no selection, auto-select first server
+        if (hasConnectedConfig) {
+          // If already connected, keep the connected server as selected
+          _selectedConfig = _configs.firstWhere((c) => c.isConnected);
+          debugPrint('✅ Keeping connected server: ${_selectedConfig?.remark}');
+        } else {
+          // Not connected, always select first server
           _selectedConfig = _configs.first;
-          await _saveSelectedServer();
           debugPrint('✅ Auto-selected first server: ${_selectedConfig?.remark}');
-          notifyListeners();
         }
+        notifyListeners();
       }
 
       debugPrint('✅ Initialization complete');
@@ -249,36 +257,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
   
-  // Load saved selected server
-  Future<void> _loadSelectedServer() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedServerId = prefs.getString('selected_server_id');
-      if (savedServerId != null && _configs.isNotEmpty) {
-        final savedServer = _configs.firstWhere(
-          (config) => config.id == savedServerId,
-          orElse: () => _configs.first,
-        );
-        _selectedConfig = savedServer;
-      }
-    } catch (e) {
-      // Error loading selected server
-    }
-  }
-  
-  // Save selected server
-  Future<void> _saveSelectedServer() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (_selectedConfig != null) {
-        await prefs.setString('selected_server_id', _selectedConfig!.id);
-      } else {
-        await prefs.remove('selected_server_id');
-      }
-    } catch (e) {
-      // Error saving selected server
-    }
-  }
+  // Note: Removed _loadSelectedServer and _saveSelectedServer methods
+  // We always auto-select the first server on app start (unless already connected)
+  // User selection is temporary and resets after disconnect
   
   // CRITICAL FIX: Enhanced method to synchronize with actual VPN service state
   Future<void> _enhancedSyncWithVpnServiceState() async {
@@ -971,6 +952,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         try {
           debugPrint('✅ VPN connection successful, updating UI state...');
           
+          // Mark the successful connection time - this enables grace period
+          _lastSuccessfulConnection = DateTime.now();
+          
           // Clear any previous error messages IMMEDIATELY
           _errorMessage = '';
           
@@ -987,6 +971,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           // Notify UI FIRST to show connected state immediately
           notifyListeners();
           debugPrint('✅ UI updated immediately - Connected: true, Error: empty');
+          debugPrint('🛡️ Grace period enabled for 3 seconds (ignore native events)');
           
           // Small delay to ensure UI updates before background tasks
           await Future.delayed(const Duration(milliseconds: 100));
@@ -1058,13 +1043,19 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       await _v2rayService.disconnect();
       statusPingOnly = false;
       
+      // Clear the grace period timer
+      _lastSuccessfulConnection = null;
+      
       // Update config status
       for (int i = 0; i < _configs.length; i++) {
         _configs[i].isConnected = false;
       }
 
-      // Keep the selected config when disconnecting
-      // Don't set _selectedConfig to null
+      // After disconnect, always reset to first server
+      if (_configs.isNotEmpty) {
+        _selectedConfig = _configs.first;
+        debugPrint('✅ Reset to first server after disconnect: ${_selectedConfig?.remark}');
+      }
 
       // Persist the changes
       await _v2rayService.saveConfigs(_configs);
@@ -1082,10 +1073,8 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
 
   Future<void> selectConfig(V2RayConfig config) async {
     _selectedConfig = config;
-    // Save the selected config for persistence
-    await _v2rayService.saveSelectedConfig(config);
-    // Also save to SharedPreferences for persistence across app restarts
-    await _saveSelectedServer();
+    // Note: We don't save selected server anymore - always defaults to first server
+    // User selection is temporary until disconnect
     
     // Log server selection analytics
     try {
