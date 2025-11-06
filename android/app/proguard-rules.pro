@@ -1,39 +1,44 @@
 ####################################################################################################
 # Flutter & Dart
 ####################################################################################################
--keep class io.flutter.app.** { *; }
--keep class io.flutter.plugin.** { *; }
--keep class io.flutter.util.** { *; }
--keep class io.flutter.view.** { *; }
--keep class io.flutter.** { *; }
--keep class io.flutter.plugins.** { *; }
--keep class io.flutter.embedding.** { *; }
+-keep,allowshrinking,allowoptimization class io.flutter.app.** { *; }
+-keep,allowshrinking,allowoptimization class io.flutter.plugin.** { *; }
+-keep,allowshrinking,allowoptimization class io.flutter.util.** { *; }
+-keep,allowshrinking,allowoptimization class io.flutter.view.** { *; }
+-keep,allowshrinking,allowoptimization class io.flutter.** { *; }
+-keep,allowshrinking,allowoptimization class io.flutter.plugins.** { *; }
+-keep,allowshrinking,allowoptimization class io.flutter.embedding.** { *; }
 
-# Flutter embedding
+# Flutter embedding - NO optimization for annotations
 -keepclassmembers class * {
     @io.flutter.embedding.engine.dart.DartEntrypoint *;
 }
 
-# Dart FFI
+# Dart FFI - NO optimization
 -keep class dart.** { *; }
 -keep class ** extends dart.jni.JniObject { *; }
 
 ####################################################################################################
 # V2Ray & Go Native
 ####################################################################################################
--keep class com.v2ray.** { *; }
--keep class go.** { *; }
--keep class libv2ray.** { *; }
--keep class tun2socks.** { *; }
+-keep,allowshrinking,allowoptimization class com.v2ray.** { *; }
+-keep,allowshrinking,allowoptimization class go.** { *; }
+-keep,allowshrinking,allowoptimization class libv2ray.** { *; }
+-keep,allowshrinking,allowoptimization class tun2socks.** { *; }
 
-# Keep all native methods
--keepclasseswithmembernames class * {
+# Keep all native methods - NO optimization
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
+
+# Keep native method names
+-keepclassmembernames class * {
     native <methods>;
 }
 
 # V2Ray interfaces
--keep interface com.v2ray.** { *; }
--keep interface libv2ray.** { *; }
+-keep,allowshrinking,allowoptimization interface com.v2ray.** { *; }
+-keep,allowshrinking,allowoptimization interface libv2ray.** { *; }
 
 ####################################################################################################
 # Kotlin & Coroutines
@@ -108,12 +113,19 @@
 ####################################################################################################
 # Your App Classes
 ####################################################################################################
--keep class com.tiksarvpn.** { *; }
--keep class com.tiksarvpn.app.** { *; }
+-keep,allowshrinking,allowoptimization class com.tiksarvpn.** { *; }
+-keep,allowshrinking,allowoptimization class com.tiksarvpn.app.** { *; }
 
-# Keep method channel classes
+# Keep method channel classes - NO optimization
 -keep class com.tiksarvpn.app.*MethodChannel { *; }
 -keep class com.tiksarvpn.app.*MethodChannel$* { *; }
+-keepclassmembers class com.tiksarvpn.app.*MethodChannel {
+    public <methods>;
+    public <fields>;
+}
+
+# Keep MainActivity - NO optimization
+-keep class com.tiksarvpn.app.MainActivity { *; }
 
 ####################################################################################################
 # Android Components
@@ -228,8 +240,23 @@
 ####################################################################################################
 # Optimization
 ####################################################################################################
-# Don't optimize away classes that may be used reflectively
--optimizations !code/simplification/arithmetic,!code/simplification/cast,!field/*,!class/merging/*
--optimizationpasses 5
--allowaccessmodification
+# Enable safe optimizations
+-dontobfuscate
 -dontpreverify
+
+# Conservative optimization - exclude risky optimizations
+-optimizations !code/simplification/arithmetic
+-optimizations !code/simplification/cast
+-optimizations !field/*
+-optimizations !class/merging/*
+-optimizations !method/removal/parameter
+-optimizations !method/propagation/parameter
+
+# Reasonable number of optimization passes
+-optimizationpasses 3
+
+# Don't note duplicate definitions
+-dontnote **
+
+# Suppress warnings
+-dontwarn **
