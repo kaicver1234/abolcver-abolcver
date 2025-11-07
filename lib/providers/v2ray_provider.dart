@@ -113,14 +113,14 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   void _handleNativeVpnStatusChange(String status) {
     debugPrint('🔄 Handling native VPN status change: $status');
     
-    // CRITICAL FIX: Ignore ALL native events for 5 seconds after successful connection
+    // CRITICAL FIX: Ignore ALL native events for 8 seconds after successful connection
     // This prevents race conditions where native sends stale events that reset UI
-    // Increased to 5 seconds for first-time connections which may take longer to stabilize
+    // Using milliseconds to catch events that arrive within first second
     if (_lastSuccessfulConnection != null) {
       final timeSinceConnection = DateTime.now().difference(_lastSuccessfulConnection!);
-      if (timeSinceConnection.inSeconds < 5) {
-        debugPrint('⏭️ Ignoring ALL native events (within 5s grace period after connection)');
-        debugPrint('⏭️ Time since connection: ${timeSinceConnection.inSeconds}s');
+      if (timeSinceConnection.inMilliseconds < 8000) {
+        debugPrint('⏭️ Ignoring ALL native events (within 8s grace period after connection)');
+        debugPrint('⏭️ Time since connection: ${timeSinceConnection.inMilliseconds}ms');
         return;
       }
     }
@@ -157,6 +157,17 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         if (_isConnecting) {
           debugPrint('⏭️ Ignoring native disconnect event during connection process');
           break;
+        }
+        
+        // EXTRA SAFETY: If we just successfully connected (within last 10 seconds),
+        // be extremely cautious about disconnect events
+        if (_lastSuccessfulConnection != null) {
+          final timeSinceConnection = DateTime.now().difference(_lastSuccessfulConnection!);
+          if (timeSinceConnection.inMilliseconds < 10000) {
+            debugPrint('⏭️ SAFETY: Ignoring disconnect within 10s of successful connection');
+            debugPrint('⏭️ Time since connection: ${timeSinceConnection.inMilliseconds}ms');
+            break;
+          }
         }
         
         // ADDITIONAL FIX: Double-check that we actually have a connected config
@@ -894,125 +905,179 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   }
 
   Future<void> connectToServer(V2RayConfig config, bool isProxyMode) async {
+    debugPrint('🚀 Starting connection to: ${config.remark}');
+    
+    // VALIDATION: Check if config is valid
+    if (config.address.isEmpty || config.port <= 0) {
+      _setError('Invalid server configuration: ${config.remark}');
+      return;
+    }
+    
+    // SAFETY: Prevent multiple simultaneous connections
+    if (_isConnecting) {
+      debugPrint('⚠️ Connection already in progress, ignoring duplicate request');
+      return;
+    }
+    
     _isConnecting = true;
     _errorMessage = '';
     notifyListeners();
 
-    // Maximum number of connection attempts
+    // Connection configuration
     const int maxAttempts = 3;
-    // Delay between attempts in seconds
     const int retryDelaySeconds = 1;
+    const int connectionTimeout = 30;
+    
+    // Track connection success for finally block
+    bool success = false;
+    String lastError = '';
 
     try {
-      // Disconnect from current server if connected
+      debugPrint('📋 Connection parameters:');
+      debugPrint('   - Server: ${config.remark}');
+      debugPrint('   - Address: ${config.address}:${config.port}');
+      debugPrint('   - Protocol: ${config.configType}');
+      debugPrint('   - Proxy mode: $isProxyMode');
+      debugPrint('   - Max attempts: $maxAttempts');
+      
+      // STEP 1: Disconnect from current server if connected
       if (_v2rayService.activeConfig != null) {
+        debugPrint('🔌 Disconnecting from current server: ${_v2rayService.activeConfig?.remark}');
         try {
-          await _v2rayService.disconnect();
+          await _v2rayService.disconnect()
+              .timeout(const Duration(seconds: 5));
+          debugPrint('✅ Disconnected from previous server');
+          
+          // Small delay to ensure clean disconnect
+          await Future.delayed(const Duration(milliseconds: 300));
         } catch (e) {
-          // Error disconnecting from current server
+          debugPrint('⚠️ Error disconnecting from current server: $e');
           // Continue with connection attempt even if disconnect failed
         }
       }
 
-      // Try to connect with automatic retry
-      bool success = false;
-      String lastError = '';
-
+      // STEP 2: Try to connect with automatic retry
       for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+        debugPrint('🔄 Connection attempt $attempt/$maxAttempts...');
+        
         try {
-          // Connection attempt
-
-          // Connect to server with timeout
+          // Attempt connection with timeout
           success = await _v2rayService
               .connect(config, isProxyMode)
               .timeout(
-                const Duration(seconds: 30), // Timeout for connection
+                Duration(seconds: connectionTimeout),
                 onTimeout: () {
-                  // Connection timeout
+                  debugPrint('⏱️ Connection timeout after ${connectionTimeout}s');
                   return false;
                 },
               );
 
           if (success) {
-            // Connection successful
+            debugPrint('🎉 Connection attempt $attempt succeeded!');
             break;
           } else {
-            // Connection failed but no exception was thrown
-            lastError =
-                'Failed to connect to ${config.remark} on attempt $attempt';
-            // Failed to connect
+            lastError = 'Failed to connect to ${config.remark} on attempt $attempt';
+            debugPrint('❌ $lastError');
 
             // If this is not the last attempt, wait before retrying
             if (attempt < maxAttempts) {
+              debugPrint('⏳ Waiting ${retryDelaySeconds}s before retry...');
               await Future.delayed(Duration(seconds: retryDelaySeconds));
             }
           }
         } catch (e) {
-          // Check if this is a timeout-related error
+          // Handle different types of errors
           if (e.toString().contains('timeout')) {
-            lastError = 'Connection timeout on attempt $attempt: $e';
-            // Connection timeout
+            lastError = 'Connection timeout on attempt $attempt';
+            debugPrint('⏱️ $lastError: $e');
+          } else if (e.toString().contains('permission')) {
+            lastError = 'VPN permission denied';
+            debugPrint('🚫 $lastError: $e');
+            // Don't retry on permission errors
+            break;
           } else {
-            lastError = 'Error on connection attempt $attempt: $e';
-            // Error on connection attempt
+            lastError = 'Error on connection attempt $attempt';
+            debugPrint('❌ $lastError: $e');
           }
 
           // If this is not the last attempt, wait before retrying
-          if (attempt < maxAttempts) {
+          if (attempt < maxAttempts && !e.toString().contains('permission')) {
+            debugPrint('⏳ Waiting ${retryDelaySeconds}s before retry...');
             await Future.delayed(Duration(seconds: retryDelaySeconds));
           }
         }
       }
 
+      // STEP 3: Handle connection result
       if (success) {
         try {
           debugPrint('✅ VPN connection successful, updating UI state...');
           
-          // CRITICAL: Mark the successful connection time FIRST
-          // This enables grace period before ANY other operations
+          // CRITICAL PHASE 1: Establish grace period FIRST
+          // This MUST be the very first thing to prevent race conditions
           _lastSuccessfulConnection = DateTime.now();
-          debugPrint('🛡️ Grace period enabled for 5 seconds (ignore native events)');
+          debugPrint('🛡️ Grace period activated for 8 seconds');
+          debugPrint('🛡️ Start time: ${_lastSuccessfulConnection!.toIso8601String()}');
           
-          // Clear any previous error messages IMMEDIATELY
+          // CRITICAL PHASE 2: Update internal state IMMEDIATELY
           _errorMessage = '';
           
-          // Update config status IMMEDIATELY
+          // Update all configs: only connected one should be marked
+          bool configUpdated = false;
           for (int i = 0; i < _configs.length; i++) {
             if (_configs[i].id == config.id) {
               _configs[i].isConnected = true;
-            } else {
+              configUpdated = true;
+              debugPrint('✅ Marked ${_configs[i].remark} as connected');
+            } else if (_configs[i].isConnected) {
               _configs[i].isConnected = false;
+              debugPrint('📴 Unmarked ${_configs[i].remark}');
             }
           }
-          _selectedConfig = config;
           
-          // Verify activeConfig is set (should be set by v2ray_service.connect)
-          if (_v2rayService.activeConfig == null) {
-            debugPrint('⚠️ Warning: activeConfig is null after successful connection!');
-          } else {
-            debugPrint('✅ Verified activeConfig: ${_v2rayService.activeConfig?.remark}');
+          if (!configUpdated) {
+            debugPrint('⚠️ Warning: Config ${config.id} not found in list, adding it');
+            config.isConnected = true;
+            _configs.add(config);
           }
           
-          // Notify UI FIRST to show connected state immediately
+          _selectedConfig = config;
+          debugPrint('✅ Selected config updated: ${config.remark}');
+          
+          // CRITICAL PHASE 3: Verify activeConfig from service
+          if (_v2rayService.activeConfig == null) {
+            debugPrint('⚠️ WARNING: activeConfig is null after connection!');
+            debugPrint('⚠️ This should not happen - connection may be unstable');
+          } else {
+            final activeRemark = _v2rayService.activeConfig?.remark ?? 'Unknown';
+            debugPrint('✅ Service activeConfig verified: $activeRemark');
+            
+            // Double-check it matches our config
+            if (_v2rayService.activeConfig?.id != config.id) {
+              debugPrint('⚠️ Warning: activeConfig mismatch!');
+              debugPrint('   Expected: ${config.id}');
+              debugPrint('   Got: ${_v2rayService.activeConfig?.id}');
+            }
+          }
+          
+          // CRITICAL PHASE 4: Notify UI IMMEDIATELY
           notifyListeners();
-          debugPrint('✅ UI updated immediately - Connected: true, Error: empty');
+          debugPrint('✅ UI notified - Connected: true, Error: cleared');
           
-          // Small delay to ensure UI updates before background tasks
-          await Future.delayed(const Duration(milliseconds: 100));
+          // PHASE 5: Small delay to ensure UI renders
+          await Future.delayed(const Duration(milliseconds: 150));
           
-          // Persist the changes in background (don't wait)
+          // PHASE 6: Background tasks (non-blocking)
+          debugPrint('📝 Starting background tasks...');
+          
           _v2rayService.saveConfigs(_configs).catchError((e) {
-            debugPrint('⚠️ Error saving configs after connection: $e');
+            debugPrint('⚠️ Error saving configs: $e');
           });
 
-          // Reset usage statistics in background
           _v2rayService.resetUsageStats().catchError((e) {
-            debugPrint('⚠️ Error resetting usage stats: $e');
+            debugPrint('⚠️ Error resetting stats: $e');
           });
           
-          debugPrint('✅ Connection established successfully');
-          
-          // Log analytics event in background
           _analyticsService.logVpnConnect(
             serverName: config.remark,
             serverAddress: config.address,
@@ -1020,26 +1085,99 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
             country: config.remark.split('-').first.trim(),
             protocol: config.configType,
           ).catchError((e) {
-            debugPrint('⚠️ Analytics logging failed: $e');
+            debugPrint('⚠️ Analytics error: $e');
           });
+          
+          debugPrint('🎉 Connection fully established to ${config.remark}!');
+          
         } catch (e) {
-          debugPrint('❌ Error in post-connection setup: $e');
-          // Don't set error - connection succeeded, just logging failed
+          debugPrint('❌ CRITICAL: Error in post-connection setup: $e');
+          debugPrint('❌ Stack trace: ${StackTrace.current}');
+          // Don't set error - connection succeeded, just setup failed
+          // Still notify UI to show connected state
+          notifyListeners();
         }
       } else {
+        // Connection failed after all attempts
+        debugPrint('💔 Connection failed after $maxAttempts attempts');
+        debugPrint('💔 Last error: $lastError');
         _setError(
           'Failed to connect to ${config.remark} after $maxAttempts attempts: $lastError',
         );
       }
     } catch (e) {
       // Unexpected error in connection process
+      debugPrint('❌ FATAL: Unexpected error in connection process');
+      debugPrint('❌ Error: $e');
+      debugPrint('❌ Stack trace: ${StackTrace.current}');
       _setError('Unexpected error connecting to ${config.remark}: $e');
     } finally {
-      _isConnecting = false;
-      debugPrint('🔄 Connection attempt finished, updating UI...');
+      debugPrint('🏁 Entering finally block...');
+      debugPrint('🏁 Success: $success');
+      debugPrint('🏁 _isConnecting: $_isConnecting');
       
-      // Always notify UI at the end
+      _isConnecting = false;
+      
+      // CRITICAL SAFETY CHECK: Verify connection state integrity
+      if (success && _v2rayService.activeConfig != null) {
+        debugPrint('🔍 Final state verification...');
+        
+        // Find the config that should be connected
+        V2RayConfig? connectedConfig;
+        try {
+          connectedConfig = _configs.firstWhere(
+            (c) => c.id == config.id,
+            orElse: () {
+              debugPrint('⚠️ Config not found in list, using provided config');
+              return config;
+            },
+          );
+        } catch (e) {
+          debugPrint('❌ Error finding config: $e');
+          connectedConfig = config;
+        }
+        
+        // Verify and restore if needed
+        if (!connectedConfig.isConnected) {
+          debugPrint('🚨 CRITICAL: Connected state was corrupted! Restoring...');
+          debugPrint('   Config: ${connectedConfig.remark}');
+          debugPrint('   Should be connected: true');
+          debugPrint('   Current state: ${connectedConfig.isConnected}');
+          
+          // Restore the correct state
+          connectedConfig.isConnected = true;
+          for (var c in _configs) {
+            if (c.id != config.id && c.isConnected) {
+              debugPrint('   Disconnecting: ${c.remark}');
+              c.isConnected = false;
+            }
+          }
+          
+          debugPrint('✅ State restored successfully');
+        } else {
+          debugPrint('✅ State integrity verified - all good!');
+        }
+        
+        // Final verification
+        final activeRemark = _v2rayService.activeConfig?.remark ?? 'Unknown';
+        final connectedCount = _configs.where((c) => c.isConnected).length;
+        debugPrint('📊 Final state summary:');
+        debugPrint('   Active config: $activeRemark');
+        debugPrint('   Connected configs count: $connectedCount');
+        debugPrint('   Selected config: ${_selectedConfig?.remark ?? 'None'}');
+        
+        if (connectedCount != 1) {
+          debugPrint('⚠️ WARNING: Expected 1 connected config, got $connectedCount');
+        }
+      } else if (success && _v2rayService.activeConfig == null) {
+        debugPrint('🚨 WARNING: Success but no activeConfig!');
+        debugPrint('   This indicates a serious problem');
+      }
+      
+      // Always notify UI at the end to ensure latest state
       notifyListeners();
+      debugPrint('🏁 Connection process completed - UI notified');
+      debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     }
   }
 
@@ -1172,38 +1310,12 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
 
     // Handle app lifecycle changes
     if (state == AppLifecycleState.resumed) {
-      debugPrint('📱 App resumed, checking VPN status...');
+      debugPrint('📱 App resumed, checking VPN status immediately...');
       
-      // CRITICAL FIX: Immediately show last known state first for instant UI response
-      // This prevents blank/incorrect UI while checking actual status
-      notifyListeners();
-      debugPrint('📱 UI refreshed with last known state');
+      // CRITICAL: Like defyxVPN, check status IMMEDIATELY without delays
+      // This ensures UI is synced with actual VPN state right away
+      _syncVpnStatusOnResume();
       
-      // QUICK CHECK: First check after minimal delay (300ms)
-      // This catches most cases where VPN is already connected
-      Future.delayed(const Duration(milliseconds: 300), () async {
-        if (!_isInitializing) {
-          debugPrint('📱 Quick VPN status check...');
-          await forceCheckVpnStatus();
-        }
-      });
-      
-      // THOROUGH CHECK: Second check after longer delay (1.5s)
-      // This ensures VPN service is fully ready after long background time
-      Future.delayed(const Duration(milliseconds: 1500), () async {
-        if (!_isInitializing) {
-          debugPrint('📱 Thorough VPN status verification...');
-          await forceCheckVpnStatus();
-        }
-      });
-      
-      // FINAL VERIFICATION: Last check to ensure state is perfectly synced
-      Future.delayed(const Duration(milliseconds: 3000), () async {
-        if (!_isInitializing) {
-          debugPrint('📱 Final VPN status verification...');
-          await forceCheckVpnStatus();
-        }
-      });
     } else if (state == AppLifecycleState.paused) {
       // App is paused, VPN status will be maintained in background
       debugPrint('📱 App paused, VPN will continue in background');
@@ -1211,6 +1323,86 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('📱 App inactive');
     } else if (state == AppLifecycleState.detached) {
       debugPrint('📱 App detached');
+    }
+  }
+  
+  /// Sync VPN status immediately on app resume (inspired by defyxVPN)
+  Future<void> _syncVpnStatusOnResume() async {
+    if (_isInitializing || _isConnecting) {
+      debugPrint('⏭️ Skipping sync - app is initializing or connecting');
+      return;
+    }
+    
+    try {
+      debugPrint('🔄 Syncing VPN status on app resume...');
+      
+      // Check actual VPN connection status from native side
+      final isActuallyConnected = await _v2rayService.isActuallyConnected()
+          .timeout(
+            const Duration(seconds: 3),
+            onTimeout: () {
+              debugPrint('⚠️ Status check timeout, using last known state');
+              return _v2rayService.activeConfig != null;
+            },
+          );
+      
+      debugPrint('🔎 VPN actually connected: $isActuallyConnected');
+      debugPrint('🔎 Active config: ${_v2rayService.activeConfig?.remark ?? "none"}');
+      
+      bool stateChanged = false;
+      
+      if (isActuallyConnected) {
+        // VPN is running - ensure UI shows connected state
+        final activeConfig = _v2rayService.activeConfig;
+        if (activeConfig != null) {
+          // Find and mark the connected config
+          for (var config in _configs) {
+            if (config.id == activeConfig.id || 
+                (config.address == activeConfig.address && config.port == activeConfig.port)) {
+              if (!config.isConnected) {
+                config.isConnected = true;
+                stateChanged = true;
+              }
+              _selectedConfig = config;
+            } else if (config.isConnected) {
+              config.isConnected = false;
+              stateChanged = true;
+            }
+          }
+          
+          // Clear any error messages
+          if (_errorMessage.isNotEmpty) {
+            _errorMessage = '';
+            stateChanged = true;
+          }
+          
+          debugPrint('✅ VPN is connected to: ${activeConfig.remark}');
+        }
+      } else {
+        // VPN is not running - ensure UI shows disconnected state
+        for (var config in _configs) {
+          if (config.isConnected) {
+            config.isConnected = false;
+            stateChanged = true;
+          }
+        }
+        debugPrint('❌ VPN is disconnected');
+      }
+      
+      // Save state if changed
+      if (stateChanged) {
+        await _v2rayService.saveConfigs(_configs);
+        debugPrint('💾 Saved updated connection state');
+      }
+      
+      // CRITICAL: Always notify UI to refresh
+      notifyListeners();
+      debugPrint('✅ UI notified of VPN state on resume');
+      
+    } catch (e) {
+      debugPrint('❌ Error syncing VPN status on resume: $e');
+      // Still notify to show last known state
+      notifyListeners();
     }
   }
   
