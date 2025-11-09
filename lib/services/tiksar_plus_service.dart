@@ -70,13 +70,13 @@ class TiksarPlusService {
           
           // Check if it's a flowLine format (like DXcore)
           if (jsonData is Map && jsonData.containsKey('flowLine')) {
-            servers.addAll(_parseFlowLineFormat(jsonData));
+            servers.addAll(_parseFlowLineFormat(Map<String, dynamic>.from(jsonData)));
           } 
           // Check if it's a simple array of server configs
           else if (jsonData is List) {
             for (var item in jsonData) {
-              if (item is Map<String, dynamic>) {
-                final config = _parseServerConfig(item);
+              if (item is Map) {
+                final config = _parseServerConfig(Map<String, dynamic>.from(item));
                 if (config != null) {
                   servers.add(config);
                 }
@@ -84,8 +84,8 @@ class TiksarPlusService {
             }
           }
           // Check if it's a single server config
-          else if (jsonData is Map<String, dynamic>) {
-            final config = _parseServerConfig(jsonData);
+          else if (jsonData is Map) {
+            final config = _parseServerConfig(Map<String, dynamic>.from(jsonData));
             if (config != null) {
               servers.add(config);
             }
