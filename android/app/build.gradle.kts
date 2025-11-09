@@ -119,8 +119,14 @@ flutter {
 }
 
 // Disable duplicate class check for Go runtime classes
-tasks.withType<com.android.build.gradle.internal.tasks.CheckDuplicateClassesTask>().configureEach {
-    enabled = false
+// This is necessary because both DXcore and libv2ray include Go runtime
+gradle.taskGraph.whenReady {
+    allTasks.forEach { task ->
+        if (task.name.contains("checkReleaseDuplicateClasses") || 
+            task.name.contains("checkDebugDuplicateClasses")) {
+            task.enabled = false
+        }
+    }
 }
 
 configurations.all {
@@ -137,6 +143,8 @@ dependencies {
     
     // DXcore library for Defyx VPN protocols (XRAY, OUTLINE, PSIPHON, WARP, GOOL, SERVERLESS)
     // Note: DXcore includes Go runtime which conflicts with libv2ray's Go runtime
-    // Using packaging.resources.pickFirsts to handle duplicates
-    implementation(files("libs/DXcore.aar"))
+    // Set transitive to false to prevent dependency conflicts
+    implementation(files("libs/DXcore.aar")) {
+        isTransitive = false
+    }
 }
