@@ -82,4 +82,7 @@ flutter {
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
+    
+    // DXcore library for Defyx VPN protocols (XRAY, OUTLINE, PSIPHON, WARP, GOOL, SERVERLESS)
+    implementation(files("libs/DXcore.aar"))
 }

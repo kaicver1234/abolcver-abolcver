@@ -21,6 +21,7 @@ class MainActivity : FlutterActivity() {
         AppListMethodChannel.registerWith(flutterEngine, context)
         PingMethodChannel.registerWith(flutterEngine, context)
         SettingsMethodChannel.registerWith(flutterEngine, context)
+        DXcoreMethodChannel.registerWith(flutterEngine, context)
         
         // Create VPN control channel for notification disconnect
         vpnControlChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)

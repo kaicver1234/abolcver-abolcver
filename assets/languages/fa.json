@@ -386,5 +386,26 @@
         "ping_label": "پینگ",
         "error": "خطا",
         "test_cancelled": "تست لغو شد"
+    },
+    "server_source": {
+        "title": "منبع سرور",
+        "subtitle": "نوع اتصال خود را انتخاب کنید",
+        "servers_loaded": "{count} سرور بارگذاری شد",
+        "smart_title": "تیکسر هوشمند",
+        "smart_subtitle": "انتخاب خودکار پروتکل (پیشنهادی)",
+        "plus_title": "تیکسر پلاس",
+        "plus_subtitle": "سرورهای پرسرعت",
+        "recommended": "پیشنهادی",
+        "change_dialog_title": "تغییر منبع سرور",
+        "change_dialog_message": "تغییر به {title}؟\n\nتمام سرورها از منبع جدید بارگذاری می‌شوند.",
+        "switch_button": "تغییر",
+        "switched_success": "تغییر به {title} انجام شد",
+        "error_prefix": "خطا: {error}",
+        "smart_mode_title": "حالت تیکسر هوشمند",
+        "smart_mode_message": "انتخاب سرور خودکار است.\nفقط روی Connect ضربه بزنید!",
+        "no_servers_message": "تازه‌سازی یا تغییر منبع سرور را امتحان کنید",
+        "refresh_subtitle": "به‌روزرسانی سرورها",
+        "refreshing_servers": "در حال به‌روزرسانی سرورها...",
+        "servers_refreshed": "سرورها با موفقیت به‌روزرسانی شدند"
     }
 }

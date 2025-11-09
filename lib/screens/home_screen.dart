@@ -647,17 +647,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       {
         'icon': Icons.refresh,
         'label': AppLocalizations.of(context).translate('home.refresh'),
-        'subtitle': AppLocalizations.of(context).translate('subscription_management.update_all'),
+        'subtitle': AppLocalizations.of(context).translate('server_source.refresh_subtitle'),
         'onTap': () async {
           final provider = Provider.of<V2RayProvider>(context, listen: false);
           _showSnackBar(
-            AppLocalizations.of(context).translate('home.updating_subscriptions'), 
+            AppLocalizations.of(context).translate('server_source.refreshing_servers'), 
             Colors.blue,
           );
           await provider.updateAllSubscriptions();
           if (provider.errorMessage.isEmpty) {
             _showSnackBar(
-              AppLocalizations.of(context).translate('home.subscriptions_updated'), 
+              AppLocalizations.of(context).translate('server_source.servers_refreshed'), 
               Colors.green,
             );
           } else {

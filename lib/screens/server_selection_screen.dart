@@ -170,10 +170,21 @@ class _ServerSelectionScreenState
   }
 
   List<V2RayConfig> _getFilteredServers(V2RayProvider provider) {
-    var servers = provider.configs.toList();
+    List<V2RayConfig> servers = [];
+    
+    // If Tiksar Plus is selected, show servers
+    // If Tiksar Smart is selected, don't show servers (DXcore manages internally)
+    if (provider.serverSource == 'plus') {
+      // Show Tiksar Plus servers
+      servers = provider.autoServers.toList();
+    } else {
+      // Tiksar Smart (DXcore) - don't show servers
+      // DXcore handles server selection automatically
+      servers = [];
+    }
     
     // Sort by ping if available
-    if (_serverPings.isNotEmpty) {
+    if (_serverPings.isNotEmpty && servers.isNotEmpty) {
       servers.sort((a, b) {
         final pingA = _serverPings[a.id] ?? 999999;
         final pingB = _serverPings[b.id] ?? 999999;
@@ -312,7 +323,12 @@ class _ServerSelectionScreenState
           GestureDetector(
             onTap: () async {
               final provider = Provider.of<V2RayProvider>(context, listen: false);
-              _showSnackBar('Refreshing servers...', Colors.blue);
+              final langProvider = Provider.of<LanguageProvider>(context, listen: false);
+              
+              _showSnackBar(
+                langProvider.translate('server_source.refreshing_servers'),
+                Colors.blue,
+              );
               
               // Clear old ping results before refreshing
               if (mounted) {
@@ -321,15 +337,19 @@ class _ServerSelectionScreenState
                 });
               }
               
-              // Update all subscriptions to get fresh server list
+              // Update Smart/Plus servers
               await provider.updateAllSubscriptions();
               
               if (provider.errorMessage.isEmpty) {
-                _showSnackBar('Servers updated successfully!', Colors.green);
+                _showSnackBar(
+                  langProvider.translate('server_source.servers_refreshed'),
+                  Colors.green,
+                );
                 
-                // Optionally auto-test pings after refresh
-                // Uncomment the line below if you want automatic ping test after refresh
-                // await _testAllServersPing();
+                // Optionally auto-test pings after refresh (only for Plus servers)
+                if (provider.serverSource == 'plus' && mounted) {
+                  // await _testAllServersPing();
+                }
               } else {
                 _showSnackBar(provider.errorMessage, Colors.red);
                 provider.clearError();
@@ -445,6 +465,47 @@ class _ServerSelectionScreenState
   }
 
   Widget _buildEmptyState() {
+    final provider = Provider.of<V2RayProvider>(context, listen: false);
+    final langProvider = Provider.of<LanguageProvider>(context, listen: false);
+    
+    // Show different message for Tiksar Smart
+    if (provider.serverSource == 'smart') {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.auto_awesome,
+              size: 80,
+              color: Colors.white.withOpacity(0.3),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              langProvider.translate('server_source.smart_mode_title'),
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                langProvider.translate('server_source.smart_mode_message'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.5),
+                  fontSize: 15,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ).animate().fadeIn().scale();
+    }
+    
+    // Default empty state for Tiksar Plus
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -456,7 +517,7 @@ class _ServerSelectionScreenState
           ),
           const SizedBox(height: 16),
           Text(
-            'No servers found',
+            langProvider.translate('server_selector.no_servers'),
             style: TextStyle(
               color: Colors.white.withOpacity(0.5),
               fontSize: 18,
@@ -465,7 +526,7 @@ class _ServerSelectionScreenState
           ),
           const SizedBox(height: 8),
           Text(
-            'Try refreshing or changing filters',
+            langProvider.translate('server_source.no_servers_message'),
             style: TextStyle(
               color: Colors.white.withOpacity(0.3),
               fontSize: 14,
