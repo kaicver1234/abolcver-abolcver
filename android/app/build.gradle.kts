@@ -36,7 +36,8 @@ android {
         applicationId = "com.tiksarvpn.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // DXcore requires minSdk 23
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = 4
         versionName = "1.1.1"
