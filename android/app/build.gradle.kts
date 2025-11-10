@@ -64,8 +64,15 @@ android {
                 println("⚠️ WARNING: Release build is using debug key! Add key.properties for production.")
             }
             
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // Enable code shrinking, obfuscation, and optimization
+            isMinifyEnabled = true
+            isShrinkResources = true
+            
+            // ProGuard rules
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
     

@@ -1404,10 +1404,8 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       
       // Double-check after a brief moment to catch any race conditions
       Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          notifyListeners();
-          debugPrint('🔄 Secondary UI refresh completed');
-        }
+        notifyListeners();
+        debugPrint('🔄 Secondary UI refresh completed');
       });
       
     } catch (e) {
