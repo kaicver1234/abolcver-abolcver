@@ -40,6 +40,11 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = 5
         versionName = "1.1.1"
+        
+        // Optimize APK size - only include necessary ABIs
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     signingConfigs {
@@ -67,6 +72,11 @@ android {
             // Enable code shrinking, obfuscation, and optimization
             isMinifyEnabled = true
             isShrinkResources = true
+            
+            // Optimize build
+            ndk {
+                debugSymbolLevel = "NONE"
+            }
             
             // ProGuard rules
             proguardFiles(
@@ -96,8 +106,14 @@ android {
                 "META-INF/NOTICE",
                 "META-INF/NOTICE.txt",
                 "META-INF/notice.txt",
-                "META-INF/*.kotlin_module"
+                "META-INF/*.kotlin_module",
+                "kotlin/**",
+                "DebugProbesKt.bin",
+                "kotlin-tooling-metadata.json"
             )
+        }
+        jniLibs {
+            useLegacyPackaging = false
         }
     }
 }
