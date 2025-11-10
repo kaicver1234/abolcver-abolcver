@@ -196,7 +196,7 @@ class V2RayService extends ChangeNotifier {
     }
   }
 
-  Future<bool> connect(V2RayConfig config, bool statusProxy) async {
+  Future<bool> connect(V2RayConfig config) async {
     try {
       await initialize();
 
@@ -209,60 +209,11 @@ class V2RayService extends ChangeNotifier {
         return false;
       }
 
-      // Get settings from SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-
-      // Get bypass subnets settings
-      final bool bypassEnabled =
-          prefs.getBool('bypass_subnets_enabled') ?? false;
-      List<String>? bypassSubnets;
-
-      if (bypassEnabled) {
-        final String savedSubnets = prefs.getString('bypass_subnets') ?? '';
-        if (savedSubnets.isNotEmpty) {
-          bypassSubnets = savedSubnets.trim().split('\n');
-        }
-      } else {
-        // Explicitly set bypassSubnets to null when the feature is disabled
-        bypassSubnets = null;
-      }
-
-      // Save the proxy mode setting to SharedPreferences
-      await prefs.setBool('proxy_mode_enabled', statusProxy);
-
-      // Save the proxy mode setting to the config object
-      config.isProxyMode = statusProxy;
-
-      // Get custom DNS settings
-      final bool dnsEnabled = prefs.getBool('custom_dns_enabled') ?? false;
-      final String dnsServers =
-          prefs.getString('custom_dns_servers') ?? '1.1.1.1';
-
-      // Apply custom DNS settings if enabled
-      if (dnsEnabled && dnsServers.isNotEmpty) {
-        // Split the DNS servers string into a list (one per line)
-        List<String> serversList = dnsServers.trim().split('\n');
-        // Remove any empty entries
-        serversList = serversList
-            .where((server) => server.trim().isNotEmpty)
-            .toList();
-
-        if (serversList.isNotEmpty) {
-          // Set the DNS servers in the parser
-          parser.dns = {"servers": serversList};
-        }
-      }
-
-      // Get blocked apps from shared preferences
-      final blockedAppsList = prefs.getStringList('blocked_apps');
-
-      // Start V2Ray in VPN mode
+      // Start V2Ray in VPN mode - simplified without extra features
       await _flutterV2ray.startV2Ray(
         remark: config.remark,
         config: parser.getFullConfiguration(),
-        blockedApps: blockedAppsList, // Use saved blocked apps list
-        bypassSubnets: bypassSubnets,
-        proxyOnly: statusProxy, // Use proxy mode based on statusProxy parameter
+        proxyOnly: false, // Always use VPN mode (not proxy mode)
         notificationDisconnectButtonName: "DISCONNECT",
       );
 
@@ -326,11 +277,6 @@ class V2RayService extends ChangeNotifier {
 
   Future<void> _saveActiveConfig(V2RayConfig config) async {
     final prefs = await SharedPreferences.getInstance();
-
-    // Get the current proxy mode setting and update the config
-    final bool proxyModeEnabled = prefs.getBool('proxy_mode_enabled') ?? false;
-    config.isProxyMode = proxyModeEnabled;
-
     await prefs.setString('active_config', jsonEncode(config.toJson()));
     // Also save as selected config for UI state persistence
     await _saveSelectedConfig(config);
@@ -338,11 +284,6 @@ class V2RayService extends ChangeNotifier {
 
   Future<void> _saveSelectedConfig(V2RayConfig config) async {
     final prefs = await SharedPreferences.getInstance();
-
-    // Get the current proxy mode setting and update the config
-    final bool proxyModeEnabled = prefs.getBool('proxy_mode_enabled') ?? false;
-    config.isProxyMode = proxyModeEnabled;
-
     await prefs.setString('selected_config', jsonEncode(config.toJson()));
   }
 
@@ -375,68 +316,31 @@ class V2RayService extends ChangeNotifier {
       // First, try to load saved config
       final savedConfig = await _loadActiveConfig();
       
-      // Try multiple times to check if VPN is actually running
-      bool? isConnected;
-      for (int attempt = 0; attempt < 3; attempt++) {
-        try {
-          // Check if VPN is actually running with timeout
-          final delay = await _flutterV2ray.getConnectedServerDelay()
-              .timeout(const Duration(seconds: 8));
-          isConnected = delay >= 0;
-          break; // Success, exit retry loop
-        } catch (e) {
-          // Timeout or error - retry
-          if (attempt < 2) {
-            await Future.delayed(const Duration(milliseconds: 500));
-          }
-        }
-      }
-
-      // If we couldn't determine connection status but have saved config
-      // assume it's still connected (for better user experience after long background)
-      if (isConnected == null && savedConfig != null) {
-        _activeConfig = savedConfig;
-        // Assumed connected based on saved config (couldn't verify VPN status)
-        
-        // Restore connection time properly
-        await _restoreConnectionTime();
-        
-        // Start usage monitoring
-        _startUsageMonitoring();
-        
-        // Notify listeners to update UI
-        notifyListeners();
+      if (savedConfig == null) {
+        // No saved config, nothing to restore
+        debugPrint('ℹ️ No saved active config found');
         return;
       }
-
-      if (isConnected == true) {
-        // VPN is definitely connected
-        if (savedConfig != null) {
-          _activeConfig = savedConfig;
-          // Restored active config
-
-          // Restore connection time properly
-          await _restoreConnectionTime();
-
-          // Start usage monitoring
-          _startUsageMonitoring();
-
-          // Notify listeners to update UI
-          notifyListeners();
-        } else {
-          // VPN is connected but no saved config found
-          // VPN is connected but we don't have the config details
-          // This shouldn't happen normally, but handle gracefully
-        }
-      } else if (isConnected == false) {
-        // VPN is definitely not running, clear any saved config
-        // VPN is not connected, clearing saved config
-        await _clearActiveConfig();
-        _activeConfig = null;
-        notifyListeners();
-      }
+      
+      // OPTIMISTIC RESTORE: If we have a saved config, restore it immediately
+      // This ensures UI shows connected state right away
+      debugPrint('✅ Found saved config: ${savedConfig.remark}');
+      _activeConfig = savedConfig;
+      
+      // Restore connection time and start monitoring immediately
+      await _restoreConnectionTime();
+      _startUsageMonitoring();
+      
+      // Notify listeners immediately so UI updates right away
+      notifyListeners();
+      debugPrint('✅ Active config restored optimistically for UI');
+      
+      // Now verify in background (non-blocking)
+      // This happens asynchronously and won't delay UI display
+      _verifyConnectionInBackground();
+      
     } catch (e) {
-      // Error restoring active config
+      debugPrint('❌ Error restoring active config: $e');
       // Try to restore from saved config as fallback
       try {
         final savedConfig = await _loadActiveConfig();
@@ -445,18 +349,59 @@ class V2RayService extends ChangeNotifier {
           await _restoreConnectionTime();
           _startUsageMonitoring();
           notifyListeners();
-          // Restored config from fallback despite error
+          debugPrint('✅ Restored config from fallback despite error');
         } else {
           await _clearActiveConfig();
           _activeConfig = null;
           notifyListeners();
         }
       } catch (fallbackError) {
+        debugPrint('❌ Complete failure restoring config: $fallbackError');
         // Complete failure - clear everything
         await _clearActiveConfig();
         _activeConfig = null;
         notifyListeners();
       }
+    }
+  }
+  
+  // Verify connection in background without blocking UI
+  void _verifyConnectionInBackground() async {
+    try {
+      debugPrint('🔎 Verifying connection in background...');
+      
+      // Try multiple times to check if VPN is actually running
+      bool? isConnected;
+      for (int attempt = 0; attempt < 3; attempt++) {
+        try {
+          // Check if VPN is actually running with timeout
+          final delay = await _flutterV2ray.getConnectedServerDelay()
+              .timeout(const Duration(seconds: 8));
+          isConnected = delay >= 0 && delay < 10000;
+          debugPrint('🔎 Delay check result: ${delay}ms, connected: $isConnected');
+          break; // Success, exit retry loop
+        } catch (e) {
+          debugPrint('⚠️ Delay check attempt ${attempt + 1} failed: $e');
+          // Timeout or error - retry
+          if (attempt < 2) {
+            await Future.delayed(const Duration(milliseconds: 500));
+          }
+        }
+      }
+
+      if (isConnected == false) {
+        // VPN is definitely not running, clear active config
+        debugPrint('❌ Background verification: VPN is NOT running');
+        _activeConfig = null;
+        await _clearActiveConfig();
+        notifyListeners();
+      } else {
+        // Either verified as connected or couldn't verify (keep optimistic state)
+        debugPrint('✅ Background verification: VPN appears to be running');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error during background verification: $e');
+      // Keep optimistic state on verification error
     }
   }
 
@@ -1067,7 +1012,6 @@ class V2RayService extends ChangeNotifier {
         configType: configType,
         fullConfig: configText,
         isConnected: false,
-        isProxyMode: false,
       );
     } catch (e) {
       // Error parsing config

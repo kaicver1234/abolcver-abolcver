@@ -68,7 +68,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         } else {
           // Connect to server
           debugPrint('🚀 Starting connection to: ${provider.selectedConfig!.remark}');
-          await provider.connectToServer(provider.selectedConfig!, false);
+          await provider.connectToServer(provider.selectedConfig!);
           
           // Check result after connection attempt
           if (mounted) {
@@ -647,17 +647,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       {
         'icon': Icons.refresh,
         'label': AppLocalizations.of(context).translate('home.refresh'),
-        'subtitle': AppLocalizations.of(context).translate('server_source.refresh_subtitle'),
+        'subtitle': AppLocalizations.of(context).translate('subscription_management.update_all'),
         'onTap': () async {
           final provider = Provider.of<V2RayProvider>(context, listen: false);
           _showSnackBar(
-            AppLocalizations.of(context).translate('server_source.refreshing_servers'), 
+            AppLocalizations.of(context).translate('home.updating_subscriptions'), 
             Colors.blue,
           );
           await provider.updateAllSubscriptions();
           if (provider.errorMessage.isEmpty) {
             _showSnackBar(
-              AppLocalizations.of(context).translate('server_source.servers_refreshed'), 
+              AppLocalizations.of(context).translate('home.subscriptions_updated'), 
               Colors.green,
             );
           } else {
@@ -702,13 +702,26 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              // Simple transparent background like VPNGradientBackground
-              color: Colors.white.withValues(alpha: 0.05),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withValues(alpha: 0.1),
+                  Colors.white.withValues(alpha: 0.05),
+                ],
+              ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.1),
-                width: 1,
+                color: Colors.white.withValues(alpha: 0.15),
+                width: 1.5,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 15,
+                  offset: const Offset(0, 5),
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -1017,13 +1030,28 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       stream: Stream.periodic(const Duration(seconds: 1)),
       builder: (context, snapshot) {
         return Container(
-          padding: const EdgeInsets.all(20),
+          padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.1),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withOpacity(0.1),
+                Colors.white.withOpacity(0.05),
+              ],
             ),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.2),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
           child: Column(
             children: [
@@ -1094,39 +1122,53 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withOpacity(0.15),
+            color.withOpacity(0.08),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: color.withOpacity(0.3),
+          width: 1,
+        ),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(
-            icon,
-            color: color,
-            size: 20,
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 22,
+            ),
           ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
-                    fontSize: 10,
-                  ),
-                ),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
+          const SizedBox(height: 10),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              letterSpacing: -0.5,
             ),
           ),
         ],

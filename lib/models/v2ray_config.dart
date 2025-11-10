@@ -5,9 +5,7 @@ class V2RayConfig {
   final int port;
   final String configType; // vmess, vless, etc.
   final String fullConfig;
-  final String serverSource; // 'manual' or 'auto' - manual for user servers, auto for Tiksar Plus
   bool isConnected;
-  bool isProxyMode;
 
   V2RayConfig({
     required this.id,
@@ -16,9 +14,7 @@ class V2RayConfig {
     required this.port,
     required this.configType,
     required this.fullConfig,
-    this.serverSource = 'manual', // Default to manual for user-added servers
     this.isConnected = false,
-    this.isProxyMode = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -29,9 +25,7 @@ class V2RayConfig {
       'port': port,
       'configType': configType,
       'fullConfig': fullConfig,
-      'serverSource': serverSource,
       'isConnected': isConnected,
-      'isProxyMode': isProxyMode,
     };
   }
 
@@ -43,9 +37,7 @@ class V2RayConfig {
       port: json['port'],
       configType: json['configType'],
       fullConfig: json['fullConfig'],
-      serverSource: json['serverSource'] ?? 'manual', // Default to manual for backward compatibility
       isConnected: json['isConnected'] ?? false,
-      isProxyMode: json['isProxyMode'] ?? false,
     );
   }
 }

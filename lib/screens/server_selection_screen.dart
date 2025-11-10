@@ -160,7 +160,7 @@ class _ServerSelectionScreenState
       );
       
       await provider.selectConfig(server);
-      await provider.connectToServer(server, false);
+      await provider.connectToServer(server);
       
       _showSnackBar('Connected to fastest server: ${server.remark} ($lowestPing ms)', Colors.green);
       Navigator.pop(context, server);
@@ -170,21 +170,10 @@ class _ServerSelectionScreenState
   }
 
   List<V2RayConfig> _getFilteredServers(V2RayProvider provider) {
-    List<V2RayConfig> servers = [];
-    
-    // If Tiksar Plus is selected, show servers
-    // If Tiksar Smart is selected, don't show servers (DXcore manages internally)
-    if (provider.serverSource == 'plus') {
-      // Show Tiksar Plus servers
-      servers = provider.autoServers.toList();
-    } else {
-      // Tiksar Smart (DXcore) - don't show servers
-      // DXcore handles server selection automatically
-      servers = [];
-    }
+    var servers = provider.configs.toList();
     
     // Sort by ping if available
-    if (_serverPings.isNotEmpty && servers.isNotEmpty) {
+    if (_serverPings.isNotEmpty) {
       servers.sort((a, b) {
         final pingA = _serverPings[a.id] ?? 999999;
         final pingB = _serverPings[b.id] ?? 999999;
@@ -257,23 +246,27 @@ class _ServerSelectionScreenState
           textDirection: languageProvider.textDirection,
           child: VPNGradientBackground(
             status: backgroundStatus,
-            child: SafeArea(
-              child: Column(
-                children: [
-                  // Modern App Bar
-                  _buildAppBar(context),
-                  
-                  // Quick Actions
-                  _buildQuickActions(),
-                  
-                  // Server List
-                  Expanded(
-                    child: servers.isEmpty
-                        ? _buildEmptyState()
-                        : _buildServerList(servers, v2rayProvider),
-                  ),
-                ],
+            child: Scaffold(
+              backgroundColor: Colors.transparent,
+              body: SafeArea(
+                child: Column(
+                  children: [
+                    // Modern App Bar
+                    _buildAppBar(context),
+                    
+                    const SizedBox(height: 12),
+                    
+                    // Server List
+                    Expanded(
+                      child: servers.isEmpty
+                          ? _buildEmptyState()
+                          : _buildServerList(servers, v2rayProvider),
+                    ),
+                  ],
+                ),
               ),
+              // Bottom Action Bar با دکمه‌های تست پینگ و اتصال سریع
+              bottomNavigationBar: _buildBottomActionBar(),
             ),
           ),
         );
@@ -323,12 +316,7 @@ class _ServerSelectionScreenState
           GestureDetector(
             onTap: () async {
               final provider = Provider.of<V2RayProvider>(context, listen: false);
-              final langProvider = Provider.of<LanguageProvider>(context, listen: false);
-              
-              _showSnackBar(
-                langProvider.translate('server_source.refreshing_servers'),
-                Colors.blue,
-              );
+              _showSnackBar('Refreshing servers...', Colors.blue);
               
               // Clear old ping results before refreshing
               if (mounted) {
@@ -337,19 +325,15 @@ class _ServerSelectionScreenState
                 });
               }
               
-              // Update Smart/Plus servers
+              // Update all subscriptions to get fresh server list
               await provider.updateAllSubscriptions();
               
               if (provider.errorMessage.isEmpty) {
-                _showSnackBar(
-                  langProvider.translate('server_source.servers_refreshed'),
-                  Colors.green,
-                );
+                _showSnackBar('Servers updated successfully!', Colors.green);
                 
-                // Optionally auto-test pings after refresh (only for Plus servers)
-                if (provider.serverSource == 'plus' && mounted) {
-                  // await _testAllServersPing();
-                }
+                // Optionally auto-test pings after refresh
+                // Uncomment the line below if you want automatic ping test after refresh
+                // await _testAllServersPing();
               } else {
                 _showSnackBar(provider.errorMessage, Colors.red);
                 provider.clearError();
@@ -376,70 +360,93 @@ class _ServerSelectionScreenState
     );
   }
 
-  Widget _buildQuickActions() {
+  // Server count info removed as requested
+
+  Widget _buildBottomActionBar() {
     return Container(
-      padding: const EdgeInsets.all(20),
-      child: Row(
-        children: [
-          Expanded(
-            child: _buildActionButton(
-              label: 'Test All Pings',
-              icon: Icons.speed,
-              color: const Color(0xFF10B981),
-              isLoading: _isTestingPings,
-              onTap: _testAllServersPing,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: _buildActionButton(
-              label: 'Connect to Fastest',
-              icon: Icons.flash_on,
-              color: const Color(0xFF6366F1),
-              onTap: _connectToFastestServer,
-            ),
-          ),
-        ],
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.transparent,
+            Colors.black.withOpacity(0.3),
+            Colors.black.withOpacity(0.5),
+          ],
+        ),
       ),
-    ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.2, end: 0);
+      child: Container(
+        margin: const EdgeInsets.only(left: 20, right: 20, bottom: 20, top: 12),
+        child: Row(
+          children: [
+            // Test Ping Button
+            Expanded(
+              child: _buildModernActionButton(
+                label: 'Test Pings',
+                icon: Icons.speed_rounded,
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF10B981),
+                    const Color(0xFF059669),
+                  ],
+                ),
+                isLoading: _isTestingPings,
+                onTap: _testAllServersPing,
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Auto Connect Button
+            Expanded(
+              child: _buildModernActionButton(
+                label: 'Auto Connect',
+                icon: Icons.flash_on_rounded,
+                gradient: LinearGradient(
+                  colors: [
+                    const Color(0xFF6366F1),
+                    const Color(0xFF4F46E5),
+                  ],
+                ),
+                onTap: _connectToFastestServer,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.3, end: 0);
   }
 
-  Widget _buildActionButton({
+  Widget _buildModernActionButton({
     required String label,
     required IconData icon,
-    required Color color,
+    required Gradient gradient,
     required VoidCallback onTap,
     bool isLoading = false,
   }) {
     return GestureDetector(
       onTap: isLoading ? null : onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 16),
         decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              color,
-              color.withOpacity(0.8),
-            ],
-          ),
+          gradient: gradient,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: color.withOpacity(0.3),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 15,
+              offset: const Offset(0, 5),
             ),
           ],
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             if (isLoading)
               SizedBox(
-                width: 16,
-                height: 16,
+                width: 24,
+                height: 24,
                 child: CircularProgressIndicator(
-                  strokeWidth: 2,
+                  strokeWidth: 2.5,
                   valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
               )
@@ -447,15 +454,16 @@ class _ServerSelectionScreenState
               Icon(
                 icon,
                 color: Colors.white,
-                size: 20,
+                size: 26,
               ),
-            const SizedBox(width: 8),
+            const SizedBox(height: 8),
             Text(
               label,
               style: const TextStyle(
                 color: Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                letterSpacing: 0.3,
               ),
             ),
           ],
@@ -465,47 +473,6 @@ class _ServerSelectionScreenState
   }
 
   Widget _buildEmptyState() {
-    final provider = Provider.of<V2RayProvider>(context, listen: false);
-    final langProvider = Provider.of<LanguageProvider>(context, listen: false);
-    
-    // Show different message for Tiksar Smart
-    if (provider.serverSource == 'smart') {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.auto_awesome,
-              size: 80,
-              color: Colors.white.withOpacity(0.3),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              langProvider.translate('server_source.smart_mode_title'),
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.7),
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                langProvider.translate('server_source.smart_mode_message'),
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.5),
-                  fontSize: 15,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ).animate().fadeIn().scale();
-    }
-    
-    // Default empty state for Tiksar Plus
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -517,7 +484,7 @@ class _ServerSelectionScreenState
           ),
           const SizedBox(height: 16),
           Text(
-            langProvider.translate('server_selector.no_servers'),
+            'No servers found',
             style: TextStyle(
               color: Colors.white.withOpacity(0.5),
               fontSize: 18,
@@ -526,7 +493,7 @@ class _ServerSelectionScreenState
           ),
           const SizedBox(height: 8),
           Text(
-            langProvider.translate('server_source.no_servers_message'),
+            'Try refreshing or changing filters',
             style: TextStyle(
               color: Colors.white.withOpacity(0.3),
               fontSize: 14,
@@ -574,8 +541,6 @@ class _ServerSelectionScreenState
     required int index,
     required VoidCallback onTap,
   }) {
-    // Use a single neutral color for all pings
-    Color pingColor = Colors.white.withOpacity(0.7);
     String pingText = '';
     
     if (ping != null) {
@@ -589,9 +554,9 @@ class _ServerSelectionScreenState
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(16),
+        duration: const Duration(milliseconds: 300),
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
           gradient: isActive
               ? LinearGradient(
@@ -599,38 +564,51 @@ class _ServerSelectionScreenState
                     const Color(0xFF6366F1),
                     const Color(0xFF4F46E5),
                   ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 )
               : null,
-          color: isActive ? null : Colors.white.withOpacity(0.05),
-          borderRadius: BorderRadius.circular(16),
+          color: isActive ? null : Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: isActive
-                ? const Color(0xFF6366F1)
-                : Colors.white.withOpacity(0.1),
+                ? const Color(0xFF6366F1).withOpacity(0.5)
+                : Colors.white.withOpacity(0.12),
+            width: 1.5,
           ),
+          boxShadow: isActive ? [
+            BoxShadow(
+              color: const Color(0xFF6366F1).withOpacity(0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ] : null,
         ),
         child: Row(
           children: [
-            // Server Icon
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                color: isActive
-                    ? Colors.white.withOpacity(0.2)
-                    : Colors.white.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.dns,
-                color: isActive
-                    ? Colors.white
-                    : Colors.white.withOpacity(0.6),
-                size: 24,
+            // Server Icon با انیمیشن
+            Hero(
+              tag: 'server_${server.id}',
+              child: Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: isActive
+                      ? Colors.white.withOpacity(0.25)
+                      : const Color(0xFF6366F1).withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  Icons.dns_rounded,
+                  color: isActive
+                      ? Colors.white
+                      : const Color(0xFF6366F1),
+                  size: 26,
+                ),
               ),
             ),
             
-            const SizedBox(width: 16),
+            const SizedBox(width: 14),
             
             // Server Info
             Expanded(
@@ -640,93 +618,100 @@ class _ServerSelectionScreenState
                   Text(
                     server.remark,
                     style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+                      color: isActive ? Colors.white : Colors.white.withOpacity(0.95),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 6),
                   Row(
                     children: [
                       // Protocol Type Badge
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
+                          color: isActive 
+                              ? Colors.white.withOpacity(0.2)
+                              : Colors.white.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.12),
-                            width: 1,
-                          ),
                         ),
                         child: Text(
                           server.configType.toUpperCase(),
                           style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.7),
+                            color: isActive 
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.8),
                             fontSize: 10,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                             letterSpacing: 0.5,
                           ),
                         ),
                       ),
-                      const Spacer(),
-                      if (ping != null) ...[
-                        const SizedBox(width: 8),
+                      const SizedBox(width: 8),
+                      // Ping Badge (فقط عدد، بدون آیکون)
+                      if (ping != null)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                           decoration: BoxDecoration(
-                            color: pingColor.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(
-                              color: pingColor.withOpacity(0.3),
-                              width: 1,
+                            color: isActive 
+                                ? Colors.white.withOpacity(0.2)
+                                : Colors.white.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            pingText,
+                            style: TextStyle(
+                              color: isActive 
+                                  ? Colors.white
+                                  : Colors.white.withOpacity(0.8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
-                          child: Row(
-                            children: [
-                              Icon(
-                                (ping < 100) ? Icons.speed : Icons.signal_cellular_alt,
-                                size: 12,
-                                color: pingColor,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                pingText.isNotEmpty ? pingText : 'Testing...',
-                                style: TextStyle(
-                                  color: pingColor,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
-                      ],
                     ],
                   ),
                 ],
               ),
             ),
             
-            // Action Button
+            // Arrow or Active Badge
             if (isActive)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withOpacity(0.25),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'ACTIVE',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.5,
-                  ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.check_circle,
+                      size: 14,
+                      color: Colors.white,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      'ACTIVE',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
                 ),
+              )
+            else
+              Icon(
+                Icons.chevron_right_rounded,
+                color: Colors.white.withOpacity(0.3),
+                size: 24,
               ),
           ],
         ),

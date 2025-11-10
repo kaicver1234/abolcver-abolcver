@@ -386,26 +386,5 @@
         "ping_label": "Ping",
         "error": "Error",
         "test_cancelled": "Test cancelled"
-    },
-    "server_source": {
-        "title": "Server Source",
-        "subtitle": "Choose your connection type",
-        "servers_loaded": "{count} servers loaded",
-        "smart_title": "Tiksar Smart",
-        "smart_subtitle": "Intelligent protocol selection (Recommended)",
-        "plus_title": "Tiksar Plus",
-        "plus_subtitle": "High-speed servers",
-        "recommended": "RECOMMENDED",
-        "change_dialog_title": "Change Server Source",
-        "change_dialog_message": "Switch to {title}?\n\nThis will reload all servers from the new source.",
-        "switch_button": "Switch",
-        "switched_success": "Switched to {title}",
-        "error_prefix": "Error: {error}",
-        "smart_mode_title": "Tiksar Smart Mode",
-        "smart_mode_message": "Server selection is automatic.\nJust tap Connect!",
-        "no_servers_message": "Try refreshing or changing server source",
-        "refresh_subtitle": "Update servers",
-        "refreshing_servers": "Updating servers...",
-        "servers_refreshed": "Servers updated successfully"
     }
 }

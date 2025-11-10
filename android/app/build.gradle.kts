@@ -36,12 +36,10 @@ android {
         applicationId = "com.tiksarvpn.app"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // DXcore requires minSdk 23
-        minSdk = 23
+        minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = 4
+        versionCode = 5
         versionName = "1.1.1"
-        multiDexEnabled = true
     }
 
     signingConfigs {
@@ -57,16 +55,15 @@ android {
 
     buildTypes {
         release {
-            // ⚠️ TEMPORARY: Using debug key for compatibility with existing installation
-            // Change this back to release key after users update or reinstall
-            signingConfig = signingConfigs.getByName("debug")
+            // ✅ Use release key for proper app signing
+            if (keystorePropertiesFile.exists() && keystoreProperties.isNotEmpty()) {
+                signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Fallback to debug if key.properties is missing
+                signingConfig = signingConfigs.getByName("debug")
+                println("⚠️ WARNING: Release build is using debug key! Add key.properties for production.")
+            }
             
-            // Uncomment below to use production release key:
-            // if (keystorePropertiesFile.exists() && keystoreProperties.isNotEmpty()) {
-            //     signingConfig = signingConfigs.getByName("release")
-            // }
-            
-            // Disable minify to avoid duplicate class check issues
             isMinifyEnabled = false
             isShrinkResources = false
         }
@@ -75,40 +72,24 @@ android {
     lint {
         checkReleaseBuilds = false
         abortOnError = false
+        disable += listOf(
+            "GoogleAppIndexingWarning",
+            "UnusedAttribute",
+            "MissingApplicationIcon"
+        )
     }
     
-    packaging {
+    packagingOptions {
         resources {
-            excludes += setOf(
-                "META-INF/NOTICE",
-                "META-INF/LICENSE",
+            excludes += listOf(
                 "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE",
                 "META-INF/LICENSE.txt",
-                "META-INF/NOTICE.txt"
-            )
-            // Prioritize DXcore's Go runtime classes over libv2ray's
-            pickFirsts += setOf(
-                "go/Seq.class",
-                "go/Seq\$GoObject.class",
-                "go/Seq\$GoRef.class",
-                "go/Seq\$GoRefQueue.class",
-                "go/Seq\$GoRefQueue\$1.class",
-                "go/Seq\$Proxy.class",
-                "go/Seq\$Ref.class",
-                "go/Seq\$RefMap.class",
-                "go/Seq\$RefTracker.class",
-                "go/Universe.class",
-                "go/Universe\$proxyerror.class",
-                "go/error.class"
-            )
-        }
-        jniLibs {
-            // Prioritize DXcore's native libraries over libv2ray's
-            pickFirsts += setOf(
-                "lib/armeabi-v7a/libgojni.so",
-                "lib/arm64-v8a/libgojni.so",
-                "lib/x86/libgojni.so",
-                "lib/x86_64/libgojni.so"
+                "META-INF/license.txt",
+                "META-INF/NOTICE",
+                "META-INF/NOTICE.txt",
+                "META-INF/notice.txt",
+                "META-INF/*.kotlin_module"
             )
         }
     }
@@ -118,25 +99,7 @@ flutter {
     source = "../.."
 }
 
-// Disable duplicate class and dex checks
-// Both DXcore and libv2ray have Go runtime, but we handle this via packaging.pickFirsts
-gradle.taskGraph.whenReady {
-    allTasks.forEach { task ->
-        val taskName = task.name
-        if (taskName.contains("checkReleaseDuplicateClasses") || 
-            taskName.contains("checkDebugDuplicateClasses")) {
-            task.enabled = false
-        }
-    }
-}
-
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("androidx.multidex:multidex:2.0.1")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
-    
-    // DXcore library for VPN protocols (XRAY, OUTLINE, PSIPHON, WARP, GOOL, SERVERLESS)
-    // Note: libv2ray is disabled to avoid duplicate Go runtime conflict
-    // DXcore's XRAY supports all V2Ray protocols (vmess, vless, trojan, shadowsocks)
-    implementation(files("libs/DXcore.aar"))
 }

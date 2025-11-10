@@ -16,19 +16,29 @@ class UpdateCheckWrapper extends StatefulWidget {
 }
 
 class _UpdateCheckWrapperState extends State<UpdateCheckWrapper> {
-  bool _isCheckingUpdate = true;
+  bool _isCheckingUpdate = false;  // تغییر به false - اول برنامه باز می‌شود
   AppUpdateInfo? _updateInfo;
 
   @override
   void initState() {
     super.initState();
-    _checkForUpdate();
+    // چک آپدیت را بعد از باز شدن برنامه انجام بده (پس‌زمینه)
+    Future.delayed(const Duration(milliseconds: 500), () {
+      _checkForUpdate();
+    });
   }
 
   Future<void> _checkForUpdate() async {
     try {
-      // Check for updates on every app launch
-      final updateInfo = await UpdateCheckerService.checkForUpdate();
+      // چک آپدیت در پس‌زمینه انجام می‌شود و برنامه را مسدود نمی‌کند
+      final updateInfo = await UpdateCheckerService.checkForUpdate()
+          .timeout(
+            const Duration(seconds: 10),  // حداکثر 10 ثانیه منتظر می‌مانیم
+            onTimeout: () {
+              debugPrint('⏱️ چک آپدیت timeout شد - برنامه ادامه می‌یابد');
+              return null;  // اگر timeout شد، null برگردان
+            },
+          );
       
       if (mounted) {
         setState(() {
@@ -36,7 +46,7 @@ class _UpdateCheckWrapperState extends State<UpdateCheckWrapper> {
           _isCheckingUpdate = false;
         });
         
-        // If update is available, show dialog immediately
+        // اگر آپدیت جدید موجود باشد، دیالوگ را نمایش بده
         if (_updateInfo != null) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             _showUpdateDialog();
@@ -44,7 +54,8 @@ class _UpdateCheckWrapperState extends State<UpdateCheckWrapper> {
         }
       }
     } catch (e) {
-      // Error checking for update - silently continue
+      // خطا در چک آپدیت - به صورت silent ادامه می‌دهیم و برنامه را باز می‌کنیم
+      debugPrint('⚠️ خطا در چک آپدیت: $e - برنامه به صورت عادی باز می‌شود');
       if (mounted) {
         setState(() {
           _isCheckingUpdate = false;
@@ -77,7 +88,8 @@ class _UpdateCheckWrapperState extends State<UpdateCheckWrapper> {
 
   @override
   Widget build(BuildContext context) {
-    // If forced update is available, show update dialog instead of main app
+    // اگر آپدیت اجباری موجود باشد، صفحه آپدیت را نمایش بده
+    // (فقط بعد از اینکه چک کامل شده باشد)
     if (_updateInfo != null && _updateInfo!.isForced && !_isCheckingUpdate) {
       return Scaffold(
         backgroundColor: const Color(0xFF1E293B),
@@ -87,7 +99,8 @@ class _UpdateCheckWrapperState extends State<UpdateCheckWrapper> {
       );
     }
     
-    // Always show the main app (check for updates happens in background)
+    // همیشه برنامه اصلی را نمایش بده (چک آپدیت در پس‌زمینه انجام می‌شود)
+    // این تضمین می‌کند که حتی بدون اینترنت هم می‌توانی وارد VPN شوی
     return widget.child;
   }
 }

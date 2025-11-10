@@ -7,27 +7,22 @@ import '../models/v2ray_config.dart';
 import '../models/subscription.dart';
 import '../services/v2ray_service.dart';
 import '../services/server_service.dart';
-import '../services/tiksar_plus_service.dart';
 import '../services/analytics_service.dart';
 
 class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   final V2RayService _v2rayService = V2RayService();
   final ServerService _serverService = ServerService();
-  final TiksarPlusService _tiksarPlusService = TiksarPlusService();
   final AnalyticsService _analyticsService = AnalyticsService();
   bool statusPingOnly = false;
   List<V2RayConfig> _configs = [];
-  List<Subscription> _subscriptions = []; // Empty - subscriptions disabled
+  List<Subscription> _subscriptions = [];
   V2RayConfig? _selectedConfig;
   bool _isConnecting = false;
   bool _isLoading = false;
   String _errorMessage = '';
   bool _isLoadingServers = false;
-  bool _isProxyMode = false;
   bool _isInitializing = true; // Track initialization state
   DateTime? _lastSuccessfulConnection; // Track last successful connection time
-  bool _isAutoMode = true; // Auto mode is always enabled (Smart/Plus selection)
-  String _serverSource = TiksarPlusService.defaultSource; // Current server source (smart or plus)
   
   // Method channel for VPN control
   static const platform = MethodChannel('com.tiksarvpn.app/vpn_control');
@@ -45,32 +40,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   bool get isLoadingServers => _isLoadingServers;
   String get errorMessage => _errorMessage;
   V2RayService get v2rayService => _v2rayService;
-  bool get isProxyMode => _isProxyMode;
   bool get isInitializing => _isInitializing;
-  bool get isAutoMode => _isAutoMode; // Getter for automatic mode
-  String get serverSource => _serverSource; // Current server source
 
   // Expose V2Ray status for real-time traffic monitoring
   V2RayStatus? get currentStatus => _v2rayService.currentStatus;
-  
-  // Get only manual servers (user's servers) - hide auto servers from UI
-  List<V2RayConfig> get manualServers {
-    return _configs.where((c) => c.serverSource == 'manual').toList();
-  }
-  
-  // Get only auto servers (Tiksar Plus servers) - internal use only
-  List<V2RayConfig> get autoServers {
-    return _configs.where((c) => c.serverSource == 'auto').toList();
-  }
-  
-  // Get friendly name for current server source
-  String get serverSourceName {
-    if (_serverSource == TiksarPlusService.sourceSmart) {
-      return 'Tiksar Smart';
-    } else {
-      return 'Tiksar Plus';
-    }
-  }
 
   V2RayProvider() {
     WidgetsBinding.instance.addObserver(this);
@@ -260,24 +233,18 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       await loadConfigs();
       debugPrint('✅ Configs loaded: ${_configs.length} servers');
 
-      // Note: Subscription loading skipped - only Smart/Plus servers are used
-      // await loadSubscriptions();
-      
-      // Load proxy mode and server source settings from SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      _isProxyMode = prefs.getBool('proxy_mode_enabled') ?? false;
-      _serverSource = prefs.getString('server_source') ?? TiksarPlusService.defaultSource;
-      debugPrint('✅ Settings loaded - Proxy: $_isProxyMode, Source: $_serverSource');
+      // Load subscriptions
+      await loadSubscriptions();
+      debugPrint('✅ Subscriptions loaded: ${_subscriptions.length} subscriptions');
 
-      // Auto mode is always enabled - fetch servers automatically from selected source
+      // Update all subscriptions on app start - await to ensure configs are loaded
       try {
-        await _fetchTiksarPlusServers(source: _serverSource);
-        debugPrint('✅ ${serverSourceName} loaded');
+        await updateAllSubscriptions();
+        debugPrint('✅ Subscriptions updated');
       } catch (e) {
-        debugPrint('⚠️ Failed to load servers: $e');
+        debugPrint('⚠️ Subscription update failed: $e');
+        // Ignore subscription update errors but continue initialization
       }
-
-      // Note: Subscription management removed - only Smart/Plus servers are used
 
       // CRITICAL FIX: Enhanced synchronization with actual VPN service state
       // This method checks VPN status and updates all configs accordingly
@@ -486,12 +453,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
-  // Subscription-based fetch disabled
   Future<void> fetchServers({required String customUrl}) async {
-    debugPrint('⚠️ fetchServers called but subscription fetch is disabled');
-    _setError('Manual server fetch is disabled. Only Smart/Plus servers are available.');
-    return;
-    /* DISABLED
     _isLoadingServers = true;
     _errorMessage = '';
     notifyListeners();
@@ -543,16 +505,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       _isLoadingServers = false;
       notifyListeners();
     }
-    */ // END DISABLED
   }
 
-  // Subscription management disabled - keeping method for compatibility
   Future<void> loadSubscriptions() async {
-    // Subscriptions disabled - only Smart/Plus servers are used
-    _subscriptions = [];
-    return;
-    
-    /* DISABLED CODE
     _setLoading(true);
     try {
       _subscriptions = await _v2rayService.loadSubscriptions();
@@ -610,7 +565,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     } finally {
       _setLoading(false);
     }
-    */ // END DISABLED CODE
   }
 
   Future<void> addConfig(V2RayConfig config) async {
@@ -688,12 +642,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     super.dispose();
   }
 
-  // Subscription management disabled
   Future<void> addSubscription(String name, String url) async {
-    debugPrint('⚠️ addSubscription called but subscriptions are disabled');
-    _setError('Subscription management is disabled. Only Smart/Plus servers are available.');
-    return;
-    /* DISABLED
     _setLoading(true);
     _errorMessage = '';
     try {
@@ -747,16 +696,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     } finally {
       _setLoading(false);
     }
-    */ // END DISABLED
   }
 
-  // Subscription management disabled
   Future<void> updateSubscription(Subscription subscription) async {
-    debugPrint('⚠️ updateSubscription called but subscriptions are disabled');
-    _setError('Subscription management is disabled. Only Smart/Plus servers are available.');
-    return;
-    /* DISABLED
-    // Original code commented out
     _setLoading(true);
     _isLoadingServers = true;
     _errorMessage = '';
@@ -825,14 +767,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     } finally {
       _setLoading(false);
     }
-    */ // END DISABLED
   }
 
-  // Subscription management disabled
+  // Update subscription info without refreshing servers
   Future<void> updateSubscriptionInfo(Subscription subscription) async {
-    debugPrint('⚠️ updateSubscriptionInfo called but subscriptions are disabled');
-    return;
-    /* DISABLED
     _setLoading(true);
     _errorMessage = '';
 
@@ -866,26 +804,78 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     } finally {
       _setLoading(false);
     }
-    */ // END DISABLED
   }
 
-  // Update servers (replaces subscription update)
-  // Now refreshes Smart/Plus servers instead of subscriptions
+  // Update all subscriptions
   Future<void> updateAllSubscriptions() async {
     _setLoading(true);
     _errorMessage = '';
     _isLoadingServers = true;
     notifyListeners();
 
-    // Clear all ping cache before updating servers
+    // Clear all ping cache before updating subscriptions
     _v2rayService.clearPingCache();
 
     try {
-      // Refresh servers from current source (Smart or Plus)
-      await _fetchTiksarPlusServers(source: _serverSource);
-      
-      debugPrint('✅ ${serverSourceName} refreshed successfully');
-      
+      // Make a copy to avoid modification during iteration
+      final subscriptionsCopy = List<Subscription>.from(_subscriptions);
+      bool anyUpdated = false;
+      List<String> failedSubscriptions = [];
+
+      for (final subscription in subscriptionsCopy) {
+        try {
+          // Skip empty or invalid subscriptions
+          if (subscription.url.isEmpty) continue;
+
+          final configs = await _v2rayService.parseSubscriptionUrl(
+            subscription.url,
+          );
+
+          // Remove old configs for this subscription
+          _configs.removeWhere((c) => subscription.configIds.contains(c.id));
+
+          // Add new configs
+          _configs.addAll(configs);
+
+          final newConfigIds = configs.map((c) => c.id).toList();
+
+          // Update subscription
+          final index = _subscriptions.indexWhere(
+            (s) => s.id == subscription.id,
+          );
+          if (index != -1) {
+            _subscriptions[index] = subscription.copyWith(
+              lastUpdated: DateTime.now(),
+              configIds: newConfigIds,
+            );
+            anyUpdated = true;
+          }
+        } catch (e) {
+          // Record failed subscription
+          failedSubscriptions.add(subscription.name);
+          // Error updating subscription
+        }
+      }
+
+      // Save all changes at once to reduce disk operations
+      if (anyUpdated) {
+        await _v2rayService.saveConfigs(_configs);
+        await _v2rayService.saveSubscriptions(_subscriptions);
+      }
+
+      // Set error message if any subscriptions failed
+      if (failedSubscriptions.isNotEmpty) {
+        if (failedSubscriptions.length == _subscriptions.length) {
+          // All subscriptions failed - likely a network issue
+          _setError(
+            'Failed to update subscriptions: Network error or invalid URLs',
+          );
+        } else {
+          // Some subscriptions failed
+          _setError('Failed to update: ${failedSubscriptions.join(', ')}');
+        }
+      }
+
       _isLoadingServers = false;
       notifyListeners();
     } catch (e) {
@@ -896,11 +886,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
-  // Subscription management disabled
   Future<void> removeSubscription(Subscription subscription) async {
-    debugPrint('⚠️ removeSubscription called but subscriptions are disabled');
-    return;
-    /* DISABLED
     // Remove configs associated with this subscription
     _configs.removeWhere((c) => subscription.configIds.contains(c.id));
 
@@ -910,10 +896,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     await _v2rayService.saveConfigs(_configs);
     await _v2rayService.saveSubscriptions(_subscriptions);
     notifyListeners();
-    */ // END DISABLED
   }
 
-  Future<void> connectToServer(V2RayConfig config, bool isProxyMode) async {
+  Future<void> connectToServer(V2RayConfig config) async {
     debugPrint('🚀 Starting connection to: ${config.remark}');
     
     // VALIDATION: Check if config is valid
@@ -946,7 +931,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('   - Server: ${config.remark}');
       debugPrint('   - Address: ${config.address}:${config.port}');
       debugPrint('   - Protocol: ${config.configType}');
-      debugPrint('   - Proxy mode: $isProxyMode');
       debugPrint('   - Max attempts: $maxAttempts');
       
       // STEP 1: Disconnect from current server if connected
@@ -972,7 +956,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         try {
           // Attempt connection with timeout
           success = await _v2rayService
-              .connect(config, isProxyMode)
+              .connect(config)
               .timeout(
                 Duration(seconds: connectionTimeout),
                 onTimeout: () {
@@ -1260,13 +1244,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
-  // تغییر وضعیت بین حالت پروکسی و تونل
-  void toggleProxyMode(bool isProxy) {
-    _isProxyMode = isProxy;
-    // اینجا می‌توانیم منطق اضافی برای تغییر حالت اضافه کنیم
-    // مثلاً ارسال دستور به سرویس برای تغییر حالت
-    notifyListeners();
-  }
+  // Proxy mode feature removed for simplification
 
   void _setLoading(bool loading) {
     _isLoading = loading;
@@ -1344,6 +1322,18 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     
     try {
       debugPrint('🔄 Syncing VPN status on app resume...');
+      
+      // CRITICAL: First check if we have a connected config but no activeConfig
+      // This means the service needs to restore the activeConfig immediately
+      final hasConnectedConfig = _configs.any((c) => c.isConnected);
+      if (hasConnectedConfig && _v2rayService.activeConfig == null) {
+        debugPrint('🔄 Found connected config but no activeConfig, restoring immediately...');
+        // Force service to restore activeConfig from saved state
+        await _v2rayService.initialize(); // This calls _tryRestoreActiveConfig
+        // Give it a moment to restore
+        await Future.delayed(const Duration(milliseconds: 100));
+        debugPrint('✅ ActiveConfig restoration triggered: ${_v2rayService.activeConfig?.remark ?? "none"}');
+      }
       
       // Check actual VPN connection status from native side
       final isActuallyConnected = await _v2rayService.isActuallyConnected()
@@ -1514,6 +1504,14 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         if (connectedConfigIndex != -1) {
           _selectedConfig = _configs[connectedConfigIndex];
           debugPrint('📂 Found connected config: ${_selectedConfig?.remark}');
+          
+          // CRITICAL: Force service to restore activeConfig immediately
+          // This ensures activeConfig is available when UI checks it
+          if (_v2rayService.activeConfig == null) {
+            debugPrint('🔄 Service activeConfig is null, triggering restore...');
+            // The service's initialize will call _tryRestoreActiveConfig
+            // which will restore it immediately in an optimistic way
+          }
         }
         
         // Notify UI immediately with saved state
@@ -1670,105 +1668,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('❌ Error checking connection status: $e');
       // Don't change connection state on errors, but still notify UI
       notifyListeners();
-    }
-  }
-
-  // ============================================================================
-  // TIKSAR PLUS METHODS
-  // Automatic server selection (similar to DXcore)
-  // ============================================================================
-
-  /// Change server source (Tiksar Smart or Tiksar Plus)
-  /// 
-  /// [source] - Server source: 'smart' or 'plus'
-  /// 
-  /// This will save the selection and reload servers
-  Future<void> changeServerSource(String source) async {
-    try {
-      if (source != TiksarPlusService.sourceSmart && 
-          source != TiksarPlusService.sourcePlus) {
-        throw Exception('Invalid server source: $source');
-      }
-      
-      debugPrint('🔄 Changing server source to: $source');
-      
-      _serverSource = source;
-      
-      // Save setting to SharedPreferences
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('server_source', source);
-      
-      // If auto mode is enabled, reload servers with new source
-      if (_isAutoMode) {
-        await _fetchTiksarPlusServers(source: source);
-        debugPrint('✅ Server source changed to ${serverSourceName}');
-      }
-      
-      notifyListeners();
-    } catch (e) {
-      debugPrint('❌ Error changing server source: $e');
-      _setError('Failed to change server source: $e');
-    }
-  }
-
-  /// Toggle Auto Mode is removed - Auto mode is always enabled
-  /// Users can only switch between Tiksar Smart and Tiksar Plus
-
-  /// Internal method to fetch servers from selected source (hidden from users)
-  Future<void> _fetchTiksarPlusServers({String? source}) async {
-    try {
-      final selectedSource = source ?? _serverSource;
-      final sourceName = selectedSource == TiksarPlusService.sourceSmart 
-          ? 'Tiksar Smart' 
-          : 'Tiksar Plus';
-      debugPrint('📡 Fetching $sourceName servers...');
-      
-      // Fetch auto servers from selected source
-      final autoServers = await _tiksarPlusService.fetchAutoServers(
-        source: selectedSource,
-      );
-
-      if (autoServers.isNotEmpty) {
-        debugPrint('✅ Fetched ${autoServers.length} Tiksar Plus servers');
-
-        // Remove old auto servers
-        _configs.removeWhere((c) => c.serverSource == 'auto');
-
-        // Add new auto servers
-        _configs.addAll(autoServers);
-
-        // Save configs
-        await _v2rayService.saveConfigs(_configs);
-
-        debugPrint('✅ Tiksar Plus servers loaded');
-      } else {
-        debugPrint('⚠️ No Tiksar Plus servers found');
-      }
-    } catch (e) {
-      debugPrint('❌ Error fetching Tiksar Plus servers: $e');
-      throw e;
-    }
-  }
-
-  /// Internal method to remove all auto servers
-  Future<void> _removeAllAutoServers() async {
-    try {
-      debugPrint('🗑️ Removing all auto servers...');
-      
-      // Remove all auto servers
-      _configs.removeWhere((c) => c.serverSource == 'auto');
-      
-      // If selected config was an auto server, clear selection
-      if (_selectedConfig?.serverSource == 'auto') {
-        _selectedConfig = null;
-      }
-
-      // Save updated configs
-      await _v2rayService.saveConfigs(_configs);
-      
-      debugPrint('✅ Auto servers removed');
-    } catch (e) {
-      debugPrint('❌ Error removing auto servers: $e');
     }
   }
   

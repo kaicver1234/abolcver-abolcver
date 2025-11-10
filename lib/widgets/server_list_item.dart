@@ -190,7 +190,6 @@ class _ServerListItemState extends State<ServerListItem> {
                           ? () async => await provider.disconnect()
                           : () async => await provider.connectToServer(
                               widget.config,
-                              provider.isProxyMode,
                             ),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: isActive
