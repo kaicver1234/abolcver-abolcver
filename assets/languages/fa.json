@@ -116,6 +116,8 @@
         "delete_failed": "خطا در حذف پیکربندی: {error}",
         "connect_failed": "خطا در اتصال به {server}: {error}",
         "test_ping": "تست پینگ",
+        "test_pings": "تست پینگ سرورها",
+        "auto_connect": "اتصال خودکار",
         "sort_by_ping": "مرتب‌سازی بر اساس پینگ",
         "update_servers": "به‌روزرسانی سرورها",
         "lowest_ping": "{server} با {ping}میلی‌ثانیه پاسخ داد",
@@ -125,6 +127,24 @@
         "batch_timeout": "مهلت زمانی دسته به پایان رسید، در حال امتحان سرورهای بعدی...",
         "no_suitable_server": "هیچ سرور مناسبی یافت نشد",
         "testing_server": "در حال تست {server}..."
+    },
+    "host_checker": {
+        "title": "بررسی میزبان",
+        "enter_host": "آدرس میزبان را وارد کنید (مثال: google.com)",
+        "check": "بررسی",
+        "online": "آنلاین",
+        "offline": "آفلاین",
+        "please_enter_host": "لطفاً یک میزبان وارد کنید",
+        "is_online": "{host} آنلاین است!",
+        "is_offline": "{host} آفلاین است: {error}",
+        "connection_timeout": "زمان اتصال به پایان رسید",
+        "host_not_found": "میزبان یافت نشد",
+        "connection_refused": "اتصال رد شد",
+        "unknown_error": "خطای ناشناخته",
+        "status_code": "کد وضعیت",
+        "response_time": "زمان پاسخ",
+        "no_results": "هنوز نتیجه‌ای وجود ندارد",
+        "start_checking": "شروع به بررسی میزبان‌ها کنید"
     },
     "update_service": {
         "update_available": "به‌روزرسانی موجود",

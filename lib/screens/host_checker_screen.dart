@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../widgets/vpn_gradient_background.dart';
+import '../utils/app_localizations.dart';
 
 class HostCheckerScreen extends StatefulWidget {
   const HostCheckerScreen({Key? key}) : super(key: key);
@@ -38,7 +39,10 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
 
   Future<void> _checkHost(String host) async {
     if (host.isEmpty) {
-      _showSnackBar('Please enter a host', Colors.orange);
+      _showSnackBar(
+        AppLocalizations.of(context).translate('host_checker.please_enter_host'), 
+        Colors.orange,
+      );
       return;
     }
 
@@ -73,7 +77,7 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
       setState(() {
         _results.insert(0, HostCheckResult(
           host: uri.host,
-          status: 'Online',
+          status: AppLocalizations.of(context).translate('host_checker.online'),
           statusCode: response.statusCode,
           responseTime: responseTime,
           timestamp: DateTime.now(),
@@ -83,29 +87,36 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
         if (_results.length > 10) {
           _results.removeLast();
         }
+        
+        // Clear input after successful check
+        _hostController.clear();
       });
       
       if (mounted) {
-        _showSnackBar('${uri.host} is online!', Colors.green);
+        _showSnackBar(
+          AppLocalizations.of(context).translate('host_checker.is_online')
+              .replaceAll('{host}', uri.host),
+          Colors.green,
+        );
       }
     } catch (e) {
       if (!mounted) return;
       
-      String errorMessage = 'Unknown error';
+      String errorMessage;
       if (e is TimeoutException) {
-        errorMessage = 'Connection timeout';
+        errorMessage = AppLocalizations.of(context).translate('host_checker.connection_timeout');
       } else if (e.toString().contains('Failed host lookup')) {
-        errorMessage = 'Host not found';
+        errorMessage = AppLocalizations.of(context).translate('host_checker.host_not_found');
       } else if (e.toString().contains('Connection refused')) {
-        errorMessage = 'Connection refused';
+        errorMessage = AppLocalizations.of(context).translate('host_checker.connection_refused');
       } else {
-        errorMessage = e.toString().split(':').first;
+        errorMessage = AppLocalizations.of(context).translate('host_checker.unknown_error');
       }
       
       setState(() {
         _results.insert(0, HostCheckResult(
           host: host,
-          status: 'Offline',
+          status: AppLocalizations.of(context).translate('host_checker.offline'),
           statusCode: 0,
           responseTime: 0,
           timestamp: DateTime.now(),
@@ -119,7 +130,12 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
       });
       
       if (mounted) {
-        _showSnackBar('$host is offline: $errorMessage', Colors.red);
+        _showSnackBar(
+          AppLocalizations.of(context).translate('host_checker.is_offline')
+              .replaceAll('{host}', host)
+              .replaceAll('{error}', errorMessage),
+          Colors.red,
+        );
       }
     } finally {
       if (!mounted) return;
@@ -201,7 +217,7 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
           
           Expanded(
             child: Text(
-              'Host Checker',
+              AppLocalizations.of(context).translate('host_checker.title'),
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -260,7 +276,7 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
                     controller: _hostController,
                     style: const TextStyle(color: Colors.white),
                     decoration: InputDecoration(
-                      hintText: 'Enter host (e.g., google.com)',
+                      hintText: AppLocalizations.of(context).translate('host_checker.enter_host'),
                       hintStyle: TextStyle(color: Colors.white.withOpacity(0.4)),
                       border: InputBorder.none,
                       contentPadding: const EdgeInsets.symmetric(
@@ -358,7 +374,7 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
             ),
             const SizedBox(height: 24),
             Text(
-              'Check Host Status',
+              AppLocalizations.of(context).translate('host_checker.title'),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 20,
@@ -367,7 +383,7 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
             ),
             const SizedBox(height: 8),
             Text(
-              'Enter a hostname to check its status',
+              AppLocalizations.of(context).translate('host_checker.start_checking'),
               style: TextStyle(
                 color: Colors.white.withOpacity(0.6),
                 fontSize: 14,

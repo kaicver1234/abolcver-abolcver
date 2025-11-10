@@ -6,6 +6,7 @@ import '../providers/language_provider.dart';
 import '../models/v2ray_config.dart';
 import '../widgets/vpn_gradient_background.dart';
 import '../services/ping_service.dart';
+import '../utils/app_localizations.dart';
 
 class ServerSelectionScreen extends StatefulWidget {
   const ServerSelectionScreen({Key? key}) : super(key: key);
@@ -69,43 +70,49 @@ class _ServerSelectionScreenState
     
     _pingAnimationController.repeat();
     
-    // Clear native ping cache to ensure fresh results
-    NativePingService.clearCache();
-    
     final provider = Provider.of<V2RayProvider>(context, listen: false);
     final servers = _getFilteredServers(provider);
     
-    _showSnackBar('Testing ${servers.length} servers...', Colors.blue);
+    _showSnackBar('Testing ${servers.length} servers with V2Ray Core...', Colors.blue);
     
     int successCount = 0;
+    int completedCount = 0;
     
-    // Test servers sequentially with a small delay to get unique results
-    // This prevents caching issues and ensures each server gets its own ping
-    for (var server in servers) {
-      if (!mounted) break;
-      
+    // Test servers in parallel using V2Ray Core (much faster!)
+    final futures = servers.map((server) async {
       try {
         final ping = await _testSingleServerPing(server);
         
         if (mounted) {
           setState(() {
-            // Use server ID as key to ensure uniqueness
             _serverPings[server.id] = ping;
             if (ping < 9999) successCount++;
+            completedCount++;
           });
+          
+          // نمایش پیشرفت
+          if (completedCount % 3 == 0 || completedCount == servers.length) {
+            _showSnackBar(
+              '⏳ Testing: $completedCount/${servers.length} servers',
+              Colors.blue,
+            );
+          }
         }
         
-        // Small delay between tests to ensure fresh results
-        await Future.delayed(const Duration(milliseconds: 100));
+        return ping;
       } catch (e) {
-        // Error testing server, mark as timeout
         if (mounted) {
           setState(() {
             _serverPings[server.id] = 9999;
+            completedCount++;
           });
         }
+        return 9999;
       }
-    }
+    }).toList();
+    
+    // Wait for all pings to complete
+    await Future.wait(futures);
     
     _pingAnimationController.stop();
     if (!mounted) return;
@@ -199,33 +206,21 @@ class _ServerSelectionScreenState
     );
   }
 
-  // Test real delay for a V2Ray server using Native Ping Service
+  // Test real delay using V2Ray Core (faster and more accurate!)
   Future<int> _testSingleServerPing(V2RayConfig server) async {
     try {
-      final host = server.address;
-      final port = server.port;
+      final provider = Provider.of<V2RayProvider>(context, listen: false);
       
-      if (host.isEmpty || port <= 0) {
-        return 9999;
-      }
+      // Use V2Ray Core's built-in ping (much faster and accurate)
+      final delay = await provider.v2rayService.getServerDelay(server);
       
-      // Use NativePingService for accurate ping measurement
-      // Disable cache to get fresh results for each server
-      final pingResult = await NativePingService.pingHost(
-        host: host,
-        port: port,
-        timeoutMs: 8000,
-        useIcmp: true,
-        useTcp: true,
-        useCache: false, // IMPORTANT: Disable cache for unique results
-      );
-      
-      if (pingResult.success && pingResult.latency > 0) {
-        return pingResult.latency;
+      if (delay != null && delay >= 0 && delay < 10000) {
+        return delay;
       } else {
         return 9999;
       }
     } catch (e) {
+      debugPrint('❌ Ping failed for ${server.remark}: $e');
       return 9999;
     }
   }
@@ -382,7 +377,7 @@ class _ServerSelectionScreenState
             // Test Ping Button
             Expanded(
               child: _buildModernActionButton(
-                label: 'Test Pings',
+                label: AppLocalizations.of(context).translate('server_selection.test_pings'),
                 icon: Icons.speed_rounded,
                 gradient: LinearGradient(
                   colors: [
@@ -398,7 +393,7 @@ class _ServerSelectionScreenState
             // Auto Connect Button
             Expanded(
               child: _buildModernActionButton(
-                label: 'Auto Connect',
+                label: AppLocalizations.of(context).translate('server_selection.auto_connect'),
                 icon: Icons.flash_on_rounded,
                 gradient: LinearGradient(
                   colors: [
@@ -650,9 +645,9 @@ class _ServerSelectionScreenState
                           ),
                         ),
                       ),
-                      const SizedBox(width: 8),
-                      // Ping Badge (فقط عدد، بدون آیکون)
-                      if (ping != null)
+                      // Ping Badge - فقط در حال تست یا بعد از تست نشون بده
+                      if (_isTestingPings || ping != null) ...[
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                           decoration: BoxDecoration(
@@ -661,17 +656,41 @@ class _ServerSelectionScreenState
                                 : Colors.white.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text(
-                            pingText,
-                            style: TextStyle(
-                              color: isActive 
-                                  ? Colors.white
-                                  : Colors.white.withOpacity(0.8),
-                              fontSize: 10,
-                              fontWeight: FontWeight.w600,
-                            ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Loading indicator وقتی در حال تست
+                              if (_isTestingPings && ping == null)
+                                SizedBox(
+                                  width: 10,
+                                  height: 10,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      isActive 
+                                          ? Colors.white
+                                          : const Color(0xFF6366F1),
+                                    ),
+                                  ),
+                                ),
+                              if (_isTestingPings && ping == null)
+                                const SizedBox(width: 4),
+                              Text(
+                                ping != null 
+                                    ? pingText 
+                                    : 'Testing...',
+                                style: TextStyle(
+                                  color: isActive 
+                                      ? Colors.white
+                                      : Colors.white.withOpacity(0.8),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ],

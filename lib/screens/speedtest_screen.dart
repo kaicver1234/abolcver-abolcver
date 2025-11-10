@@ -28,6 +28,11 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
   double _progress = 0.0;
   double _currentSpeed = 0.0;
   
+  // Live ping tracking
+  final List<int> _livePings = [];
+  int _currentPingIndex = 0;
+  Timer? _pingDisplayTimer;
+  
   // Animation Controllers
   late AnimationController _pulseController;
   late AnimationController _rotationController;
@@ -60,6 +65,7 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
     _pulseController.dispose();
     _rotationController.dispose();
     _speedTestService.dispose();
+    _pingDisplayTimer?.cancel();
     super.dispose();
   }
   
@@ -80,7 +86,12 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
       _ping = 0;
       _progress = 0.0;
       _currentSpeed = 0.0;
+      _livePings.clear();
+      _currentPingIndex = 0;
     });
+    
+    // Start live ping monitoring
+    _startLivePingMonitoring();
     
     _rotationController.repeat();
     
@@ -94,11 +105,13 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
           
           // Update results immediately as they become available
           if (phase == TestPhase.loading && progress == 1.0) {
-            // Ping test completed, show ping result
+            // Ping test completed, show final ping result
             final result = _speedTestService.latencies;
             if (result.isNotEmpty) {
               _ping = (result.reduce((a, b) => a + b) / result.length).round();
+              _livePings.addAll(result);
             }
+            _pingDisplayTimer?.cancel();
           }
         });
       },
@@ -138,9 +151,31 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
     );
   }
   
+  void _startLivePingMonitoring() {
+    _pingDisplayTimer?.cancel();
+    _pingDisplayTimer = Timer.periodic(const Duration(milliseconds: 800), (timer) {
+      if (_currentPhase != TestPhase.loading || !mounted) {
+        timer.cancel();
+        return;
+      }
+      
+      // Get latest pings from service
+      final latencies = _speedTestService.latencies;
+      if (latencies.length > _currentPingIndex) {
+        setState(() {
+          _currentPingIndex = latencies.length;
+          if (latencies.isNotEmpty) {
+            _ping = latencies.last;
+          }
+        });
+      }
+    });
+  }
+  
   void _stopTest() {
     _speedTestService.cancelTest();
     _rotationController.stop();
+    _pingDisplayTimer?.cancel();
     if (!mounted) return;
     setState(() {
       _currentStatus = SpeedTestStatus.ready;
@@ -503,43 +538,136 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
     required String value,
     required Color color,
   }) {
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
+    // Check if this is ping card and we're testing
+    final bool isPingCard = icon == Icons.speed;
+    final bool isLivePing = isPingCard && _currentPhase == TestPhase.loading && _currentStatus == SpeedTestStatus.testing;
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            color.withValues(alpha: 0.2),
+            color.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: color.withValues(alpha: 0.3),
+          width: 2,
+        ),
+        boxShadow: [
+          BoxShadow(
             color: color.withValues(alpha: 0.2),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: color.withValues(alpha: 0.4),
-              width: 2,
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          // Icon with pulse animation for live ping
+          if (isLivePing)
+            ScaleTransition(
+              scale: _pulseAnimation,
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    colors: [
+                      color,
+                      color.withValues(alpha: 0.6),
+                    ],
+                  ),
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: color.withValues(alpha: 0.5),
+                      blurRadius: 20,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  icon,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+            )
+          else
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    color.withValues(alpha: 0.4),
+                    color.withValues(alpha: 0.2),
+                  ],
+                ),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 28,
+              ),
+            ),
+          const SizedBox(height: 12),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.7),
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.5,
             ),
           ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 24,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.6),
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
+          const SizedBox(height: 6),
+          // Animated value with shimmer effect for live ping
+          if (isLivePing)
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 300),
+              transitionBuilder: (child, animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: ScaleTransition(
+                    scale: Tween<double>(begin: 0.8, end: 1.0).animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: Text(
+                value,
+                key: ValueKey(value),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
+                  shadows: [
+                    Shadow(
+                      color: color.withValues(alpha: 0.5),
+                      blurRadius: 10,
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                letterSpacing: -0.5,
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

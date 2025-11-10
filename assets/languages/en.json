@@ -116,6 +116,8 @@
         "delete_failed": "Failed to delete configuration: {error}",
         "connect_failed": "Failed to connect to {server}: {error}",
         "test_ping": "Test Ping",
+        "test_pings": "Test Pings",
+        "auto_connect": "Auto Connect",
         "sort_by_ping": "Sort by Ping",
         "update_servers": "Update Servers",
         "lowest_ping": "{server} responded with {ping}ms",
@@ -125,6 +127,24 @@
         "batch_timeout": "Batch timeout, trying next servers...",
         "no_suitable_server": "No suitable server found",
         "testing_server": "Testing {server}..."
+    },
+    "host_checker": {
+        "title": "Host Checker",
+        "enter_host": "Enter host (e.g., google.com)",
+        "check": "Check",
+        "online": "Online",
+        "offline": "Offline",
+        "please_enter_host": "Please enter a host",
+        "is_online": "{host} is online!",
+        "is_offline": "{host} is offline: {error}",
+        "connection_timeout": "Connection timeout",
+        "host_not_found": "Host not found",
+        "connection_refused": "Connection refused",
+        "unknown_error": "Unknown error",
+        "status_code": "Status Code",
+        "response_time": "Response Time",
+        "no_results": "No results yet",
+        "start_checking": "Start checking hosts"
     },
     "update_service": {
         "update_available": "Update Available",

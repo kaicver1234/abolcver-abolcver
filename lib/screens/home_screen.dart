@@ -20,10 +20,11 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin {
+class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   bool _isConnecting = false;
   late PageController _pageController;
   int _currentPage = 0;
+  BoxDecoration? _statsDecoration; // Cache decoration for performance
   
   @override
   bool get wantKeepAlive => true;
@@ -35,10 +36,25 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       keepPage: true,
       viewportFraction: 1.0,
     );
+    // Listen to app lifecycle to force rebuild when resumed
+    WidgetsBinding.instance.addObserver(this);
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed && mounted) {
+      // Force rebuild UI when app comes back from background
+      debugPrint('🏠 HomeScreen: App resumed, forcing UI rebuild...');
+      setState(() {
+        // Just trigger rebuild - provider will have latest state
+      });
+    }
   }
   
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     super.dispose();
   }
@@ -541,25 +557,9 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             
             const SizedBox(height: 20),
             
-            // Stats Grid with smooth animation
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 400),
-              transitionBuilder: (Widget child, Animation<double> animation) {
-                return FadeTransition(
-                  opacity: animation,
-                  child: SlideTransition(
-                    position: Tween<Offset>(
-                      begin: const Offset(0, 0.1),
-                      end: Offset.zero,
-                    ).animate(animation),
-                    child: child,
-                  ),
-                );
-              },
-              child: provider.activeConfig != null
-                  ? _buildStatsGrid(provider)
-                  : const SizedBox.shrink(key: ValueKey('empty')),
-            ),
+            // Stats Grid - ساده‌شده برای عملکرد بهتر
+            if (provider.activeConfig != null)
+              _buildStatsGrid(provider),
             
             const SizedBox(height: 20),
           ],
@@ -784,11 +784,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Pulse Animation Rings
+        // Pulse Animation Rings (کاهش از 3 به 2 برای بهینه‌سازی)
         if (isConnected)
-          ...List.generate(3, (index) {
+          ...List.generate(2, (index) {
             return _PulseRing(
-              delay: index * 0.33,
+              delay: index * 0.5,
               size: 200.0,
             );
           }),
@@ -1024,35 +1024,36 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   Widget _buildStatsGrid(V2RayProvider provider) {
     final v2rayService = provider.v2rayService;
     
-    // Use StreamBuilder to update stats every second
-    return StreamBuilder(
-      key: const ValueKey('stats'),
-      stream: Stream.periodic(const Duration(seconds: 1)),
-      builder: (context, snapshot) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.1),
-                Colors.white.withOpacity(0.05),
+    // بهینه‌سازی: هر 2 ثانیه به جای 1 ثانیه (کاهش 50% rebuild)
+    return RepaintBoundary(
+      child: StreamBuilder(
+        key: const ValueKey('stats'),
+        stream: Stream.periodic(const Duration(seconds: 2)),
+        builder: (context, snapshot) {
+          return Container(
+            padding: const EdgeInsets.all(16),
+            decoration: _statsDecoration ??= BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0x1AFFFFFF),
+                  Color(0x0DFFFFFF),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: const Color(0x33FFFFFF),
+                width: 1.5,
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x1A000000),
+                  blurRadius: 15,
+                  offset: Offset(0, 8),
+                ),
               ],
             ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.2),
-              width: 1.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
           child: Column(
             children: [
               Row(
@@ -1065,7 +1066,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       color: Colors.blue,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: _buildStatItem(
                       icon: Icons.upload,
@@ -1076,7 +1077,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               Row(
                 children: [
                   Expanded(
@@ -1087,11 +1088,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       color: Colors.orange,
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: StreamBuilder<int?>(
                       stream: Stream.periodic(
-                        const Duration(seconds: 5),
+                        const Duration(seconds: 10),
                         (_) => v2rayService.getCurrentPing(),
                       ).asyncMap((future) => future),
                       builder: (context, snapshot) {
@@ -1110,9 +1111,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               ),
             ],
           ),
-        );
-      },
-    ).animate().fadeIn(delay: 500.ms);
+          );
+        },
+      ),
+    );
   }
 
   Widget _buildStatItem({
@@ -1122,7 +1124,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
@@ -1132,43 +1134,44 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             color.withOpacity(0.08),
           ],
         ),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
           color: color.withOpacity(0.3),
           width: 1,
         ),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: color.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
               icon,
               color: color,
-              size: 22,
+              size: 18,
             ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           Text(
             label,
             style: TextStyle(
               color: Colors.white.withOpacity(0.7),
-              fontSize: 11,
+              fontSize: 10,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             value,
             style: const TextStyle(
               color: Colors.white,
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: FontWeight.bold,
-              letterSpacing: -0.5,
+              letterSpacing: -0.3,
             ),
           ),
         ],

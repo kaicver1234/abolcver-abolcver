@@ -1299,6 +1299,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       debugPrint('📱 App resumed, checking VPN status immediately...');
       
+      // CRITICAL: Notify listeners FIRST to show last known state immediately
+      notifyListeners();
+      
       // CRITICAL: Like defyxVPN, check status IMMEDIATELY without delays
       // This ensures UI is synced with actual VPN state right away
       _syncVpnStatusOnResume();
@@ -1323,16 +1326,16 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     try {
       debugPrint('🔄 Syncing VPN status on app resume...');
       
-      // CRITICAL: First check if we have a connected config but no activeConfig
-      // This means the service needs to restore the activeConfig immediately
-      final hasConnectedConfig = _configs.any((c) => c.isConnected);
-      if (hasConnectedConfig && _v2rayService.activeConfig == null) {
-        debugPrint('🔄 Found connected config but no activeConfig, restoring immediately...');
-        // Force service to restore activeConfig from saved state
-        await _v2rayService.initialize(); // This calls _tryRestoreActiveConfig
-        // Give it a moment to restore
-        await Future.delayed(const Duration(milliseconds: 100));
-        debugPrint('✅ ActiveConfig restoration triggered: ${_v2rayService.activeConfig?.remark ?? "none"}');
+      // CRITICAL: Immediately restore activeConfig if service lost it
+      if (_v2rayService.activeConfig == null) {
+        debugPrint('🔄 ActiveConfig is null, attempting immediate restore...');
+        await _v2rayService.initialize();
+        
+        // If we have a connected config, notify UI immediately
+        if (_v2rayService.activeConfig != null) {
+          debugPrint('✅ ActiveConfig restored: ${_v2rayService.activeConfig!.remark}');
+          notifyListeners();
+        }
       }
       
       // Check actual VPN connection status from native side
@@ -1394,9 +1397,18 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         debugPrint('💾 Saved updated connection state');
       }
       
-      // CRITICAL: Always notify UI to refresh
+      // CRITICAL: Always notify UI to refresh (even if no state change)
+      // This ensures UI rebuilds with current state
       notifyListeners();
-      debugPrint('✅ UI notified of VPN state on resume');
+      debugPrint('✅ UI forcefully refreshed on resume');
+      
+      // Double-check after a brief moment to catch any race conditions
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (mounted) {
+          notifyListeners();
+          debugPrint('🔄 Secondary UI refresh completed');
+        }
+      });
       
     } catch (e) {
       debugPrint('❌ Error syncing VPN status on resume: $e');
