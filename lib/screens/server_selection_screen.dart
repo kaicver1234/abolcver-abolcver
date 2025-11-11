@@ -73,7 +73,7 @@ class _ServerSelectionScreenState
     final provider = Provider.of<V2RayProvider>(context, listen: false);
     final servers = _getFilteredServers(provider);
     
-    _showSnackBar('Testing ${servers.length} servers with V2Ray Core...', Colors.blue);
+    _showSnackBar('Testing ${servers.length} servers with V2Ray Core...', Colors.blue, duration: 2);
     
     int successCount = 0;
     int completedCount = 0;
@@ -96,14 +96,6 @@ class _ServerSelectionScreenState
             if (ping < 9999) successCount++;
             completedCount++;
           });
-          
-          // نمایش پیشرفت
-          if (completedCount % 3 == 0 || completedCount == servers.length) {
-            _showSnackBar(
-              '⏳ Testing: $completedCount/${servers.length} servers',
-              Colors.blue,
-            );
-          }
         }
         
         return ping;
@@ -154,7 +146,7 @@ class _ServerSelectionScreenState
       message = '✅ $successCount/${servers.length} servers online (Avg: ${avgPing}ms)';
     }
     
-    _showSnackBar(message, successCount > 0 ? Colors.green : Colors.red);
+    _showSnackBar(message, successCount > 0 ? Colors.green : Colors.red, duration: 2);
   }
 
   Future<void> _connectToFastestServer() async {
@@ -209,7 +201,7 @@ class _ServerSelectionScreenState
     return servers;
   }
 
-  void _showSnackBar(String message, Color color) {
+  void _showSnackBar(String message, Color color, {int duration = 4}) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -220,6 +212,7 @@ class _ServerSelectionScreenState
           borderRadius: BorderRadius.circular(12),
         ),
         margin: const EdgeInsets.all(16),
+        duration: Duration(seconds: duration),
       ),
     );
   }

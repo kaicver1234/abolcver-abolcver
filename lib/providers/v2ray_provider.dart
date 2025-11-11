@@ -1358,7 +1358,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       
       debugPrint('🔎 VPN actually connected: $isActuallyConnected');
       debugPrint('🔎 Active config: ${_v2rayService.activeConfig?.remark ?? "none"}');
-      debugPrint('🔎 Service running: ${_v2rayService.isRunning}');
       
       bool stateChanged = false;
       
@@ -1372,9 +1371,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           final shouldBeConnected = (config.remark == activeRemark);
           if (config.isConnected != shouldBeConnected) {
             config.isConnected = shouldBeConnected;
-            if (shouldBeConnected) {
-              config.errorMessage = null;
-            }
             stateChanged = true;
             debugPrint('${shouldBeConnected ? "✅" : "❌"} ${config.remark}: isConnected = $shouldBeConnected');
           }
@@ -1386,7 +1382,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         for (var config in _configs) {
           if (config.isConnected) {
             config.isConnected = false;
-            config.errorMessage = null;
             stateChanged = true;
             debugPrint('❌ ${config.remark}: isConnected = false');
           }
