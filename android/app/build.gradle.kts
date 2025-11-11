@@ -64,20 +64,8 @@ android {
                 println("⚠️ WARNING: Release build is using debug key! Add key.properties for production.")
             }
             
-            // Enable code shrinking, obfuscation, and optimization
-            isMinifyEnabled = true
-            isShrinkResources = true
-            
-            // Optimize build
-            ndk {
-                debugSymbolLevel = "NONE"
-            }
-            
-            // ProGuard rules
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
     
@@ -101,14 +89,8 @@ android {
                 "META-INF/NOTICE",
                 "META-INF/NOTICE.txt",
                 "META-INF/notice.txt",
-                "META-INF/*.kotlin_module",
-                "kotlin/**",
-                "DebugProbesKt.bin",
-                "kotlin-tooling-metadata.json"
+                "META-INF/*.kotlin_module"
             )
-        }
-        jniLibs {
-            useLegacyPackaging = false
         }
     }
 }
