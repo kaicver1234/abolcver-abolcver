@@ -41,117 +41,161 @@ class _WindowsSetupScreenState extends State<WindowsSetupScreen> {
   @override
   void initState() {
     super.initState();
+    debugPrint('🪟 WindowsSetupScreen: initState');
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final languageProvider = Provider.of<LanguageProvider>(
-        context,
-        listen: false,
-      );
-      setState(() {
-        _selectedLanguage = languageProvider.currentLanguage;
-      });
+      try {
+        final languageProvider = Provider.of<LanguageProvider>(
+          context,
+          listen: false,
+        );
+        if (mounted) {
+          setState(() {
+            _selectedLanguage = languageProvider.currentLanguage;
+          });
+        }
+        debugPrint('🌐 Language set to: ${_selectedLanguage?.code}');
+      } catch (e) {
+        debugPrint('❌ Error getting language provider: $e');
+        if (mounted) {
+          setState(() {
+            _selectedLanguage = _languages[0]['language'] as AppLanguage;
+          });
+        }
+      }
     });
   }
 
   Future<void> _completeSetup() async {
-    if (_selectedLanguage == null) return;
+    if (_selectedLanguage == null) {
+      debugPrint('⚠️ No language selected');
+      return;
+    }
 
+    debugPrint('✅ Completing setup with language: ${_selectedLanguage!.code}');
     setState(() => _isLoading = true);
 
-    final languageProvider = Provider.of<LanguageProvider>(
-      context,
-      listen: false,
-    );
-    await languageProvider.changeLanguage(_selectedLanguage!);
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('language_selected', true);
-    await prefs.setBool('privacy_accepted', true);
-
-    if (mounted) {
-      Navigator.pushReplacement(
+    try {
+      final languageProvider = Provider.of<LanguageProvider>(
         context,
-        MaterialPageRoute(
-          builder: (_) => const MainNavigationScreen(),
-        ),
+        listen: false,
       );
+      await languageProvider.changeLanguage(_selectedLanguage!);
+      debugPrint('✅ Language changed successfully');
+
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('language_selected', true);
+      await prefs.setBool('privacy_accepted', true);
+      debugPrint('✅ Preferences saved');
+
+      if (mounted) {
+        debugPrint('🚀 Navigating to MainNavigationScreen...');
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const MainNavigationScreen(),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error in _completeSetup: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
+      if (mounted) {
+        setState(() => _isLoading = false);
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🎨 WindowsSetupScreen: build');
+    
     return Scaffold(
       backgroundColor: const Color(0xFF0A0E1A),
-      body: Center(
-        child: Container(
-          width: 600,
-          padding: const EdgeInsets.all(48),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF1A1F2E), Color(0xFF0F131E)],
-            ),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.1),
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 40,
-                spreadRadius: 10,
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(32),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 600),
+              padding: const EdgeInsets.all(48),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF1A1F2E), Color(0xFF0F131E)],
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.1),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.5),
+                    blurRadius: 40,
+                    spreadRadius: 10,
                   ),
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF667EEA).withOpacity(0.4),
-                      blurRadius: 20,
-                      spreadRadius: 5,
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF667EEA).withOpacity(0.4),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: const Icon(
-                  Icons.vpn_lock_rounded,
-                  color: Colors.white,
-                  size: 48,
-                ),
+                    child: const Icon(
+                      Icons.vpn_lock_rounded,
+                      color: Colors.white,
+                      size: 48,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  const Text(
+                    'Welcome to Tiksar VPN',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 32,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Fast, Secure, and Free VPN for Windows',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 48),
+                  if (_currentStep == 0) _buildLanguageStep(),
+                  if (_currentStep == 1) _buildPrivacyStep(),
+                  const SizedBox(height: 32),
+                  _buildButtons(),
+                ],
               ),
-              const SizedBox(height: 32),
-              const Text(
-                'Welcome to Tiksar VPN',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 32,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: -0.5,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                'Fast, Secure, and Free VPN for Windows',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.6),
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 48),
-              if (_currentStep == 0) _buildLanguageStep(),
-              if (_currentStep == 1) _buildPrivacyStep(),
-              const SizedBox(height: 32),
-              _buildButtons(),
-            ],
+            ),
           ),
         ),
       ),
@@ -203,7 +247,10 @@ class _WindowsSetupScreenState extends State<WindowsSetupScreen> {
             child: Material(
               color: Colors.transparent,
               child: InkWell(
-                onTap: () => setState(() => _selectedLanguage = language),
+                onTap: () {
+                  debugPrint('🌐 Selected language: ${language.code}');
+                  setState(() => _selectedLanguage = language);
+                },
                 borderRadius: BorderRadius.circular(16),
                 child: Padding(
                   padding: const EdgeInsets.all(20),
@@ -338,7 +385,10 @@ class _WindowsSetupScreenState extends State<WindowsSetupScreen> {
       children: [
         if (_currentStep > 0)
           TextButton(
-            onPressed: () => setState(() => _currentStep--),
+            onPressed: () {
+              debugPrint('⬅️ Going back to step ${_currentStep - 1}');
+              setState(() => _currentStep--);
+            },
             child: Row(
               children: [
                 const Icon(Icons.arrow_back_rounded, color: Colors.white70),
@@ -364,9 +414,13 @@ class _WindowsSetupScreenState extends State<WindowsSetupScreen> {
                 : () {
                     if (_currentStep == 0) {
                       if (_selectedLanguage != null) {
+                        debugPrint('➡️ Moving to step 1');
                         setState(() => _currentStep = 1);
+                      } else {
+                        debugPrint('⚠️ No language selected');
                       }
                     } else {
+                      debugPrint('🏁 Completing setup...');
                       _completeSetup();
                     }
                   },

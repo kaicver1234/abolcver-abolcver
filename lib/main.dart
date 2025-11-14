@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -17,49 +18,56 @@ import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  
-  // Firebase initialization with proper configuration (only for mobile)
-  try {
-    if (Platform.isAndroid || Platform.isIOS) {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      );
-      
-      // Initialize Firebase Analytics with app info
-      final analytics = FirebaseAnalytics.instance;
-      await analytics.setAnalyticsCollectionEnabled(true);
-      
-      // Initialize notification service
-      await NotificationService().initialize();
-      
-      // Log app open
-      await analytics.logAppOpen();
-      
-      debugPrint('✅ Firebase initialized successfully');
-    } else {
-      debugPrint('ℹ️  Firebase skipped for desktop platforms');
+  runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+    
+    debugPrint('🚀 Starting Tiksar VPN...');
+    debugPrint('📱 Platform: ${Platform.operatingSystem}');
+    
+    try {
+      if (Platform.isAndroid || Platform.isIOS) {
+        debugPrint('📲 Initializing Firebase for mobile...');
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        );
+        
+        final analytics = FirebaseAnalytics.instance;
+        await analytics.setAnalyticsCollectionEnabled(true);
+        await NotificationService().initialize();
+        await analytics.logAppOpen();
+        
+        debugPrint('✅ Firebase initialized successfully');
+      } else {
+        debugPrint('💻 Desktop platform detected - skipping Firebase');
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Firebase initialization error: $e');
+      debugPrint('Stack trace: $stackTrace');
     }
-  } catch (e) {
-    // Firebase initialization failed, log error
-    debugPrint('❌ Firebase initialization error: $e');
-  }
-  
-  final languageProvider = LanguageProvider();
-  await languageProvider.initialize();
+    
+    debugPrint('🌐 Initializing language provider...');
+    final languageProvider = LanguageProvider();
+    await languageProvider.initialize();
+    debugPrint('✅ Language provider initialized');
 
-  // Check if user has selected language and accepted privacy policy
-  final prefs = await SharedPreferences.getInstance();
-  final bool languageSelected = prefs.getBool('language_selected') ?? false;
-  final bool privacyAccepted = prefs.getBool('privacy_accepted') ?? false;
+    debugPrint('💾 Loading preferences...');
+    final prefs = await SharedPreferences.getInstance();
+    final bool languageSelected = prefs.getBool('language_selected') ?? false;
+    final bool privacyAccepted = prefs.getBool('privacy_accepted') ?? false;
+    debugPrint('✅ Preferences loaded: lang=$languageSelected, privacy=$privacyAccepted');
 
-  runApp(
-    MyApp(
-      languageSelected: languageSelected,
-      privacyAccepted: privacyAccepted, 
-      languageProvider: languageProvider
-    ),
-  );
+    debugPrint('🎨 Launching app...');
+    runApp(
+      MyApp(
+        languageSelected: languageSelected,
+        privacyAccepted: privacyAccepted, 
+        languageProvider: languageProvider
+      ),
+    );
+  }, (error, stackTrace) {
+    debugPrint('💥 FATAL ERROR: $error');
+    debugPrint('Stack trace: $stackTrace');
+  });
 }
 
 class MyApp extends StatelessWidget {
@@ -76,41 +84,74 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🏗️ Building MyApp widget...');
+    
     List<NavigatorObserver> observers = [];
+    final bool isDesktop = Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+    
     if (Platform.isAndroid || Platform.isIOS) {
-      final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
-      final FirebaseAnalyticsObserver observer = 
-          FirebaseAnalyticsObserver(analytics: analytics);
-      observers.add(observer);
+      try {
+        final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+        final FirebaseAnalyticsObserver observer = 
+            FirebaseAnalyticsObserver(analytics: analytics);
+        observers.add(observer);
+      } catch (e) {
+        debugPrint('⚠️ Firebase Analytics observer error: $e');
+      }
     }
     
-    final bool isDesktop = Platform.isWindows || Platform.isMacOS || Platform.isLinux;
     final bool needsSetup = !languageSelected || !privacyAccepted;
+    debugPrint('🎯 Platform: ${isDesktop ? 'Desktop' : 'Mobile'}, NeedsSetup: $needsSetup');
     
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: languageProvider),
-        ChangeNotifierProvider(create: (context) => V2RayProvider()),
+        ChangeNotifierProvider(
+          create: (context) {
+            debugPrint('🔧 Creating V2RayProvider...');
+            try {
+              return V2RayProvider();
+            } catch (e, stackTrace) {
+              debugPrint('❌ V2RayProvider creation error: $e');
+              debugPrint('Stack trace: $stackTrace');
+              rethrow;
+            }
+          },
+        ),
       ],
       child: Consumer<LanguageProvider>(
-        builder: (context, languageProvider, child) {
+        builder: (context, langProvider, child) {
+          debugPrint('🌍 Current language: ${langProvider.currentLanguage.code}');
+          
           Widget homeScreen;
           
-          if (isDesktop && needsSetup) {
-            homeScreen = const WindowsSetupScreen();
-          } else if (!languageSelected) {
-            homeScreen = const LanguageSelectionScreen();
-          } else if (!privacyAccepted) {
-            homeScreen = const PrivacyWelcomeScreen();
-          } else {
-            homeScreen = const MainNavigationScreen();
+          try {
+            if (isDesktop && needsSetup) {
+              debugPrint('📺 Loading WindowsSetupScreen...');
+              homeScreen = const WindowsSetupScreen();
+            } else if (!languageSelected) {
+              debugPrint('🌐 Loading LanguageSelectionScreen...');
+              homeScreen = const LanguageSelectionScreen();
+            } else if (!privacyAccepted) {
+              debugPrint('🔒 Loading PrivacyWelcomeScreen...');
+              homeScreen = const PrivacyWelcomeScreen();
+            } else {
+              debugPrint('🏠 Loading MainNavigationScreen...');
+              homeScreen = const MainNavigationScreen();
+            }
+          } catch (e, stackTrace) {
+            debugPrint('❌ Screen selection error: $e');
+            debugPrint('Stack trace: $stackTrace');
+            homeScreen = _buildErrorScreen(e.toString());
           }
+          
+          debugPrint('✅ Home screen selected, building MaterialApp...');
           
           return MaterialApp(
             title: 'Tiksar VPN',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.darkTheme(languageProvider.currentLanguage.code),
-            locale: languageProvider.locale,
+            theme: AppTheme.darkTheme(langProvider.currentLanguage.code),
+            locale: langProvider.locale,
             navigatorObservers: observers,
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
@@ -122,8 +163,67 @@ class MyApp extends StatelessWidget {
               Locale('fa'),
             ],
             home: isDesktop ? homeScreen : UpdateCheckWrapper(child: homeScreen),
+            builder: (context, widget) {
+              debugPrint('🎨 MaterialApp builder called');
+              return widget ?? const SizedBox.shrink();
+            },
           );
         },
+      ),
+    );
+  }
+  
+  Widget _buildErrorScreen(String error) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0E1A),
+      body: Center(
+        child: Container(
+          padding: const EdgeInsets.all(40),
+          constraints: const BoxConstraints(maxWidth: 600),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(
+                Icons.error_outline_rounded,
+                color: Colors.red,
+                size: 80,
+              ),
+              const SizedBox(height: 24),
+              const Text(
+                'Application Error',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                error,
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 14,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton(
+                onPressed: () {
+                  debugPrint('🔄 Restarting app...');
+                  exit(0);
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                ),
+                child: const Text('Restart App'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
