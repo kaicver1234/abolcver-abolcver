@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
@@ -6,6 +7,7 @@ import '../providers/language_provider.dart';
 import '../widgets/vpn_gradient_background.dart';
 import 'main_navigation_screen.dart';
 import '../utils/app_localizations.dart';
+import 'dart:ui';
 
 class PrivacyWelcomeScreen extends StatefulWidget {
   const PrivacyWelcomeScreen({Key? key}) : super(key: key);
@@ -38,10 +40,12 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
   }
 
   void _nextPage() {
+    HapticFeedback.lightImpact();
     if (_currentPage < 2) {
-      _pageController.nextPage(
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeOutCubic,
+      _pageController.animateToPage(
+        _currentPage + 1,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOutCubic,
       );
     } else {
       _completeOnboarding();
@@ -49,15 +53,17 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
   }
 
   void _previousPage() {
+    HapticFeedback.lightImpact();
     if (_currentPage > 0) {
       _pageController.previousPage(
-        duration: const Duration(milliseconds: 500),
-        curve: Curves.easeOutCubic,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOutCubic,
       );
     }
   }
 
   void _completeOnboarding() async {
+    HapticFeedback.mediumImpact();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('privacy_accepted', true);
     
@@ -68,12 +74,19 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
           pageBuilder: (context, animation, secondaryAnimation) => 
               const MainNavigationScreen(),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            final curvedAnimation = CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOutCubic,
+            );
             return FadeTransition(
-              opacity: animation,
-              child: child,
+              opacity: curvedAnimation,
+              child: ScaleTransition(
+                scale: Tween<double>(begin: 0.95, end: 1.0).animate(curvedAnimation),
+                child: child,
+              ),
             );
           },
-          transitionDuration: const Duration(milliseconds: 800),
+          transitionDuration: const Duration(milliseconds: 600),
         ),
       );
     }
@@ -160,47 +173,81 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Logo Animation
+          // Logo Animation with Glassmorphism
           Container(
-            width: 140,
-            height: 140,
+            width: 160,
+            height: 160,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF6366F1).withOpacity(0.8),
+                  const Color(0xFF8B5CF6).withOpacity(0.6),
+                ],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFF6366F1).withOpacity(0.5),
-                  blurRadius: 30,
+                  color: const Color(0xFF6366F1).withOpacity(0.4),
+                  blurRadius: 40,
+                  spreadRadius: 10,
+                ),
+                BoxShadow(
+                  color: const Color(0xFF8B5CF6).withOpacity(0.3),
+                  blurRadius: 60,
                   spreadRadius: 5,
+                  offset: const Offset(0, 20),
                 ),
               ],
             ),
-            child: const Icon(
-              Icons.shield_outlined,
-              size: 70,
-              color: Colors.white,
+            child: ClipOval(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.shield_outlined,
+                    size: 80,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
             ),
           ).animate()
-              .scale(duration: 800.ms, curve: Curves.elasticOut)
-              .fadeIn(),
+              .scale(duration: 1000.ms, curve: Curves.elasticOut)
+              .fadeIn(duration: 600.ms)
+              .then()
+              .shimmer(duration: 2000.ms, color: Colors.white.withOpacity(0.3)),
           
-          const SizedBox(height: 40),
+          const SizedBox(height: 50),
           
           Text(
             AppLocalizations.of(context).translate('privacy_welcome.welcome_title'),
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 36,
-              fontWeight: FontWeight.bold,
+              fontSize: 38,
+              fontWeight: FontWeight.w900,
               color: Colors.white,
               height: 1.2,
-              letterSpacing: -1,
+              letterSpacing: -1.5,
+              shadows: [
+                Shadow(
+                  color: Colors.black26,
+                  offset: Offset(0, 2),
+                  blurRadius: 8,
+                ),
+              ],
             ),
           ).animate()
-              .fadeIn(delay: 200.ms)
-              .slideY(begin: 0.3, end: 0),
+              .fadeIn(delay: 300.ms, duration: 600.ms)
+              .slideY(begin: 0.3, end: 0, curve: Curves.easeOutCubic),
           
           const SizedBox(height: 20),
           
@@ -208,23 +255,24 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
             AppLocalizations.of(context).translate('privacy_welcome.welcome_subtitle'),
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.7),
-              height: 1.5,
+              fontSize: 17,
+              color: Colors.white.withOpacity(0.8),
+              height: 1.6,
+              letterSpacing: 0.3,
             ),
           ).animate()
-              .fadeIn(delay: 400.ms)
-              .slideY(begin: 0.3, end: 0),
+              .fadeIn(delay: 500.ms, duration: 600.ms)
+              .slideY(begin: 0.3, end: 0, curve: Curves.easeOutCubic),
           
           const SizedBox(height: 60),
           
-          // Features Grid
+          // Features Grid with Glassmorphism
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildFeatureIcon(Icons.lock_outline, AppLocalizations.of(context).translate('privacy_welcome.secure'), 600),
-              _buildFeatureIcon(Icons.flash_on, AppLocalizations.of(context).translate('privacy_welcome.fast'), 700),
-              _buildFeatureIcon(Icons.public, AppLocalizations.of(context).translate('privacy_welcome.global'), 800),
+              _buildFeatureIcon(Icons.lock_outline, AppLocalizations.of(context).translate('privacy_welcome.secure'), 700),
+              _buildFeatureIcon(Icons.flash_on, AppLocalizations.of(context).translate('privacy_welcome.fast'), 850),
+              _buildFeatureIcon(Icons.public, AppLocalizations.of(context).translate('privacy_welcome.global'), 1000),
             ],
           ),
         ],
@@ -261,19 +309,28 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
     ];
     
     return Padding(
-      padding: const EdgeInsets.all(40),
+      padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 40),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Text(
             AppLocalizations.of(context).translate('privacy_welcome.why_choose_us'),
             style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
+              fontSize: 34,
+              fontWeight: FontWeight.w900,
               color: Colors.white,
-              letterSpacing: -0.5,
+              letterSpacing: -1,
+              shadows: [
+                Shadow(
+                  color: Colors.black26,
+                  offset: Offset(0, 2),
+                  blurRadius: 8,
+                ),
+              ],
             ),
-          ).animate().fadeIn().slideY(begin: -0.3, end: 0),
+          ).animate()
+              .fadeIn(duration: 500.ms)
+              .slideY(begin: -0.2, end: 0, curve: Curves.easeOutCubic),
           
           const SizedBox(height: 40),
           
@@ -281,60 +338,98 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
             final index = entry.key;
             final feature = entry.value;
             
-            return Container(
-              margin: const EdgeInsets.only(bottom: 20),
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.1),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: (feature['color'] as Color).withOpacity(0.2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      feature['icon'] as IconData,
-                      color: feature['color'] as Color,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          feature['title'] as String,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          feature['desc'] as String,
-                          style: TextStyle(
-                            color: Colors.white.withOpacity(0.6),
-                            fontSize: 14,
-                          ),
-                        ),
+            return ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.white.withOpacity(0.12),
+                        Colors.white.withOpacity(0.05),
                       ],
                     ),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.2),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: (feature['color'] as Color).withOpacity(0.1),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
                   ),
-                ],
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 56,
+                        height: 56,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              (feature['color'] as Color).withOpacity(0.8),
+                              (feature['color'] as Color).withOpacity(0.5),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: [
+                            BoxShadow(
+                              color: (feature['color'] as Color).withOpacity(0.4),
+                              blurRadius: 12,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          feature['icon'] as IconData,
+                          color: Colors.white,
+                          size: 28,
+                        ),
+                      ),
+                      const SizedBox(width: 18),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              feature['title'] as String,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              feature['desc'] as String,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 14,
+                                height: 1.4,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ),
             ).animate()
-                .fadeIn(delay: Duration(milliseconds: 200 + index * 100))
-                .slideX(begin: 0.3, end: 0);
+                .fadeIn(delay: Duration(milliseconds: 200 + index * 120), duration: 500.ms)
+                .slideX(begin: 0.2, end: 0, curve: Curves.easeOutCubic)
+                .scale(begin: const Offset(0.95, 0.95), delay: Duration(milliseconds: 200 + index * 120));
           }).toList(),
         ],
       ),
@@ -347,37 +442,80 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Success Icon with Glassmorphism
           Container(
-            width: 120,
-            height: 120,
+            width: 140,
+            height: 140,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF10B981), Color(0xFF059669)],
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  const Color(0xFF10B981).withOpacity(0.8),
+                  const Color(0xFF059669).withOpacity(0.6),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF10B981).withOpacity(0.5),
+                  blurRadius: 40,
+                  spreadRadius: 10,
+                ),
+                BoxShadow(
+                  color: const Color(0xFF059669).withOpacity(0.3),
+                  blurRadius: 60,
+                  offset: const Offset(0, 20),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 2,
+                    ),
+                  ),
+                  child: const Icon(
+                    Icons.check_circle_outline,
+                    size: 70,
+                    color: Colors.white,
+                  ),
+                ),
               ),
             ),
-            child: const Icon(
-              Icons.check,
-              size: 60,
-              color: Colors.white,
-            ),
           ).animate()
-              .scale(duration: 800.ms, curve: Curves.elasticOut)
-              .fadeIn(),
+              .scale(duration: 1000.ms, curve: Curves.elasticOut)
+              .fadeIn(duration: 600.ms)
+              .then()
+              .shimmer(duration: 2000.ms, color: Colors.white.withOpacity(0.3)),
           
-          const SizedBox(height: 40),
+          const SizedBox(height: 50),
           
           Text(
             AppLocalizations.of(context).translate('privacy_welcome.ready_to_start'),
+            textAlign: TextAlign.center,
             style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
+              fontSize: 36,
+              fontWeight: FontWeight.w900,
               color: Colors.white,
-              letterSpacing: -0.5,
+              letterSpacing: -1.2,
+              height: 1.2,
+              shadows: [
+                Shadow(
+                  color: Colors.black26,
+                  offset: Offset(0, 2),
+                  blurRadius: 8,
+                ),
+              ],
             ),
           ).animate()
-              .fadeIn(delay: 200.ms)
-              .slideY(begin: 0.3, end: 0),
+              .fadeIn(delay: 300.ms, duration: 600.ms)
+              .slideY(begin: 0.3, end: 0, curve: Curves.easeOutCubic),
           
           const SizedBox(height: 20),
           
@@ -385,57 +523,115 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
             AppLocalizations.of(context).translate('privacy_welcome.one_tap_away'),
             textAlign: TextAlign.center,
             style: TextStyle(
-              fontSize: 16,
-              color: Colors.white.withOpacity(0.7),
-              height: 1.5,
+              fontSize: 17,
+              color: Colors.white.withOpacity(0.8),
+              height: 1.6,
+              letterSpacing: 0.3,
             ),
           ).animate()
-              .fadeIn(delay: 400.ms)
-              .slideY(begin: 0.3, end: 0),
+              .fadeIn(delay: 500.ms, duration: 600.ms)
+              .slideY(begin: 0.3, end: 0, curve: Curves.easeOutCubic),
           
           const SizedBox(height: 60),
           
-          // Get Started Button
+          // Get Started Button with Glassmorphism
           GestureDetector(
             onTap: _completeOnboarding,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 18),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                ),
-                borderRadius: BorderRadius.circular(30),
-                boxShadow: [
-                  BoxShadow(
-                    color: const Color(0xFF6366F1).withOpacity(0.4),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(35),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 60, vertical: 20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        const Color(0xFF6366F1).withOpacity(0.9),
+                        const Color(0xFF8B5CF6).withOpacity(0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(35),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF6366F1).withOpacity(0.5),
+                        blurRadius: 30,
+                        offset: const Offset(0, 15),
+                      ),
+                      BoxShadow(
+                        color: const Color(0xFF8B5CF6).withOpacity(0.3),
+                        blurRadius: 40,
+                        offset: const Offset(0, 20),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Text(
-                AppLocalizations.of(context).translate('privacy_welcome.get_started'),
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.5,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        AppLocalizations.of(context).translate('privacy_welcome.get_started'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Icon(
+                        Icons.arrow_forward_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           ).animate()
-              .fadeIn(delay: 600.ms)
-              .scale(delay: 600.ms),
+              .fadeIn(delay: 700.ms, duration: 600.ms)
+              .scale(delay: 700.ms, begin: const Offset(0.9, 0.9), curve: Curves.easeOutBack)
+              .then(delay: 500.ms)
+              .shimmer(duration: 2000.ms, color: Colors.white.withOpacity(0.3)),
           
           const SizedBox(height: 40),
           
-          Text(
-            AppLocalizations.of(context).translate('privacy_welcome.no_registration'),
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
-              fontSize: 14,
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.08),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.15),
+              ),
             ),
-          ).animate().fadeIn(delay: 800.ms),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.check_circle,
+                  color: const Color(0xFF10B981),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  AppLocalizations.of(context).translate('privacy_welcome.no_registration'),
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.8),
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ).animate()
+              .fadeIn(delay: 900.ms, duration: 600.ms)
+              .slideY(begin: 0.2, end: 0),
         ],
       ),
     );
@@ -444,35 +640,57 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
   Widget _buildFeatureIcon(IconData icon, String label, int delayMs) {
     return Column(
       children: [
-        Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.white.withOpacity(0.2),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              width: 70,
+              height: 70,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withOpacity(0.15),
+                    Colors.white.withOpacity(0.05),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.3),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Icon(
+                icon,
+                color: Colors.white,
+                size: 32,
+              ),
             ),
           ),
-          child: Icon(
-            icon,
-            color: Colors.white.withOpacity(0.9),
-            size: 28,
-          ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 12),
         Text(
           label,
           style: TextStyle(
-            color: Colors.white.withOpacity(0.7),
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
+            color: Colors.white.withOpacity(0.9),
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
           ),
         ),
       ],
     ).animate()
-        .fadeIn(delay: Duration(milliseconds: delayMs))
-        .scale(delay: Duration(milliseconds: delayMs));
+        .fadeIn(delay: Duration(milliseconds: delayMs), duration: 500.ms)
+        .scale(delay: Duration(milliseconds: delayMs), begin: const Offset(0.8, 0.8), curve: Curves.easeOutBack);
   }
 
   Widget _buildBottomControls() {
@@ -481,61 +699,116 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          // Back Button
+          // Back Button with Glassmorphism
           AnimatedOpacity(
             opacity: _currentPage > 0 ? 1 : 0,
             duration: const Duration(milliseconds: 300),
             child: GestureDetector(
               onTap: _currentPage > 0 ? _previousPage : null,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.arrow_back,
-                  color: Colors.white,
-                  size: 20,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withOpacity(0.15),
+                          Colors.white.withOpacity(0.08),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.arrow_back_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
                 ),
               ),
             ),
           ),
           
-          // Page Indicators
+          // Page Indicators with Enhanced Design
           Row(
             children: List.generate(3, (index) {
+              final isActive = _currentPage == index;
               return AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                width: _currentPage == index ? 24 : 8,
-                height: 8,
+                duration: const Duration(milliseconds: 400),
+                curve: Curves.easeInOutCubic,
+                margin: const EdgeInsets.symmetric(horizontal: 5),
+                width: isActive ? 32 : 10,
+                height: 10,
                 decoration: BoxDecoration(
-                  color: _currentPage == index
-                      ? const Color(0xFF6366F1)
-                      : Colors.white.withOpacity(0.3),
-                  borderRadius: BorderRadius.circular(4),
+                  gradient: isActive
+                      ? const LinearGradient(
+                          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                        )
+                      : null,
+                  color: isActive ? null : Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(5),
+                  boxShadow: isActive
+                      ? [
+                          BoxShadow(
+                            color: const Color(0xFF6366F1).withOpacity(0.5),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
               );
             }),
           ),
           
-          // Next Button
+          // Next Button with Glassmorphism
           AnimatedOpacity(
             opacity: _currentPage < 2 ? 1 : 0,
             duration: const Duration(milliseconds: 300),
             child: GestureDetector(
               onTap: _currentPage < 2 ? _nextPage : null,
-              child: Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF6366F1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.arrow_forward,
-                  color: Colors.white,
-                  size: 20,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: BackdropFilter(
+                  filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFF6366F1),
+                          Color(0xFF8B5CF6),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.3),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF6366F1).withOpacity(0.4),
+                          blurRadius: 15,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.arrow_forward_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
                 ),
               ),
             ),

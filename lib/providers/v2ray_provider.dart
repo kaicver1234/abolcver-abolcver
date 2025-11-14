@@ -211,38 +211,42 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     try {
       debugPrint('🚀 Starting app initialization...');
       
-      // OPTIMISTIC UI: Load saved config immediately and show UI first
+      // STEP 1: INSTANT UI - Load saved state and show immediately (0-50ms)
       await _loadSavedStateAndShowUI();
       debugPrint('✅ Saved state loaded and UI displayed');
       
-      // Initialize service
-      await _v2rayService.initialize();
-      debugPrint('✅ V2Ray service initialized');
+      // STEP 2: QUICK SYNC - Check VPN status IMMEDIATELY (50-200ms)
+      // This is the most critical step for showing connection state
+      final quickSyncFuture = _enhancedSyncWithVpnServiceState();
+      
+      // STEP 3: Initialize service in parallel
+      final serviceInitFuture = _v2rayService.initialize();
+      
+      // Wait for both quick sync and service init
+      await Future.wait([quickSyncFuture, serviceInitFuture]);
+      debugPrint('✅ Quick sync and service init complete');
 
       // Set up callback for notification disconnects
       _v2rayService.setDisconnectedCallback(() {
         _handleNotificationDisconnect();
       });
 
-      // Load configurations first
+      // STEP 4: Load configurations (can be slower)
       await loadConfigs();
       debugPrint('✅ Configs loaded: ${_configs.length} servers');
 
-      // Load subscriptions
+      // STEP 5: Load subscriptions
       await loadSubscriptions();
       debugPrint('✅ Subscriptions loaded: ${_subscriptions.length} subscriptions');
 
-      // Update all subscriptions on app start - await to ensure configs are loaded
-      try {
-        await updateAllSubscriptions();
-        debugPrint('✅ Subscriptions updated');
-      } catch (e) {
-        debugPrint('⚠️ Subscription update failed: $e');
-        // Ignore subscription update errors but continue initialization
-      }
-
-      // CRITICAL FIX: Enhanced synchronization with actual VPN service state
-      // This method checks VPN status and updates all configs accordingly
+      // STEP 6: Update subscriptions in background (don't block UI)
+      updateAllSubscriptions().then((_) {
+        debugPrint('✅ Subscriptions updated in background');
+      }).catchError((e) {
+        debugPrint('⚠️ Background subscription update failed: $e');
+      });
+      
+      // STEP 7: Final sync to ensure everything is correct
       await _enhancedSyncWithVpnServiceState();
       
       // Always auto-select first server (unless already connected)
@@ -250,11 +254,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         final hasConnectedConfig = _configs.any((c) => c.isConnected);
         
         if (hasConnectedConfig) {
-          // If already connected, keep the connected server as selected
           _selectedConfig = _configs.firstWhere((c) => c.isConnected);
           debugPrint('✅ Keeping connected server: ${_selectedConfig?.remark}');
-        } else {
-          // Not connected, always select first server
+        } else if (_selectedConfig == null) {
           _selectedConfig = _configs.first;
           debugPrint('✅ Auto-selected first server: ${_selectedConfig?.remark}');
         }
@@ -615,38 +617,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     } catch (e) {
       _setError('Failed to import configuration: $e');
       return null;
-    }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    debugPrint('📱 App lifecycle state changed: $state');
-    
-    switch (state) {
-      case AppLifecycleState.resumed:
-        // App came to foreground - sync with VPN state
-        debugPrint('✅ App resumed - syncing VPN state');
-        Future.delayed(const Duration(milliseconds: 500), () async {
-          await _enhancedSyncWithVpnServiceState();
-          notifyListeners();
-        });
-        break;
-      case AppLifecycleState.paused:
-        // App went to background
-        debugPrint('⏸️ App paused');
-        break;
-      case AppLifecycleState.inactive:
-        // App is inactive
-        debugPrint('💤 App inactive');
-        break;
-      case AppLifecycleState.detached:
-        // App is detached
-        debugPrint('🔌 App detached');
-        break;
-      case AppLifecycleState.hidden:
-        // App is hidden
-        debugPrint('👻 App hidden');
-        break;
     }
   }
 
