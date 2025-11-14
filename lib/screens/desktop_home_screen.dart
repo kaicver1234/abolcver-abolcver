@@ -1,9 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
 import '../utils/app_localizations.dart';
+import '../models/connection_mode.dart';
+import '../services/windows_proxy_service.dart';
 import '../screens/server_selection_screen.dart';
 import '../screens/ip_info_screen.dart';
 import '../screens/speedtest_screen.dart';
@@ -21,6 +24,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   bool _isConnecting = false;
   int _selectedNavIndex = 0;
+  ConnectionMode _connectionMode = ConnectionMode.vpn;
   
   @override
   bool get wantKeepAlive => true;
@@ -69,7 +73,13 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
                           const SizedBox(width: 24),
                           Expanded(
                             flex: 2,
-                            child: _buildStatsPanel(context, v2rayProvider, localizations),
+                            child: Column(
+                              children: [
+                                _buildModeSelector(localizations),
+                                const SizedBox(height: 20),
+                                _buildStatsPanel(context, v2rayProvider, localizations),
+                              ],
+                            ),
                           ),
                         ],
                       ),
@@ -84,16 +94,185 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
     );
   }
 
+  Widget _buildModeSelector(AppLocalizations localizations) {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF1A1F2E), Color(0xFF0F131E)],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.3),
+            blurRadius: 20,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF667EEA), Color(0xFF764BA2)],
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.sync_alt_rounded,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Text(
+                'Connection Mode',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          _buildModeOption(
+            ConnectionMode.vpn,
+            Icons.vpn_lock_rounded,
+            'VPN Mode',
+            'Full system VPN with TUN interface',
+            const Color(0xFF00FF87),
+          ),
+          const SizedBox(height: 12),
+          _buildModeOption(
+            ConnectionMode.proxy,
+            Icons.lan_rounded,
+            'Proxy Mode',
+            'System-wide HTTP/SOCKS proxy',
+            const Color(0xFF667EEA),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeOption(
+    ConnectionMode mode,
+    IconData icon,
+    String title,
+    String description,
+    Color accentColor,
+  ) {
+    final isSelected = _connectionMode == mode;
+    
+    return Container(
+      decoration: BoxDecoration(
+        gradient: isSelected
+            ? LinearGradient(
+                colors: [
+                  accentColor.withOpacity(0.3),
+                  accentColor.withOpacity(0.1),
+                ],
+              )
+            : null,
+        color: isSelected ? null : Colors.white.withOpacity(0.03),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isSelected ? accentColor : Colors.white.withOpacity(0.1),
+          width: isSelected ? 2 : 1,
+        ),
+        boxShadow: isSelected
+            ? [
+                BoxShadow(
+                  color: accentColor.withOpacity(0.3),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                ),
+              ]
+            : null,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => setState(() => _connectionMode = mode),
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? accentColor.withOpacity(0.2)
+                        : Colors.white.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isSelected ? accentColor : Colors.white.withOpacity(0.6),
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: isSelected ? Colors.white : Colors.white.withOpacity(0.8),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        description,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.5),
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (isSelected)
+                  Icon(
+                    Icons.check_circle_rounded,
+                    color: accentColor,
+                    size: 22,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSidebar(BuildContext context, AppLocalizations localizations) {
     return Container(
       width: 280,
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            const Color(0xFF1A1F2E),
-            const Color(0xFF0F131E),
+            Color(0xFF1A1F2E),
+            Color(0xFF0F131E),
           ],
         ),
         boxShadow: [
@@ -148,7 +327,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
                         ),
                       ),
                       Text(
-                        'v1.1.1',
+                        'Windows v1.1.1',
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.5),
                           fontSize: 12,
@@ -324,7 +503,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
               ),
               const SizedBox(width: 8),
               Text(
-                'Windows',
+                'Windows ${Platform.operatingSystemVersion.contains('10') ? '10/11' : ''}',
                 style: TextStyle(
                   color: Colors.white.withOpacity(0.8),
                   fontSize: 14,
@@ -480,6 +659,38 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
             fontWeight: FontWeight.w500,
           ),
         ),
+        
+        if (_connectionMode == ConnectionMode.proxy && isConnected)
+          Container(
+            margin: const EdgeInsets.only(top: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF667EEA).withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: const Color(0xFF667EEA).withOpacity(0.4),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.lan_rounded,
+                  color: Color(0xFF667EEA),
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Proxy Mode Active',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -632,47 +843,29 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
   }
 
   Widget _buildStatsPanel(BuildContext context, V2RayProvider v2rayProvider, AppLocalizations localizations) {
-    return Column(
-      children: [
-        _buildStatCard(
-          'Connection Stats',
-          Icons.analytics_rounded,
-          [
-            _buildStatRow(
-              Icons.upload_rounded,
-              localizations.translate('home.upload'),
-              _formatSpeed(v2rayProvider.currentStatus?.uploadSpeed ?? 0),
-              const Color(0xFF72D9FF),
-            ),
-            const SizedBox(height: 16),
-            _buildStatRow(
-              Icons.download_rounded,
-              localizations.translate('home.download'),
-              _formatSpeed(v2rayProvider.currentStatus?.downloadSpeed ?? 0),
-              const Color(0xFF76F959),
-            ),
-            const SizedBox(height: 16),
-            _buildStatRow(
-              Icons.timer_rounded,
-              localizations.translate('home.duration'),
-              v2rayProvider.currentStatus?.duration ?? '00:00:00',
-              const Color(0xFFFFAA66),
-            ),
-          ],
+    return _buildStatCard(
+      'Connection Stats',
+      Icons.analytics_rounded,
+      [
+        _buildStatRow(
+          Icons.upload_rounded,
+          localizations.translate('home.upload'),
+          _formatSpeed(v2rayProvider.currentStatus?.uploadSpeed ?? 0),
+          const Color(0xFF72D9FF),
         ),
-        
-        const SizedBox(height: 20),
-        
-        _buildStatCard(
-          'System Information',
-          Icons.computer_rounded,
-          [
-            _buildInfoRow('Platform', 'Windows 10/11'),
-            const SizedBox(height: 12),
-            _buildInfoRow('Core Version', 'V2Ray 5.10.0'),
-            const SizedBox(height: 12),
-            _buildInfoRow('App Version', '1.1.1'),
-          ],
+        const SizedBox(height: 16),
+        _buildStatRow(
+          Icons.download_rounded,
+          localizations.translate('home.download'),
+          _formatSpeed(v2rayProvider.currentStatus?.downloadSpeed ?? 0),
+          const Color(0xFF76F959),
+        ),
+        const SizedBox(height: 16),
+        _buildStatRow(
+          Icons.timer_rounded,
+          localizations.translate('home.duration'),
+          v2rayProvider.currentStatus?.duration ?? '00:00:00',
+          const Color(0xFFFFAA66),
         ),
       ],
     );
@@ -775,33 +968,14 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
     );
   }
 
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.6),
-            fontSize: 13,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
   void _handleConnection(V2RayProvider v2rayProvider) async {
     if (v2rayProvider.v2rayService.isConnected) {
       setState(() => _isConnecting = true);
+      
+      if (_connectionMode == ConnectionMode.proxy) {
+        await WindowsProxyService.disableSystemProxy();
+      }
+      
       await v2rayProvider.disconnect();
       setState(() => _isConnecting = false);
     } else {
@@ -812,6 +986,24 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen>
       
       setState(() => _isConnecting = true);
       await v2rayProvider.connectToServer(v2rayProvider.selectedConfig!);
+      
+      if (_connectionMode == ConnectionMode.proxy) {
+        final socksPort = 10808;
+        final success = await WindowsProxyService.enableSystemProxy(
+          host: '127.0.0.1',
+          port: socksPort,
+        );
+        
+        if (!success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to configure system proxy'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+      
       setState(() => _isConnecting = false);
     }
   }

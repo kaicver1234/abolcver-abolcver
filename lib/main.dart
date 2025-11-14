@@ -8,6 +8,7 @@ import 'providers/language_provider.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/privacy_welcome_screen.dart';
 import 'screens/language_selection_screen.dart';
+import 'screens/windows_setup_screen.dart';
 import 'screens/update_check_wrapper.dart';
 import 'services/notification_service.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -75,7 +76,6 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Firebase Analytics observer for route tracking (only for mobile)
     List<NavigatorObserver> observers = [];
     if (Platform.isAndroid || Platform.isIOS) {
       final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
@@ -84,6 +84,9 @@ class MyApp extends StatelessWidget {
       observers.add(observer);
     }
     
+    final bool isDesktop = Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+    final bool needsSetup = !languageSelected || !privacyAccepted;
+    
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: languageProvider),
@@ -91,28 +94,34 @@ class MyApp extends StatelessWidget {
       ],
       child: Consumer<LanguageProvider>(
         builder: (context, languageProvider, child) {
+          Widget homeScreen;
+          
+          if (isDesktop && needsSetup) {
+            homeScreen = const WindowsSetupScreen();
+          } else if (!languageSelected) {
+            homeScreen = const LanguageSelectionScreen();
+          } else if (!privacyAccepted) {
+            homeScreen = const PrivacyWelcomeScreen();
+          } else {
+            homeScreen = const MainNavigationScreen();
+          }
+          
           return MaterialApp(
             title: 'Tiksar VPN',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme(languageProvider.currentLanguage.code),
             locale: languageProvider.locale,
-            navigatorObservers: observers, // Analytics tracking
+            navigatorObservers: observers,
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: const [
-              Locale('en'), // English
-              Locale('fa'), // Persian
+              Locale('en'),
+              Locale('fa'),
             ],
-            home: UpdateCheckWrapper(
-              child: !languageSelected
-                  ? const LanguageSelectionScreen()
-                  : (privacyAccepted
-                      ? const MainNavigationScreen()
-                      : const PrivacyWelcomeScreen()),
-            ),
+            home: isDesktop ? homeScreen : UpdateCheckWrapper(child: homeScreen),
           );
         },
       ),
