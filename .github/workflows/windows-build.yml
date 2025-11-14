@@ -38,6 +38,40 @@ jobs:
     - name: Get dependencies
       run: flutter pub get
       
+    - name: Download V2Ray Core
+      run: |
+        Write-Host "Downloading V2Ray Core for Windows..."
+        
+        # Create directory if it doesn't exist
+        New-Item -ItemType Directory -Force -Path "assets/v2ray-core"
+        
+        # Download V2Ray core
+        $v2rayVersion = "v5.20.0"
+        $downloadUrl = "https://github.com/v2fly/v2ray-core/releases/download/$v2rayVersion/v2ray-windows-64.zip"
+        $zipFile = "v2ray-windows-64.zip"
+        
+        Write-Host "Downloading from: $downloadUrl"
+        Invoke-WebRequest -Uri $downloadUrl -OutFile $zipFile -UseBasicParsing
+        
+        # Extract files
+        Write-Host "Extracting V2Ray core..."
+        Expand-Archive -Path $zipFile -DestinationPath "v2ray-temp" -Force
+        
+        # Copy required files
+        Write-Host "Copying required files..."
+        Copy-Item "v2ray-temp/v2ray.exe" -Destination "assets/v2ray-core/" -Force
+        Copy-Item "v2ray-temp/geoip.dat" -Destination "assets/v2ray-core/" -Force
+        Copy-Item "v2ray-temp/geosite.dat" -Destination "assets/v2ray-core/" -Force
+        
+        # Cleanup
+        Remove-Item $zipFile -Force
+        Remove-Item "v2ray-temp" -Recurse -Force
+        
+        Write-Host "V2Ray Core downloaded successfully!"
+        Write-Host "Files in assets/v2ray-core:"
+        Get-ChildItem "assets/v2ray-core" | Format-Table Name, Length
+      shell: pwsh
+      
     - name: Analyze code
       run: flutter analyze
       continue-on-error: true
