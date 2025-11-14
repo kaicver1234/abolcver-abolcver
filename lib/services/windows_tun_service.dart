@@ -133,7 +133,7 @@ class WindowsTunService {
         'powershell',
         [
           '-Command',
-          'Get-NetAdapter | Where-Object {$_.InterfaceDescription -like "*WinTun*"}'
+          r'Get-NetAdapter | Where-Object {$_.InterfaceDescription -like "*WinTun*"}'
         ],
       );
 

@@ -619,6 +619,38 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    debugPrint('📱 App lifecycle state changed: $state');
+    
+    switch (state) {
+      case AppLifecycleState.resumed:
+        // App came to foreground - sync with VPN state
+        debugPrint('✅ App resumed - syncing VPN state');
+        Future.delayed(const Duration(milliseconds: 500), () async {
+          await _enhancedSyncWithVpnServiceState();
+          notifyListeners();
+        });
+        break;
+      case AppLifecycleState.paused:
+        // App went to background
+        debugPrint('⏸️ App paused');
+        break;
+      case AppLifecycleState.inactive:
+        // App is inactive
+        debugPrint('💤 App inactive');
+        break;
+      case AppLifecycleState.detached:
+        // App is detached
+        debugPrint('🔌 App detached');
+        break;
+      case AppLifecycleState.hidden:
+        // App is hidden
+        debugPrint('👻 App hidden');
+        break;
+    }
+  }
+
+  @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     // Remove listener from V2RayService
