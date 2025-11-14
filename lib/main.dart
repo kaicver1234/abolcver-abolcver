@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -17,23 +18,27 @@ import 'theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Firebase initialization with proper configuration
+  // Firebase initialization with proper configuration (only for mobile)
   try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    
-    // Initialize Firebase Analytics with app info
-    final analytics = FirebaseAnalytics.instance;
-    await analytics.setAnalyticsCollectionEnabled(true);
-    
-    // Initialize notification service
-    await NotificationService().initialize();
-    
-    // Log app open
-    await analytics.logAppOpen();
-    
-    debugPrint('✅ Firebase initialized successfully');
+    if (Platform.isAndroid || Platform.isIOS) {
+      await Firebase.initializeApp(
+        options: DefaultFirebaseOptions.currentPlatform,
+      );
+      
+      // Initialize Firebase Analytics with app info
+      final analytics = FirebaseAnalytics.instance;
+      await analytics.setAnalyticsCollectionEnabled(true);
+      
+      // Initialize notification service
+      await NotificationService().initialize();
+      
+      // Log app open
+      await analytics.logAppOpen();
+      
+      debugPrint('✅ Firebase initialized successfully');
+    } else {
+      debugPrint('ℹ️  Firebase skipped for desktop platforms');
+    }
   } catch (e) {
     // Firebase initialization failed, log error
     debugPrint('❌ Firebase initialization error: $e');
@@ -70,10 +75,14 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Firebase Analytics observer for route tracking
-    final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
-    final FirebaseAnalyticsObserver observer = 
-        FirebaseAnalyticsObserver(analytics: analytics);
+    // Firebase Analytics observer for route tracking (only for mobile)
+    List<NavigatorObserver> observers = [];
+    if (Platform.isAndroid || Platform.isIOS) {
+      final FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+      final FirebaseAnalyticsObserver observer = 
+          FirebaseAnalyticsObserver(analytics: analytics);
+      observers.add(observer);
+    }
     
     return MultiProvider(
       providers: [
@@ -87,7 +96,7 @@ class MyApp extends StatelessWidget {
             debugShowCheckedModeBanner: false,
             theme: AppTheme.darkTheme(languageProvider.currentLanguage.code),
             locale: languageProvider.locale,
-            navigatorObservers: [observer], // Analytics tracking
+            navigatorObservers: observers, // Analytics tracking
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,

@@ -1,0 +1,87 @@
+name: Build Windows Release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'lib/**'
+      - 'windows/**'
+      - 'local_packages/**'
+      - 'pubspec.yaml'
+      - '.github/workflows/windows-build.yml'
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.24.0'
+        channel: 'stable'
+        cache: true
+        
+    - name: Enable Windows Desktop
+      run: |
+        flutter config --enable-windows-desktop
+        flutter config --no-analytics
+        
+    - name: Flutter Doctor
+      run: flutter doctor -v
+      
+    - name: Get dependencies
+      run: flutter pub get
+      
+    - name: Analyze code
+      run: flutter analyze
+      continue-on-error: true
+      
+    - name: Build Windows Release
+      run: flutter build windows --release --verbose
+      
+    - name: Prepare release files
+      run: |
+        cd build/windows/x64/runner/Release
+        echo "Build completed successfully" > BUILD_INFO.txt
+        echo "Version: 1.1.1" >> BUILD_INFO.txt
+        echo "Build Date: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')" >> BUILD_INFO.txt
+        echo "Platform: Windows 10/11 (x64)" >> BUILD_INFO.txt
+      shell: pwsh
+      
+    - name: Create ZIP archive
+      run: |
+        cd build/windows/x64/runner
+        Compress-Archive -Path Release\* -DestinationPath ..\..\..\..\TiksarVPN-Windows-v1.1.1.zip -Force
+      shell: pwsh
+      
+    - name: Upload Build Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: TiksarVPN-Windows-v1.1.1
+        path: TiksarVPN-Windows-v1.1.1.zip
+        retention-days: 30
+        
+    - name: Upload Release Files (Unzipped)
+      uses: actions/upload-artifact@v4
+      with:
+        name: TiksarVPN-Windows-Release-Files
+        path: build/windows/x64/runner/Release/
+        retention-days: 7
+
+    - name: Create Release (on tag)
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: TiksarVPN-Windows-v1.1.1.zip
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

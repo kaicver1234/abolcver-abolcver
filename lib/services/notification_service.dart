@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -12,27 +13,30 @@ class NotificationService {
 
   Future<void> initialize() async {
     try {
-      // Firebase already initialized in main.dart
-      
-      // Request notification permissions
-      await _requestPermissions();
-      
-      // Initialize local notifications for showing notifications in foreground
-      await _initializeLocalNotifications();
-      
-      // Subscribe to all_users topic to receive notifications for all users
-      await _firebaseMessaging.subscribeToTopic('all_users');
+      // Only initialize Firebase messaging on mobile platforms
+      if (Platform.isAndroid || Platform.isIOS) {
+        // Request notification permissions
+        await _requestPermissions();
+        
+        // Initialize local notifications for showing notifications in foreground
+        await _initializeLocalNotifications();
+        
+        // Subscribe to all_users topic to receive notifications for all users
+        await _firebaseMessaging.subscribeToTopic('all_users');
+        
+        // Handle foreground messages
+        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+        
+        // Handle background messages
+        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      }
       // Notification service initialized
       
-      // Handle foreground messages
-      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-      
-      // Handle background messages
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-      
     } catch (e) {
-      // Error initializing notifications
-      rethrow;
+      // Error initializing notifications - skip for desktop
+      if (Platform.isAndroid || Platform.isIOS) {
+        rethrow;
+      }
     }
   }
 

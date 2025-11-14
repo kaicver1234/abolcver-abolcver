@@ -15,6 +15,15 @@
         "store": "Store",
         "tools": "Tools"
     },
+    "nav": {
+        "home": "Home",
+        "speedTest": "Speed Test",
+        "ipInfo": "IP Info",
+        "hostChecker": "Host Checker",
+        "servers": "Servers",
+        "settings": "Settings",
+        "about": "About"
+    },
     "tools": {
         "title": "Tools",
         "ip_information_desc": "View detailed information about your current IP address",
@@ -32,6 +41,10 @@
     },
     "home": {
         "title": "Tiksar VPN",
+        "welcome": "Welcome to Tiksar VPN",
+        "subtitle": "Stay secure, private and unrestricted",
+        "currentServer": "Current Server",
+        "noServerSelected": "No Server Selected",
         "tap_to_connect": "TAP TO CONNECT",
         "tap_to_stop": "TAP TO STOP",
         "connect": "Connect",
@@ -67,7 +80,12 @@
         "updating_subscriptions": "Updating servers...",
         "subscriptions_updated": "Servers updated successfully",
         "latency": "Latency",
-        "server_location_label": "Server Location"
+        "server_location_label": "Server Location",
+        "statistics": "Statistics",
+        "duration": "Duration",
+        "protectedConnection": "Protected Connection",
+        "unprotectedConnection": "Unprotected Connection",
+        "systemInfo": "System Info"
     },
     "server_selector": {
         "connection_active": "Connection Active",

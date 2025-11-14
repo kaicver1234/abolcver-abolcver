@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_v2ray/flutter_v2ray.dart';
 import 'package:flutter/services.dart';
@@ -1333,16 +1334,21 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('🔄 Force re-initializing service to restore state...');
       await _v2rayService.initialize();
       
+      // Notify immediately after init
+      notifyListeners();
+      
       // Wait a moment for service to fully restore
-      await Future.delayed(const Duration(milliseconds: 200));
+      await Future.delayed(const Duration(milliseconds: 100));
       
       // Notify immediately after restore attempt
       if (_v2rayService.activeConfig != null) {
         debugPrint('✅ ActiveConfig after restore: ${_v2rayService.activeConfig!.remark}');
-        notifyListeners();
       } else {
         debugPrint('⚠️ ActiveConfig still null after restore');
       }
+      
+      // Force UI update
+      notifyListeners();
       
       // Check actual VPN connection status from native side
       debugPrint('🔎 Checking actual VPN connection status...');
@@ -1399,10 +1405,20 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       notifyListeners();
       debugPrint('✅ UI forcefully refreshed on resume');
       
-      // Double-check after a brief moment to catch any race conditions
+      // Multiple quick UI refreshes to ensure smooth update
+      Future.delayed(const Duration(milliseconds: 200), () {
+        notifyListeners();
+        debugPrint('🔄 First UI refresh completed');
+      });
+      
       Future.delayed(const Duration(milliseconds: 500), () {
         notifyListeners();
-        debugPrint('🔄 Secondary UI refresh completed');
+        debugPrint('🔄 Second UI refresh completed');
+      });
+      
+      Future.delayed(const Duration(milliseconds: 1000), () {
+        notifyListeners();
+        debugPrint('🔄 Final UI refresh completed');
       });
       
     } catch (e) {

@@ -40,6 +40,8 @@ flutter:
         pluginClass: FlutterV2rayPlugin
       ios:
         pluginClass: FlutterV2rayPlugin
+      windows:
+        pluginClass: FlutterV2rayPluginCApi
 
   # To add assets to your plugin package, add an assets section, like this:
   # assets:

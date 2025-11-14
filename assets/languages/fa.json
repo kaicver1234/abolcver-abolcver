@@ -15,6 +15,15 @@
         "store": "فروشگاه",
         "tools": "ابزارها"
     },
+    "nav": {
+        "home": "خانه",
+        "speedTest": "تست سرعت",
+        "ipInfo": "اطلاعات آی‌پی",
+        "hostChecker": "بررسی میزبان",
+        "servers": "سرورها",
+        "settings": "تنظیمات",
+        "about": "درباره"
+    },
     "tools": {
         "title": "ابزارها",
         "ip_information_desc": "مشاهده اطلاعات دقیق درباره آدرس آی‌پی فعلی شما",
@@ -32,6 +41,10 @@
     },
     "home": {
         "title": "تیکسر وی‌پی‌ان",
+        "welcome": "خوش آمدید به تیکسر وی‌پی‌ان",
+        "subtitle": "امن، خصوصی و بدون محدودیت",
+        "currentServer": "سرور فعلی",
+        "noServerSelected": "هیچ سروری انتخاب نشده",
         "tap_to_connect": "برای اتصال ضربه بزنید",
         "tap_to_stop": "برای قطع ضربه بزنید",
         "connect": "اتصال",
@@ -67,7 +80,12 @@
         "updating_subscriptions": "به‌روزرسانی سرورها...",
         "subscriptions_updated": "سرورها با موفقیت به‌روزرسانی شدند",
         "latency": "تاخیر",
-        "server_location_label": "موقعیت سرور"
+        "server_location_label": "موقعیت سرور",
+        "statistics": "آمارها",
+        "duration": "مدت زمان",
+        "protectedConnection": "اتصال محافظت شده",
+        "unprotectedConnection": "اتصال محافظت نشده",
+        "systemInfo": "اطلاعات سیستم"
     },
     "server_selector": {
         "connection_active": "اتصال فعال",

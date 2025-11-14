@@ -78,8 +78,10 @@ class _ServerSelectionScreenState
     int successCount = 0;
     int completedCount = 0;
     
-    // Test servers in parallel using V2Ray Core (much faster!)
-    final futures = servers.map((server) async {
+    // Test servers in batches of 3 to avoid overwhelming V2Ray Core
+    for (int i = 0; i < servers.length; i += 3) {
+      final batch = servers.skip(i).take(3).toList();
+      final futures = batch.map((server) async {
       try {
         // Add timeout for each server test (6 seconds max)
         final ping = await _testSingleServerPing(server).timeout(
@@ -109,19 +111,23 @@ class _ServerSelectionScreenState
         }
         return 9999;
       }
-    }).toList();
-    
-    // Wait for all pings to complete with overall timeout (60 seconds max)
-    try {
-      await Future.wait(futures).timeout(
-        const Duration(seconds: 60),
-        onTimeout: () {
-          debugPrint('⚠️ Overall ping test timeout');
-          return [];
-        },
-      );
-    } catch (e) {
-      debugPrint('❌ Error in Future.wait: $e');
+      }).toList();
+      
+      // Wait for this batch to complete
+      try {
+        await Future.wait(futures).timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('⚠️ Batch timeout');
+            return [];
+          },
+        );
+      } catch (e) {
+        debugPrint('❌ Error in batch: $e');
+      }
+      
+      // Delay between batches to avoid overwhelming V2Ray Core
+      await Future.delayed(const Duration(milliseconds: 500));
     }
     
     _pingAnimationController.stop();

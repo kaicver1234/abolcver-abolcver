@@ -36,10 +36,7 @@ class DefaultFirebaseOptions {
           'you can reconfigure this by running the FlutterFire CLI again.',
         );
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
+        return windows;
       case TargetPlatform.linux:
         throw UnsupportedError(
           'DefaultFirebaseOptions have not been configured for linux - '
@@ -55,6 +52,14 @@ class DefaultFirebaseOptions {
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyCphADgBooyKXVR-T8khtOWDKfQABqYl5A',
     appId: '1:246805700616:android:c5c071d70c247b6397f1bd',
+    messagingSenderId: '246805700616',
+    projectId: 'tiksar-vpn',
+    storageBucket: 'tiksar-vpn.firebasestorage.app',
+  );
+
+  static const FirebaseOptions windows = FirebaseOptions(
+    apiKey: 'AIzaSyCphADgBooyKXVR-T8khtOWDKfQABqYl5A',
+    appId: '1:246805700616:windows:c5c071d70c247b6397f1bd',
     messagingSenderId: '246805700616',
     projectId: 'tiksar-vpn',
     storageBucket: 'tiksar-vpn.firebasestorage.app',
