@@ -1377,6 +1377,11 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
             debugPrint('${shouldBeConnected ? "✅" : "❌"} ${config.remark}: isConnected = $shouldBeConnected');
           }
         }
+        
+        // CRITICAL: Ensure monitoring is running for long-running connections
+        // This handles cases where app was in background for extended periods
+        debugPrint('🔄 Ensuring usage monitoring is active...');
+        _v2rayService.ensureMonitoringActive();
       } else {
         debugPrint('❌ VPN is NOT connected, clearing all connection states');
         

@@ -586,9 +586,9 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
                   ),
                 ),
                 const SizedBox(height: 24),
-                const Text(
-                  'Tiksar VPN',
-                  style: TextStyle(
+                Text(
+                  localizations.translate('app.title'),
+                  style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
                     color: Colors.white,
@@ -596,7 +596,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  'Version 1.1.1 - Windows Edition',
+                  localizations.translate('common.windows_version'),
                   style: TextStyle(
                     fontSize: 14,
                     color: Colors.white.withOpacity(0.6),
@@ -614,9 +614,9 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
                   ),
                   child: Column(
                     children: [
-                      const Text(
-                        'Fast, Secure, and Free VPN',
-                        style: TextStyle(
+                      Text(
+                        localizations.translate('common.welcome_subtitle'),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
                           fontWeight: FontWeight.w600,
@@ -624,7 +624,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        'Tiksar VPN provides secure and private internet access with high-speed servers worldwide.',
+                        localizations.translate('desktop.about_description'),
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.7),
@@ -826,9 +826,9 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
                 ),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Connection Mode',
-                style: TextStyle(
+              Text(
+                localizations.translate('common.connection_mode'),
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -840,22 +840,18 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
           _buildModeOption(
             ConnectionMode.vpn,
             Icons.vpn_lock_rounded,
-            'VPN Mode',
-            _hasAdminRights && _hasWinTunDriver
-                ? 'Full system VPN protection'
-                : _hasAdminRights
-                    ? 'Requires WinTun driver'
-                    : 'Requires Administrator rights',
+            localizations.translate('common.vpn_mode'),
+            localizations.translate('common.vpn_mode_desc'),
             const Color(0xFF00FF87),
             vpnProvider,
-            requiresAdmin: !_hasAdminRights || !_hasWinTunDriver,
+            requiresAdmin: false,
           ),
           const SizedBox(height: 12),
           _buildModeOption(
             ConnectionMode.proxy,
             Icons.lan_rounded,
-            'Proxy Mode',
-            'System-wide proxy (Recommended)',
+            localizations.translate('common.proxy_mode'),
+            localizations.translate('common.proxy_mode_desc'),
             const Color(0xFF667EEA),
             vpnProvider,
             requiresAdmin: false,
@@ -1015,9 +1011,9 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
-                        'Tiksar VPN',
-                        style: TextStyle(
+                      Text(
+                        localizations.translate('app.title'),
+                        style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
@@ -1025,7 +1021,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
                         ),
                       ),
                       Text(
-                        'Windows v1.1.1',
+                        localizations.translate('common.windows_version'),
                         style: TextStyle(
                           color: Colors.white.withOpacity(0.5),
                           fontSize: 12,
@@ -1184,8 +1180,10 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
     final isConnected = vpnProvider.isConnected;
     final isConnecting = vpnProvider.isConnecting;
     final status = isConnecting 
-        ? 'Connecting...'
-        : (isConnected ? 'Connected' : 'Disconnected');
+        ? localizations.translate('home.connecting')
+        : (isConnected 
+            ? localizations.translate('home.connected') 
+            : localizations.translate('home.disconnected'));
     
     return Container(
       decoration: BoxDecoration(
@@ -1416,7 +1414,9 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
                 ),
                 const SizedBox(width: 12),
                 Text(
-                  isConnected ? 'Disconnect' : 'Connect',
+                  isConnected 
+                      ? localizations.translate('home.disconnect') 
+                      : localizations.translate('home.connect'),
                   style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -1465,7 +1465,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Current Server',
+                  localizations.translate('common.current_server'),
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.6),
                     fontSize: 13,
@@ -1474,7 +1474,7 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  vpnProvider.selectedServerConfig?.remark ?? 'No server selected',
+                  vpnProvider.selectedServerConfig?.remark ?? localizations.translate('common.no_server_selected'),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -1536,9 +1536,9 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
                 child: const Icon(Icons.analytics_rounded, color: Colors.white, size: 20),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Connection Stats',
-                style: TextStyle(
+              Text(
+                localizations.translate('common.connection_stats'),
+                style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -1551,21 +1551,21 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
           
           _buildStatRow(
             Icons.upload_rounded,
-            'Upload',
+            localizations.translate('home.upload'),
             _formatSpeed(vpnProvider.uploadSpeed),
             const Color(0xFF72D9FF),
           ),
           const SizedBox(height: 16),
           _buildStatRow(
             Icons.download_rounded,
-            'Download',
+            localizations.translate('home.download'),
             _formatSpeed(vpnProvider.downloadSpeed),
             const Color(0xFF76F959),
           ),
           const SizedBox(height: 16),
           _buildStatRow(
             Icons.timer_rounded,
-            'Duration',
+            localizations.translate('home.duration'),
             vpnProvider.duration,
             const Color(0xFFFFAA66),
           ),
@@ -1636,22 +1636,8 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
         );
       }
     } else {
-      // Check VPN mode requirements
-      if (_connectionMode == ConnectionMode.vpn) {
-        if (!_hasAdminRights) {
-          if (mounted) {
-            _showAdminRequiredDialog();
-          }
-          return;
-        }
-        
-        if (!_hasWinTunDriver) {
-          if (mounted) {
-            _showWinTunRequiredDialog();
-          }
-          return;
-        }
-      }
+      // No special requirements needed anymore!
+      // Both VPN and Proxy modes work without admin rights or WinTun
       
       if (vpnProvider.selectedServerConfig == null) {
         if (mounted) {
@@ -1677,14 +1663,19 @@ class _DesktopHomeScreenState extends State<DesktopHomeScreen> {
           _startStatsMonitoring(vpnProvider);
           
           if (_connectionMode == ConnectionMode.proxy) {
+            // Use HTTP proxy (port 10809) for better compatibility
+            await WindowsProxyService.enableSystemProxy(
+              host: '127.0.0.1',
+              port: 10809,
+              isSocks: false,
+            );
+          } else if (_connectionMode == ConnectionMode.vpn) {
+            // VPN Mode: Use SOCKS5 proxy with system-wide routing
+            // This works without WinTun driver - acts like global proxy
             await WindowsProxyService.enableSystemProxy(
               host: '127.0.0.1',
               port: 10808,
-            );
-          } else if (_connectionMode == ConnectionMode.vpn) {
-            await WindowsTunService.enableVpnRouting(
-              proxyHost: '127.0.0.1',
-              proxyPort: 10808,
+              isSocks: true,
             );
           }
           

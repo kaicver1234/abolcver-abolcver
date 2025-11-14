@@ -16,6 +16,7 @@ class WindowsProxyService {
   static Future<bool> enableSystemProxy({
     required String host,
     required int port,
+    bool isSocks = false,
   }) async {
     if (!Platform.isWindows) {
       debugPrint('⚠️ Proxy configuration is only supported on Windows');
@@ -23,8 +24,10 @@ class WindowsProxyService {
     }
 
     try {
-      debugPrint('🔧 Enabling Windows system proxy: $host:$port');
+      final proxyType = isSocks ? 'socks' : 'http';
+      debugPrint('🔧 Enabling Windows system proxy ($proxyType): $host:$port');
 
+      // Enable proxy
       final result = await Process.run('reg', [
         'add',
         'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings',
@@ -42,6 +45,8 @@ class WindowsProxyService {
         return false;
       }
 
+      // Set proxy server with protocol prefix for SOCKS
+      final proxyServer = isSocks ? 'socks=$host:$port' : '$host:$port';
       final serverResult = await Process.run('reg', [
         'add',
         'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings',
@@ -50,7 +55,7 @@ class WindowsProxyService {
         '/t',
         'REG_SZ',
         '/d',
-        '$host:$port',
+        proxyServer,
         '/f'
       ]);
 
@@ -59,6 +64,7 @@ class WindowsProxyService {
         return false;
       }
 
+      // Set bypass list (exclude local addresses)
       final bypassResult = await Process.run('reg', [
         'add',
         'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Internet Settings',
@@ -67,7 +73,7 @@ class WindowsProxyService {
         '/t',
         'REG_SZ',
         '/d',
-        'localhost;127.*;10.*;172.16.*;172.17.*;172.18.*;172.19.*;172.20.*;172.21.*;172.22.*;172.23.*;172.24.*;172.25.*;172.26.*;172.27.*;172.28.*;172.29.*;172.30.*;172.31.*;192.168.*;<local>',
+        '<local>',
         '/f'
       ]);
 
@@ -75,6 +81,7 @@ class WindowsProxyService {
         debugPrint('⚠️ Warning: Failed to set proxy bypass list');
       }
 
+      // Notify system of proxy changes
       await _notifyProxyChange();
 
       _isProxyEnabled = true;

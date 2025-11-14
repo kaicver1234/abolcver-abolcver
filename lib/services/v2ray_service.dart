@@ -1077,6 +1077,19 @@ class V2RayService extends ChangeNotifier {
     _usageStatsTimer?.cancel();
     _usageStatsTimer = null;
   }
+  
+  /// Ensure monitoring is active for long-running connections
+  /// This is called when app resumes to restart monitoring if needed
+  void ensureMonitoringActive() {
+    if (_activeConfig != null && _usageStatsTimer == null) {
+      debugPrint('🔄 Restarting usage monitoring after app resume');
+      _startUsageMonitoring();
+    } else if (_activeConfig != null && _usageStatsTimer != null) {
+      debugPrint('✅ Usage monitoring already active');
+    } else {
+      debugPrint('ℹ️ No active config, monitoring not needed');
+    }
+  }
 
   // Save usage stats and connection time to storage
   Future<void> _saveUsageStats() async {
