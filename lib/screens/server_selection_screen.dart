@@ -5,7 +5,6 @@ import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
 import '../models/v2ray_config.dart';
 import '../widgets/vpn_gradient_background.dart';
-import '../services/ping_service.dart';
 import '../utils/app_localizations.dart';
 
 class ServerSelectionScreen extends StatefulWidget {
@@ -76,7 +75,6 @@ class _ServerSelectionScreenState
     _showSnackBar('Testing ${servers.length} servers with V2Ray Core...', Colors.blue, duration: 2);
     
     int successCount = 0;
-    int completedCount = 0;
     
     // Test servers in batches of 3 to avoid overwhelming V2Ray Core
     for (int i = 0; i < servers.length; i += 3) {
@@ -96,7 +94,6 @@ class _ServerSelectionScreenState
           setState(() {
             _serverPings[server.id] = ping;
             if (ping < 9999) successCount++;
-            completedCount++;
           });
         }
         
@@ -106,7 +103,6 @@ class _ServerSelectionScreenState
         if (mounted) {
           setState(() {
             _serverPings[server.id] = 9999;
-            completedCount++;
           });
         }
         return 9999;

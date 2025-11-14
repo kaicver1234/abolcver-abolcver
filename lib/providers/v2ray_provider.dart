@@ -1,5 +1,4 @@
-import 'dart:async';
-import 'dart:io';
+﻿import 'dart:async';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_v2ray/flutter_v2ray.dart';
 import 'package:flutter/services.dart';
@@ -48,17 +47,12 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
 
   V2RayProvider() {
     WidgetsBinding.instance.addObserver(this);
-    // Listen to V2RayService changes to update UI automatically
     _v2rayService.addListener(_onV2RayServiceChanged);
-    
-    // Set up VPN status event listener (inspired by defyxVPN)
     _setupVpnStatusListener();
-    
     _initialize();
-    
-    // Set up method channel handler for notification disconnect
     platform.setMethodCallHandler(_handleMethodCall);
   }
+
   
   // Handle method calls from native side
   Future<dynamic> _handleMethodCall(MethodCall call) async {
