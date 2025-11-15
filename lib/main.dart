@@ -25,65 +25,6 @@ void main() async {
     
     // Show splash screen immediately
     runApp(const SplashApp());
-    } catch (e, stackTrace) {
-      debugPrint('💥 INITIALIZATION ERROR: $e');
-      debugPrint('Stack trace: $stackTrace');
-      
-      // Try to show error screen even if initialization failed
-      runApp(
-        MaterialApp(
-          home: Scaffold(
-            backgroundColor: const Color(0xFF0A0E1A),
-            body: Center(
-              child: Container(
-                padding: const EdgeInsets.all(40),
-                constraints: const BoxConstraints(maxWidth: 600),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(
-                      Icons.error_outline_rounded,
-                      color: Colors.red,
-                      size: 80,
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Initialization Error',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'Failed to start Tiksar VPN\n\n$e',
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 32),
-                    ElevatedButton(
-                      onPressed: () => exit(0),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 32,
-                          vertical: 16,
-                        ),
-                      ),
-                      child: const Text('Exit'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
   }, (error, stackTrace) {
     debugPrint('💥 FATAL ERROR: $error');
     debugPrint('Stack trace: $stackTrace');
