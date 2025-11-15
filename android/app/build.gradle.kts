@@ -63,13 +63,9 @@ android {
                 signingConfigs.getByName("debug")
             }
 
-            isMinifyEnabled = true
-            isShrinkResources = true
-            
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            // Disable minify for VPN apps to avoid compatibility issues
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
         
         debug {
