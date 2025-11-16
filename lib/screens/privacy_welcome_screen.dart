@@ -67,12 +67,20 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('privacy_accepted', true);
     
+    if (!mounted) return;
+    
+    // Get the language provider from current context
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    
     if (mounted) {
       Navigator.pushReplacement(
         context,
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => 
-              const MainNavigationScreen(),
+              Provider.value(
+                value: languageProvider,
+                child: const MainNavigationScreen(),
+              ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             final curvedAnimation = CurvedAnimation(
               parent: animation,

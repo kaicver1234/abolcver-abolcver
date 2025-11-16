@@ -90,7 +90,10 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
         context,
         PageRouteBuilder(
           pageBuilder: (context, animation, secondaryAnimation) => 
-              const PrivacyWelcomeScreen(),
+              Provider.value(
+                value: languageProvider,
+                child: const PrivacyWelcomeScreen(),
+              ),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
             return FadeTransition(
               opacity: animation,
