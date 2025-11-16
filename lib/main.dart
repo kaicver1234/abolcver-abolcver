@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
@@ -9,7 +7,6 @@ import 'screens/main_navigation_screen.dart';
 import 'screens/privacy_welcome_screen.dart';
 import 'screens/language_selection_screen.dart';
 import 'screens/update_check_wrapper.dart';
-import 'screens/splash_loading_screen.dart';
 import 'services/notification_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
@@ -17,18 +14,57 @@ import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
-  runZonedGuarded(() async {
-    WidgetsFlutterBinding.ensureInitialized();
-    
-    debugPrint('🚀 Starting Tiksar VPN...');
-    debugPrint('📱 Platform: ${Platform.operatingSystem}');
-    
-    // Show splash screen immediately
-    runApp(const SplashApp());
-  }, (error, stackTrace) {
-    debugPrint('💥 FATAL ERROR: $error');
-    debugPrint('Stack trace: $stackTrace');
-  });
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  debugPrint('🚀 Starting Tiksar VPN...');
+  
+  // Initialize Firebase
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    ).timeout(const Duration(seconds: 5));
+    debugPrint('✅ Firebase initialized');
+  } catch (e) {
+    debugPrint('⚠️ Firebase skipped: $e');
+  }
+  
+  // Initialize services in background
+  _initializeServices();
+  
+  // Load preferences
+  final prefs = await SharedPreferences.getInstance();
+  final bool languageSelected = prefs.getBool('language_selected') ?? false;
+  final bool privacyAccepted = prefs.getBool('privacy_accepted') ?? false;
+  
+  // Initialize language provider
+  final languageProvider = LanguageProvider();
+  await languageProvider.initialize();
+  
+  debugPrint('🎨 Launching app...');
+  
+  // Run app directly
+  runApp(MyApp(
+    languageSelected: languageSelected,
+    privacyAccepted: privacyAccepted,
+    languageProvider: languageProvider,
+  ));
+}
+
+void _initializeServices() {
+  // Analytics
+  try {
+    FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(true);
+    FirebaseAnalytics.instance.logAppOpen();
+  } catch (e) {
+    debugPrint('⚠️ Analytics skipped: $e');
+  }
+  
+  // Notifications
+  try {
+    NotificationService().initialize();
+  } catch (e) {
+    debugPrint('⚠️ Notifications skipped: $e');
+  }
 }
 
 class MyApp extends StatelessWidget {
