@@ -69,35 +69,28 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
     
     if (!mounted) return;
     
-    // Get the language provider from current context
-    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-    
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => 
-              Provider.value(
-                value: languageProvider,
-                child: const MainNavigationScreen(),
-              ),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final curvedAnimation = CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeInOutCubic,
-            );
-            return FadeTransition(
-              opacity: curvedAnimation,
-              child: ScaleTransition(
-                scale: Tween<double>(begin: 0.95, end: 1.0).animate(curvedAnimation),
-                child: child,
-              ),
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 600),
-        ),
-      );
-    }
+    // Simply navigate - provider is already available in the widget tree
+    Navigator.pushReplacement(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => 
+            const MainNavigationScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final curvedAnimation = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeInOutCubic,
+          );
+          return FadeTransition(
+            opacity: curvedAnimation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.95, end: 1.0).animate(curvedAnimation),
+              child: child,
+            ),
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 600),
+      ),
+    );
   }
 
   @override
@@ -451,42 +444,13 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           // Success Icon with Glassmorphism
-          Container(
-            width: 140,
-            height: 140,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  const Color(0xFF10B981).withOpacity(0.8),
-                  const Color(0xFF059669).withOpacity(0.6),
-                ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF10B981).withOpacity(0.5),
-                  blurRadius: 40,
-                  spreadRadius: 10,
-                ),
-                BoxShadow(
-                  color: const Color(0xFF059669).withOpacity(0.3),
-                  blurRadius: 60,
-                  offset: const Offset(0, 20),
-                ),
-              ],
-            ),
-            child: const Icon(
-              Icons.check_circle_outline,
-              size: 70,
-              color: Colors.white,
-            ),
+          const Icon(
+            Icons.check_circle_outline,
+            size: 70,
+            color: Colors.white,
           ).animate()
               .scale(duration: 1000.ms, curve: Curves.elasticOut)
-              .fadeIn(duration: 600.ms)
-              .then()
-              .shimmer(duration: 2000.ms, color: Colors.white.withOpacity(0.3)),
+              .fadeIn(duration: 600.ms),
           
           const SizedBox(height: 50),
           

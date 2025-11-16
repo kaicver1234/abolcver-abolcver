@@ -116,7 +116,15 @@ class MyApp extends StatelessWidget {
           } catch (e, stackTrace) {
             debugPrint('❌ Screen error: $e');
             debugPrint('Stack: $stackTrace');
-            homeScreen = _buildErrorScreen(e.toString());
+            homeScreen = Scaffold(
+              backgroundColor: const Color(0xFF0A0E1A),
+              body: Center(
+                child: Text(
+                  'Error: $e',
+                  style: const TextStyle(color: Colors.white),
+                ),
+              ),
+            );
           }
           
           debugPrint('✅ Building MaterialApp with ${homeScreen.runtimeType}');
@@ -136,7 +144,11 @@ class MyApp extends StatelessWidget {
               Locale('en'),
               Locale('fa'),
             ],
-            home: UpdateCheckWrapper(child: homeScreen),
+            builder: (context, child) {
+              // Wrap with UpdateCheckWrapper
+              return UpdateCheckWrapper(child: homeScreen);
+            },
+            home: homeScreen,
           );
         },
       ),
