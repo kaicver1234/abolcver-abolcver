@@ -54,5 +54,7 @@ assets/v2ray-core/*.json
 *.jks
 *.keystore
 android/key.properties
+android/*.jks
 key.properties
 keystore-base64.txt
+my-release-key.jks

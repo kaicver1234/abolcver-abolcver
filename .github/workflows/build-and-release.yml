@@ -49,12 +49,18 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > my-release-key.jks
+            echo "🔑 Decoding keystore..."
+            echo "$KEYSTORE_BASE64" | base64 -d > android/my-release-key.jks
+            
+            echo "📝 Creating key.properties..."
             echo "storePassword=$KEYSTORE_PASSWORD" > android/key.properties
             echo "keyPassword=$KEY_PASSWORD" >> android/key.properties
             echo "keyAlias=$KEY_ALIAS" >> android/key.properties
-            echo "storeFile=../my-release-key.jks" >> android/key.properties
+            echo "storeFile=my-release-key.jks" >> android/key.properties
+            
             echo "✅ Keystore configured successfully"
+            ls -la android/my-release-key.jks
+            cat android/key.properties
           else
             echo "⚠️ No keystore secrets found, will use debug signing"
           fi
@@ -62,7 +68,7 @@ jobs:
 
       - name: Check Signing Status
         run: |
-          if [ -f "my-release-key.jks" ]; then
+          if [ -f "android/my-release-key.jks" ]; then
             echo "✅ Building with RELEASE keystore (No Play Protect warning)"
             echo "SIGNING_TYPE=release" >> $GITHUB_ENV
           else
