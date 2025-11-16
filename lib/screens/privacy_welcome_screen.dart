@@ -469,24 +469,10 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
                 ),
               ],
             ),
-            child: ClipOval(
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.3),
-                      width: 2,
-                    ),
-                  ),
-                  child: const Icon(
-                    Icons.check_circle_outline,
-                    size: 70,
-                    color: Colors.white,
-                  ),
-                ),
-              ),
+            child: const Icon(
+              Icons.check_circle_outline,
+              size: 70,
+              color: Colors.white,
             ),
           ).animate()
               .scale(duration: 1000.ms, curve: Curves.elasticOut)

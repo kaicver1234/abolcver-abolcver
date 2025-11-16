@@ -162,7 +162,7 @@ class MyApp extends StatelessWidget {
 }
 
 
-// Splash App - Shows loading screen or goes directly to app
+// Splash App - Initialize and navigate directly to main app
 class SplashApp extends StatefulWidget {
   const SplashApp({Key? key}) : super(key: key);
 
@@ -174,97 +174,44 @@ class _SplashAppState extends State<SplashApp> {
   @override
   void initState() {
     super.initState();
-    _checkFirstLaunch();
+    _initializeAndNavigate();
   }
 
-  Future<void> _checkFirstLaunch() async {
+  Future<void> _initializeAndNavigate() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final bool isFirstLaunch = prefs.getBool('is_first_launch') ?? true;
-      
-      if (isFirstLaunch) {
-        // First launch - go directly to welcome screen
-        debugPrint('🎉 First launch detected - skipping loading screen');
-        await prefs.setBool('is_first_launch', false);
-        _navigateToApp(showLoading: false);
-      } else {
-        // Not first launch - show loading screen
-        debugPrint('🔄 Returning user - showing loading screen');
-        _navigateToApp(showLoading: true);
-      }
-    } catch (e) {
-      debugPrint('⚠️ Error checking first launch: $e');
-      _navigateToApp(showLoading: false);
-    }
-  }
-
-  void _navigateToApp({required bool showLoading}) {
-    if (!mounted) return;
-    
-    if (showLoading) {
-      // Show loading screen
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(
-          builder: (context) => MaterialApp(
-            title: 'Tiksar VPN',
-            debugShowCheckedModeBanner: false,
-            theme: ThemeData.dark(),
-            home: SplashLoadingScreen(
-              onInitialize: _initializeApp,
-              onComplete: _launchMainApp,
-            ),
-          ),
-        ),
-      );
-    } else {
-      // Skip loading, initialize in background
-      _initializeApp().then((_) {
-        if (mounted) {
-          _launchMainApp();
+      // Initialize Firebase in background
+      debugPrint('📲 Initializing Firebase...');
+      try {
+        await Firebase.initializeApp(
+          options: DefaultFirebaseOptions.currentPlatform,
+        ).timeout(const Duration(seconds: 5));
+        
+        debugPrint('✅ Firebase initialized');
+        
+        // Analytics
+        try {
+          final analytics = FirebaseAnalytics.instance;
+          await analytics.setAnalyticsCollectionEnabled(true)
+              .timeout(const Duration(seconds: 2));
+          await analytics.logAppOpen()
+              .timeout(const Duration(seconds: 2));
+          debugPrint('✅ Analytics enabled');
+        } catch (e) {
+          debugPrint('⚠️ Analytics skipped: $e');
         }
-      });
-    }
-  }
-
-  Future<void> _initializeApp() async {
-    // Initialize Firebase
-    debugPrint('📲 Initializing Firebase...');
-    try {
-      await Firebase.initializeApp(
-        options: DefaultFirebaseOptions.currentPlatform,
-      ).timeout(const Duration(seconds: 5));
-      
-      debugPrint('✅ Firebase initialized');
-      
-      // Analytics
-      try {
-        final analytics = FirebaseAnalytics.instance;
-        await analytics.setAnalyticsCollectionEnabled(true)
-            .timeout(const Duration(seconds: 2));
-        await analytics.logAppOpen()
-            .timeout(const Duration(seconds: 2));
-        debugPrint('✅ Analytics enabled');
+        
+        // Notifications
+        try {
+          await NotificationService().initialize()
+              .timeout(const Duration(seconds: 3));
+          debugPrint('✅ Notifications enabled');
+        } catch (e) {
+          debugPrint('⚠️ Notifications skipped: $e');
+        }
       } catch (e) {
-        debugPrint('⚠️ Analytics skipped: $e');
+        debugPrint('⚠️ Firebase skipped: $e');
       }
-      
-      // Notifications
-      try {
-        await NotificationService().initialize()
-            .timeout(const Duration(seconds: 3));
-        debugPrint('✅ Notifications enabled');
-      } catch (e) {
-        debugPrint('⚠️ Notifications skipped: $e');
-      }
-    } catch (e) {
-      debugPrint('⚠️ Firebase skipped: $e');
-    }
-  }
 
-  void _launchMainApp() async {
-    if (!mounted) return;
-    
-    try {
       // Load preferences and navigate to main app
       debugPrint('🌐 Loading language provider...');
       final languageProvider = LanguageProvider();
@@ -290,23 +237,18 @@ class _SplashAppState extends State<SplashApp> {
         ),
       );
     } catch (e) {
-      debugPrint('❌ Error launching main app: $e');
+      debugPrint('❌ Error launching app: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return const MaterialApp(
       title: 'Tiksar VPN',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark(),
-      home: const Scaffold(
+      home: Scaffold(
         backgroundColor: Color(0xFF0A0E1A),
-        body: Center(
-          child: CircularProgressIndicator(
-            color: Color(0xFF667EEA),
-          ),
-        ),
+        body: SizedBox.shrink(),
       ),
     );
   }
