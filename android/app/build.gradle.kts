@@ -12,8 +12,22 @@ plugins {
 // Load keystore properties from key.properties file
 val keystorePropertiesFile = rootProject.file("key.properties")
 val keystoreProperties = Properties()
+var useReleaseKeystore = false
+
 if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+    try {
+        keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+        val storeFilePath = keystoreProperties.getProperty("storeFile")
+        if (storeFilePath != null) {
+            val keystoreFile = rootProject.file(storeFilePath)
+            useReleaseKeystore = keystoreFile.exists()
+            if (!useReleaseKeystore) {
+                println("⚠️ Keystore file not found: $storeFilePath - Using debug signing")
+            }
+        }
+    } catch (e: Exception) {
+        println("⚠️ Error loading keystore properties: ${e.message} - Using debug signing")
+    }
 }
 
 android {
@@ -43,7 +57,7 @@ android {
     }
 
     signingConfigs {
-        if (keystorePropertiesFile.exists() && keystoreProperties.isNotEmpty()) {
+        if (useReleaseKeystore) {
             create("release") {
                 keyAlias = keystoreProperties.getProperty("keyAlias")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
@@ -57,9 +71,10 @@ android {
         release {
             // ✅ Use release signing config for production builds
             // This prevents Google Play Protect warnings
-            signingConfig = if (keystorePropertiesFile.exists() && keystoreProperties.isNotEmpty()) {
+            signingConfig = if (useReleaseKeystore) {
                 signingConfigs.getByName("release")
             } else {
+                println("⚠️ Building with debug signing - APK will show Play Protect warning")
                 signingConfigs.getByName("debug")
             }
 

@@ -60,6 +60,17 @@ jobs:
           fi
         shell: bash
 
+      - name: Check Signing Status
+        run: |
+          if [ -f "my-release-key.jks" ]; then
+            echo "✅ Building with RELEASE keystore (No Play Protect warning)"
+            echo "SIGNING_TYPE=release" >> $GITHUB_ENV
+          else
+            echo "⚠️ Building with DEBUG keystore (Will show Play Protect warning)"
+            echo "SIGNING_TYPE=debug" >> $GITHUB_ENV
+          fi
+        shell: bash
+
       - name: Build universal APK
         run: flutter build apk --release
 
@@ -106,11 +117,13 @@ jobs:
           body: |
             ## Installation
             
+            **Signing Status:** ${{ env.SIGNING_TYPE == 'release' && '✅ Release Signed (No Play Protect warning)' || '⚠️ Debug Signed (May show Play Protect warning)' }}
+            
             ### Download
             
             | Architecture | Download Link |
             |-------------|---------------|
-            | Universal   | <a href="https://github.com/code3-dev/Tiksar-vpn/releases/latest/download/proxTiksarVPNycloud-universal.apk"><img src="https://img.shields.io/badge/Android-Universal-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android Universal"></a> |
+            | Universal   | <a href="https://github.com/code3-dev/Tiksar-vpn/releases/latest/download/TiksarVPN-universal.apk"><img src="https://img.shields.io/badge/Android-Universal-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android Universal"></a> |
             | armeabi-v7a | <a href="https://github.com/code3-dev/Tiksar-vpn/releases/latest/download/TiksarVPN-armeabi-v7a.apk"><img src="https://img.shields.io/badge/Android-armeabi--v7a-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android armeabi-v7a"></a> |
             | arm64-v8a   | <a href="https://github.com/code3-dev/Tiksar-vpn/releases/latest/download/TiksarVPN-arm64-v8a.apk"><img src="https://img.shields.io/badge/Android-arm64--v8a-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android arm64-v8a"></a> |
             | x86_64      | <a href="https://github.com/code3-dev/Tiksar-vpn/releases/latest/download/TiksarVPN-x86_64.apk"><img src="https://img.shields.io/badge/Android-x86_64-3DDC84?style=for-the-badge&logo=android&logoColor=white" alt="Android x86_64"></a> |

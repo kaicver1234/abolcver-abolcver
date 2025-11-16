@@ -49,3 +49,10 @@ assets/v2ray-core/*.exe
 assets/v2ray-core/*.dat
 assets/v2ray-core/*.json
 !assets/v2ray-core/README.md
+
+# Keystore files (NEVER commit these!)
+*.jks
+*.keystore
+android/key.properties
+key.properties
+keystore-base64.txt
