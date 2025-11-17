@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'providers/language_provider.dart';
+import 'providers/v2ray_provider.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/privacy_welcome_screen.dart';
 import 'screens/language_selection_screen.dart';
@@ -93,8 +94,11 @@ class MyApp extends StatelessWidget {
       debugPrint('⚠️ Analytics error (safe to ignore): $e');
     }
     
-    return ChangeNotifierProvider.value(
-      value: languageProvider,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: languageProvider),
+        ChangeNotifierProvider(create: (_) => V2RayProvider()),
+      ],
       child: Consumer<LanguageProvider>(
         builder: (context, langProvider, child) {
           debugPrint('🌍 Language: ${langProvider.currentLanguage.code}');
