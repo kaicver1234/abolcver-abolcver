@@ -583,7 +583,7 @@ class _ServerSelectionScreenState
         ),
         child: Row(
           children: [
-            // Server Icon با انیمیشن
+            // Server Flag or Smart Connect Icon
             Hero(
               tag: 'server_${server.id}',
               child: Container(
@@ -594,14 +594,25 @@ class _ServerSelectionScreenState
                       ? Colors.white.withOpacity(0.25)
                       : const Color(0xFF6366F1).withOpacity(0.15),
                   borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.1),
+                    width: 1,
+                  ),
                 ),
-                child: Icon(
-                  Icons.dns_rounded,
-                  color: isActive
-                      ? Colors.white
-                      : const Color(0xFF6366F1),
-                  size: 26,
-                ),
+                child: server.isSmartConnect
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(14),
+                        child: Image.asset(
+                          'assets/images/apk.png',
+                          fit: BoxFit.cover,
+                        ),
+                      )
+                    : Center(
+                        child: Text(
+                          server.countryFlag,
+                          style: const TextStyle(fontSize: 32),
+                        ),
+                      ),
               ),
             ),
             

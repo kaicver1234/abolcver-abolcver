@@ -988,19 +988,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         ),
         child: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFF6366F1).withOpacity(0.2),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(
-                Icons.language,
-                color: Color(0xFF6366F1),
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 16),
             // Country Flag or Smart Connect Icon
             if (selectedConfig != null) ...[
               if (selectedConfig.isSmartConnect)
@@ -1016,8 +1003,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                     ),
                   ),
                 )
-              else if (selectedConfig.countryCode != null)
-                // Country Flag
+              else
+                // Country Flag (always show flag for servers)
                 Text(
                   selectedConfig.countryFlag,
                   style: const TextStyle(fontSize: 36),

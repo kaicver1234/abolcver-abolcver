@@ -83,9 +83,11 @@ class CloudflareSpeedTestService {
       
       if (_isCancelled) return;
       
-      // Phase 3: 30 Second Upload Test
+      // Immediate transition to upload test
       debugPrint('📤 Phase 3: Testing Upload (30s)...');
       onPhaseChange(TestPhase.upload, 0.0);
+      // Small delay to ensure UI updates
+      await Future.delayed(const Duration(milliseconds: 100));
       await _run30SecondUploadTest(onPhaseChange, onSpeedUpdate);
       
       if (_isCancelled) return;
@@ -165,27 +167,32 @@ class CloudflareSpeedTestService {
     });
     
     // Keep downloading until 30 seconds
+    int downloadAttempts = 0;
     while (DateTime.now().isBefore(endTime) && !_isCancelled) {
+      downloadAttempts++;
+      debugPrint('   🔄 Download attempt $downloadAttempts');
+      
       try {
-        // Download a chunk (5MB for good measurement)
+        // Download a chunk (3MB for faster iterations)
         final speed = await _measureDownloadSpeed(
-          bytes: 5000000,
+          bytes: 3000000,
           onSpeedUpdate: onSpeedUpdate,
         );
         
         if (speed > 0) {
           _downloadSpeeds.add(speed);
           debugPrint('   📥 Download speed: ${speed.toStringAsFixed(2)} Mbps');
+        } else {
+          debugPrint('   ⚠️ Download returned 0 speed');
         }
       } catch (e) {
         debugPrint('   ⚠️ Download chunk failed: $e');
         // Continue testing even if one chunk fails
+        // Add small delay on error to prevent rapid retries
+        await Future.delayed(const Duration(milliseconds: 200));
       }
       
-      // Small delay to prevent overwhelming the server
-      if (DateTime.now().isBefore(endTime)) {
-        await Future.delayed(const Duration(milliseconds: 100));
-      }
+      // No delay between successful downloads to maximize testing
     }
     
     _testTimer?.cancel();
@@ -216,27 +223,32 @@ class CloudflareSpeedTestService {
     });
     
     // Keep uploading until 30 seconds
+    int uploadAttempts = 0;
     while (DateTime.now().isBefore(endTime) && !_isCancelled) {
+      uploadAttempts++;
+      debugPrint('   🔄 Upload attempt $uploadAttempts');
+      
       try {
-        // Upload a chunk (5MB for good measurement)
+        // Upload a chunk (3MB for faster iterations)
         final speed = await _measureUploadSpeed(
-          bytes: 5000000,
+          bytes: 3000000,
           onSpeedUpdate: onSpeedUpdate,
         );
         
         if (speed > 0) {
           _uploadSpeeds.add(speed);
           debugPrint('   📤 Upload speed: ${speed.toStringAsFixed(2)} Mbps');
+        } else {
+          debugPrint('   ⚠️ Upload returned 0 speed');
         }
       } catch (e) {
         debugPrint('   ⚠️ Upload chunk failed: $e');
         // Continue testing even if one chunk fails
+        // Add small delay on error to prevent rapid retries
+        await Future.delayed(const Duration(milliseconds: 200));
       }
       
-      // Small delay to prevent overwhelming the server
-      if (DateTime.now().isBefore(endTime)) {
-        await Future.delayed(const Duration(milliseconds: 100));
-      }
+      // No delay between successful uploads to maximize testing
     }
     
     _testTimer?.cancel();
@@ -304,11 +316,16 @@ class CloudflareSpeedTestService {
     if (_isCancelled) return 0.0;
     
     try {
-      // Generate random data
-      final data = List.generate(bytes, (index) => Random().nextInt(256));
+      // Generate random data more efficiently
+      final data = Uint8List(bytes);
+      final random = Random();
+      for (int i = 0; i < bytes; i++) {
+        data[i] = random.nextInt(256);
+      }
       
       final startTime = DateTime.now();
       DateTime? lastUpdateTime;
+      int lastSent = 0;
       
       await _dio.post(
         '/__up',
@@ -322,17 +339,23 @@ class CloudflareSpeedTestService {
             'Content-Type': 'application/octet-stream',
             'Content-Length': bytes,
           },
+          sendTimeout: const Duration(seconds: 30),
         ),
         onSendProgress: (sent, total) {
+          if (_isCancelled) return;
+          
           final now = DateTime.now();
           final elapsed = now.difference(startTime).inMilliseconds / 1000.0;
           
-          if (!_isCancelled &&
-              elapsed > 0.05 &&
-              (lastUpdateTime == null || now.difference(lastUpdateTime!).inMilliseconds > 100)) {
+          // Update speed more frequently and ensure progress
+          if (elapsed > 0.01 && sent > lastSent) {
             final speedMbps = (sent * 8) / (elapsed * 1000000);
-            onSpeedUpdate(speedMbps);
-            lastUpdateTime = now;
+            
+            if (lastUpdateTime == null || now.difference(lastUpdateTime!).inMilliseconds > 50) {
+              onSpeedUpdate(speedMbps);
+              lastUpdateTime = now;
+              lastSent = sent;
+            }
           }
         },
       );
@@ -348,6 +371,7 @@ class CloudflareSpeedTestService {
       
       return mbps;
     } catch (e) {
+      debugPrint('   ❌ Upload error: $e');
       throw Exception('Upload failed: $e');
     }
   }

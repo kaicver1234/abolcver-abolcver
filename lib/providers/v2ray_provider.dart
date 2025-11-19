@@ -239,16 +239,32 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         _handleNotificationDisconnect();
       });
 
-      // STEP 4: Load configurations (can be slower)
+      // STEP 4: Load configurations from storage
       await loadConfigs();
-      debugPrint('✅ Configs loaded: ${_configs.length} servers');
+      debugPrint('✅ Configs loaded from storage: ${_configs.length} servers');
 
-      // Subscriptions removed - using GitHub servers only
+      // STEP 5: Fetch fresh servers from GitHub
+      // If no servers in storage, wait for fetch. Otherwise fetch in background.
+      if (_configs.isEmpty) {
+        debugPrint('📥 No servers in storage, fetching from GitHub...');
+        await fetchServers(customUrl: 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt');
+        debugPrint('✅ Fresh servers fetched: ${_configs.length} servers');
+      } else {
+        debugPrint('📥 Fetching fresh servers in background...');
+        // Fetch in background to update servers
+        fetchServers(customUrl: 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt')
+          .then((_) {
+            debugPrint('✅ Background server update complete: ${_configs.length} servers');
+          })
+          .catchError((e) {
+            debugPrint('⚠️ Background server update failed: $e');
+          });
+      }
       
-      // STEP 5: Final sync to ensure everything is correct
+      // STEP 6: Final sync to ensure everything is correct
       await _enhancedSyncWithVpnServiceState();
       
-      // STEP 6: Smart server selection logic
+      // STEP 7: Smart server selection logic
       if (_configs.isNotEmpty) {
         final hasConnectedConfig = _configs.any((c) => c.isConnected);
         

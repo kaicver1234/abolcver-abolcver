@@ -26,32 +26,35 @@ class ServerService {
           line = line.trim();
           if (line.isEmpty) continue;
 
-          // Processing line
-
           try {
+            // Extract country code if present: [CC] config
+            String? countryCode;
+            String configLine = line;
+            
+            // Try to extract country code from beginning: [CC] config
+            final countryCodeMatch = RegExp(r'^\[([A-Z]{2})\]\s*(.+)').firstMatch(line);
+            if (countryCodeMatch != null) {
+              countryCode = countryCodeMatch.group(1);
+              configLine = countryCodeMatch.group(2)!;
+            }
+            
             // Try to parse as JSON first
-            if (line.startsWith('{') && line.endsWith('}')) {
-              final serverJson = jsonDecode(line);
+            if (configLine.startsWith('{') && configLine.endsWith('}')) {
+              final serverJson = jsonDecode(configLine);
               final config = _parseJsonConfig(serverJson);
               if (config != null) {
                 servers.add(config);
-                // Added JSON config
               }
             }
             // If not JSON, try to parse as a V2Ray URI (vmess://, vless://, etc.)
-            else if (line.contains('://')) {
-              final config = _parseUriConfig(line);
+            else if (configLine.contains('://')) {
+              final config = _parseUriConfig(configLine, countryCode: countryCode);
               if (config != null) {
                 servers.add(config);
-                // Added URI config
-              } else {
-                // Failed to parse URI
               }
-            } else {
-              // Line is not JSON or URI format
             }
           } catch (e) {
-            // Error parsing server line
+            // Error parsing server line: $e
           }
         }
 
@@ -87,14 +90,13 @@ class ServerService {
   }
 
   // Parse a URI configuration (vmess://, vless://, etc.)
-  V2RayConfig? _parseUriConfig(String uri) {
+  V2RayConfig? _parseUriConfig(String uri, {String? countryCode}) {
     try {
-      // Parsing URI
-
       // Use FlutterV2ray to parse the URL
       if (uri.startsWith('vmess://') ||
           uri.startsWith('vless://') ||
-          uri.startsWith('ss://')) {
+          uri.startsWith('ss://') ||
+          uri.startsWith('trojan://')) {
         try {
           V2RayURL parser = FlutterV2ray.parseFromURL(uri);
           String configType = '';
@@ -105,31 +107,41 @@ class ServerService {
             configType = 'vless';
           } else if (uri.startsWith('ss://')) {
             configType = 'shadowsocks';
+          } else if (uri.startsWith('trojan://')) {
+            configType = 'trojan';
+          }
+
+          // If no country code from line, try to extract from remark
+          if (countryCode == null && parser.remark.isNotEmpty) {
+            // Try patterns: [CC], (CC), CC-, -CC-, CC|, |CC|
+            final remarkMatch = RegExp(r'[\[\(]([A-Z]{2})[\]\)]|^([A-Z]{2})[-\s]|[-\s]([A-Z]{2})[-\s]|[\|\s]([A-Z]{2})[\|\s]').firstMatch(parser.remark);
+            if (remarkMatch != null) {
+              countryCode = remarkMatch.group(1) ?? remarkMatch.group(2) ?? remarkMatch.group(3) ?? remarkMatch.group(4);
+            }
           }
 
           // Use the parsed address and port from the V2RayURL parser
           String address = parser.address;
           int port = parser.port;
 
-          // Parsed URI with FlutterV2ray
-
           return V2RayConfig(
-            id: DateTime.now().millisecondsSinceEpoch.toString(),
+            id: '${DateTime.now().millisecondsSinceEpoch}_${address}_$port',
             remark: parser.remark,
+            countryCode: countryCode,
             address: address,
             port: port,
             configType: configType,
             fullConfig: uri,
           );
         } catch (e) {
-          // Error parsing with FlutterV2ray
+          // Error parsing with FlutterV2ray: $e
           return null;
         }
       }
 
       return null;
     } catch (e) {
-      // Error parsing URI config
+      // Error parsing URI config: $e
       return null;
     }
   }
