@@ -2,6 +2,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
 import '../widgets/vpn_gradient_background.dart';
@@ -1024,10 +1025,32 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                     borderRadius: BorderRadius.circular(8),
                     color: Colors.white.withOpacity(0.1),
                   ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    selectedConfig.countryFlag,
-                    style: const TextStyle(fontSize: 32),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: selectedConfig.countryFlagUrl,
+                      width: 48,
+                      height: 48,
+                      fit: BoxFit.cover,
+                      placeholder: (context, url) => Center(
+                        child: SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white.withOpacity(0.5),
+                            ),
+                          ),
+                        ),
+                      ),
+                      errorWidget: (context, url, error) => Center(
+                        child: Text(
+                          selectedConfig.countryFlag,
+                          style: const TextStyle(fontSize: 32),
+                        ),
+                      ),
+                    ),
                   ),
                 ),
               const SizedBox(width: 12),

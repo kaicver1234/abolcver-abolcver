@@ -1,6 +1,8 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
 import '../models/v2ray_config.dart';
@@ -576,206 +578,248 @@ class _ServerSelectionScreenState
     
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(18),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          gradient: isActive
-              ? LinearGradient(
-                  colors: [
-                    const Color(0xFF6366F1),
-                    const Color(0xFF4F46E5),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          color: isActive ? null : Colors.white.withOpacity(0.06),
-          borderRadius: BorderRadius.circular(18),
+          color: isActive
+              ? const Color(0xFF1E293B).withOpacity(0.9)
+              : const Color(0xFF1E293B).withOpacity(0.5),
+          borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive
-                ? const Color(0xFF6366F1).withOpacity(0.5)
-                : Colors.white.withOpacity(0.12),
+                ? Colors.white.withOpacity(0.3)
+                : Colors.white.withOpacity(0.1),
             width: 1.5,
           ),
-          boxShadow: isActive ? [
+          boxShadow: [
             BoxShadow(
-              color: const Color(0xFF6366F1).withOpacity(0.3),
-              blurRadius: 12,
+              color: Colors.black.withOpacity(0.2),
+              blurRadius: 10,
               offset: const Offset(0, 4),
             ),
-          ] : null,
+          ],
         ),
-        child: Row(
+        child: Stack(
           children: [
-            // Server Flag or Smart Connect Icon
-            Hero(
-              tag: 'server_${server.id}',
-              child: Container(
-                width: 52,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? Colors.white.withOpacity(0.25)
-                      : const Color(0xFF6366F1).withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.1),
-                    width: 1,
+            // Main Content
+            Row(
+              children: [
+                // Server Flag or Smart Connect Icon
+                Hero(
+                  tag: 'server_${server.id}',
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF334155).withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.2),
+                        width: 2,
+                      ),
+                    ),
+                    child: server.isSmartConnect
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: Image.asset(
+                              'assets/images/apk.png',
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: CachedNetworkImage(
+                              imageUrl: server.countryFlagUrl,
+                              fit: BoxFit.cover,
+                              placeholder: (context, url) => Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    valueColor: AlwaysStoppedAnimation<Color>(
+                                      Colors.white.withOpacity(0.5),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              errorWidget: (context, url, error) => Center(
+                                child: Text(
+                                  server.countryFlag,
+                                  style: const TextStyle(fontSize: 36),
+                                ),
+                              ),
+                            ),
+                          ),
                   ),
                 ),
-                child: server.isSmartConnect
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
-                        child: Image.asset(
-                          'assets/images/apk.png',
-                          fit: BoxFit.cover,
+                
+                const SizedBox(width: 16),
+                
+                // Server Info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Server Name
+                      Text(
+                        server.isSmartConnect 
+                            ? AppLocalizations.of(context).translate('server_selection.smart_connect')
+                            : server.remark,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: -0.3,
                         ),
-                      )
-                    : Center(
-                        child: Text(
-                          server.countryFlag,
-                          style: const TextStyle(fontSize: 32),
-                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-              ),
+                      const SizedBox(height: 8),
+                      // Badges Row
+                      Row(
+                        children: [
+                          // Protocol Badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF475569).withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.2),
+                                width: 1,
+                              ),
+                            ),
+                            child: Text(
+                              server.configType.toUpperCase(),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.8,
+                              ),
+                            ),
+                          ),
+                          // Ping Badge
+                          if (ping != null) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: _getPingColor(ping).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _getPingColor(ping).withOpacity(0.5),
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.speed_rounded,
+                                    size: 12,
+                                    color: _getPingColor(ping),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    pingText,
+                                    style: TextStyle(
+                                      color: _getPingColor(ping),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             
-            const SizedBox(width: 14),
-            
-            // Server Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    server.isSmartConnect 
-                        ? AppLocalizations.of(context).translate('server_selection.smart_connect')
-                        : server.remark,
-                    style: TextStyle(
-                      color: isActive ? Colors.white : Colors.white.withOpacity(0.95),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -0.2,
+            // Active Badge
+            if (isActive)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF10B981).withOpacity(0.9),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 1.5,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      // Protocol Type Badge
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: isActive 
-                              ? Colors.white.withOpacity(0.2)
-                              : Colors.white.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          server.configType.toUpperCase(),
-                          style: TextStyle(
-                            color: isActive 
-                                ? Colors.white
-                                : Colors.white.withOpacity(0.8),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                          ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(
+                        Icons.check_circle_rounded,
+                        size: 14,
+                        color: Colors.white,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        'ACTIVE',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
                         ),
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
             
-            // Ping Badge or Arrow or Active Badge
-            if (_isTestingPings && ping == null)
-              // در حال تست پینگ - نمایش loading
-              Container(
-                padding: const EdgeInsets.all(8),
-                child: SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      const Color(0xFF6366F1),
+            // Loading Indicator
+            if (_isTestingPings && ping == null && !isActive)
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF475569).withOpacity(0.8),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Colors.white,
+                      ),
                     ),
                   ),
                 ),
-              )
-            else if (ping != null)
-              // پینگ موجود - نمایش با رنگ‌بندی
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: _getPingColor(ping).withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _getPingColor(ping).withOpacity(0.5),
-                    width: 1.5,
+              ),
+            
+            // Arrow Icon
+            if (!isActive && !(_isTestingPings && ping == null))
+              Positioned(
+                top: 0,
+                bottom: 0,
+                right: 16,
+                child: Center(
+                  child: Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: Colors.white.withOpacity(0.4),
+                    size: 16,
                   ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.speed_rounded,
-                      size: 14,
-                      color: _getPingColor(ping),
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      pingText,
-                      style: TextStyle(
-                        color: _getPingColor(ping),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.3,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else if (isActive)
-              // سرور فعال
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.25),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      size: 14,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 4),
-                    const Text(
-                      'ACTIVE',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ],
-                ),
-              )
-            else
-              // فلش پیش‌فرض
-              Icon(
-                Icons.chevron_right_rounded,
-                color: Colors.white.withOpacity(0.3),
-                size: 24,
+              ),
               ),
           ],
         ),

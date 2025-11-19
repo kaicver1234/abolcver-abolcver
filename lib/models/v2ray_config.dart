@@ -57,6 +57,15 @@ class V2RayConfig {
     );
   }
   
+  // Get country flag image URL from flagcdn.com
+  String get countryFlagUrl {
+    if (countryCode == null || countryCode!.length != 2) {
+      return 'https://flagcdn.com/w160/un.png'; // UN flag as default
+    }
+    final code = countryCode!.toLowerCase();
+    return 'https://flagcdn.com/w160/$code.png';
+  }
+  
   // Get country name from code
   String get countryName {
     if (countryCode == null) return 'Unknown';
