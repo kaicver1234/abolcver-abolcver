@@ -76,26 +76,67 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         await provider.disconnect();
         // _showSnackBar('Disconnected Successfully', Colors.orange);
       } else {
-        // Auto-select first server if none selected
-        if (provider.selectedConfig == null && provider.configs.isNotEmpty) {
-          await provider.selectConfig(provider.configs.first);
-        }
+        // Check if user selected Smart Connect or a specific server
+        final selectedConfig = provider.selectedConfig;
         
-        if (provider.selectedConfig == null) {
-          _showSnackBar('Please select a server first', Colors.red);
-        } else {
-          // Connect to server
-          debugPrint('🚀 Starting connection to: ${provider.selectedConfig!.remark}');
-          await provider.connectToServer(provider.selectedConfig!);
+        if (selectedConfig != null && selectedConfig.isSmartConnect) {
+          // Smart Connect selected: Find and connect to best server
+          debugPrint('🧠 Smart Connect: Finding best server...');
+          _showSnackBar(
+            AppLocalizations.of(context).translate('server_selection.finding_best_server'),
+            Colors.blue,
+          );
           
-          // Check result after connection attempt
+          final success = await provider.smartConnect(maxServersToTest: 5);
+          
           if (mounted) {
-            if (provider.activeConfig != null) {
-              debugPrint('✅ Connection successful - activeConfig: ${provider.activeConfig!.remark}');
-              // Consumer2 will rebuild automatically, no need for manual setState
+            if (success && provider.activeConfig != null) {
+              debugPrint('✅ Smart Connect successful to: ${provider.activeConfig!.remark}');
+              _showSnackBar('Connected to ${provider.activeConfig!.remark}', Colors.green);
+            } else if (provider.errorMessage.isNotEmpty) {
+              debugPrint('❌ Smart Connect failed: ${provider.errorMessage}');
+              _showSnackBar(provider.errorMessage, Colors.red);
+            } else {
+              _showSnackBar('Connection failed', Colors.red);
+            }
+          }
+        } else if (selectedConfig != null) {
+          // Manual Connect: User selected a specific server
+          debugPrint('🎯 Manual Connect to: ${selectedConfig.remark}');
+          _showSnackBar('Connecting to ${selectedConfig.remark}...', Colors.blue);
+          
+          final success = await provider.connectToServer(selectedConfig);
+          
+          if (mounted) {
+            if (success && provider.activeConfig != null) {
+              debugPrint('✅ Connected to: ${provider.activeConfig!.remark}');
+              _showSnackBar('Connected to ${provider.activeConfig!.remark}', Colors.green);
             } else if (provider.errorMessage.isNotEmpty) {
               debugPrint('❌ Connection failed: ${provider.errorMessage}');
               _showSnackBar(provider.errorMessage, Colors.red);
+            } else {
+              _showSnackBar('Connection failed', Colors.red);
+            }
+          }
+        } else {
+          // No selection: Default to Smart Connect
+          debugPrint('🧠 No selection, using Smart Connect...');
+          _showSnackBar(
+            AppLocalizations.of(context).translate('server_selection.finding_best_server'),
+            Colors.blue,
+          );
+          
+          final success = await provider.smartConnect(maxServersToTest: 5);
+          
+          if (mounted) {
+            if (success && provider.activeConfig != null) {
+              debugPrint('✅ Smart Connect successful to: ${provider.activeConfig!.remark}');
+              _showSnackBar('Connected to ${provider.activeConfig!.remark}', Colors.green);
+            } else if (provider.errorMessage.isNotEmpty) {
+              debugPrint('❌ Smart Connect failed: ${provider.errorMessage}');
+              _showSnackBar(provider.errorMessage, Colors.red);
+            } else {
+              _showSnackBar('Connection failed', Colors.red);
             }
           }
         }
@@ -644,28 +685,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           );
         },
       },
-      {
-        'icon': Icons.refresh,
-        'label': AppLocalizations.of(context).translate('home.refresh'),
-        'subtitle': AppLocalizations.of(context).translate('subscription_management.update_all'),
-        'onTap': () async {
-          final provider = Provider.of<V2RayProvider>(context, listen: false);
-          _showSnackBar(
-            AppLocalizations.of(context).translate('home.updating_subscriptions'), 
-            Colors.blue,
-          );
-          await provider.updateAllSubscriptions();
-          if (provider.errorMessage.isEmpty) {
-            _showSnackBar(
-              AppLocalizations.of(context).translate('home.subscriptions_updated'), 
-              Colors.green,
-            );
-          } else {
-            _showSnackBar(provider.errorMessage, Colors.red);
-            provider.clearError();
-          }
-        },
-      },
     ];
 
     return ListView.builder(
@@ -982,12 +1001,27 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               ),
             ),
             const SizedBox(width: 16),
-            // Country Flag
-            if (selectedConfig?.countryCode != null) ...[
-              Text(
-                selectedConfig!.countryFlag,
-                style: const TextStyle(fontSize: 36),
-              ),
+            // Country Flag or Smart Connect Icon
+            if (selectedConfig != null) ...[
+              if (selectedConfig.isSmartConnect)
+                // Smart Connect Icon
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    image: const DecorationImage(
+                      image: AssetImage('assets/images/apk.png'),
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                )
+              else if (selectedConfig.countryCode != null)
+                // Country Flag
+                Text(
+                  selectedConfig.countryFlag,
+                  style: const TextStyle(fontSize: 36),
+                ),
               const SizedBox(width: 12),
             ],
             Expanded(
@@ -1003,7 +1037,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    selectedConfig?.remark ?? 'Select a server',
+                    selectedConfig != null
+                        ? selectedConfig.getDisplayName(
+                            (key) => AppLocalizations.of(context).translate(key),
+                          )
+                        : AppLocalizations.of(context).translate('home.no_server_selected'),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,

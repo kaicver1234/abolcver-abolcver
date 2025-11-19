@@ -6,7 +6,7 @@ import 'package:flutter_v2ray/flutter_v2ray.dart';
 class ServerService {
   // Default GitHub URL for server configurations
   static const String defaultServerUrl =
-      'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub.txt';
+      'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt';
 
   Future<List<V2RayConfig>> fetchServers({required String customUrl}) async {
     try {

@@ -64,37 +64,59 @@ class _ServerListItemState extends State<ServerListItem> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Country Flag
-                  if (widget.config.countryCode != null) ...[
-                    Text(
-                      widget.config.countryFlag,
-                      style: const TextStyle(fontSize: 32),
-                    ),
-                    const SizedBox(width: 12),
-                  ],
+                  // Country Flag Icon + Server Name
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    child: Row(
                       children: [
-                        Text(
-                          widget.config.remark,
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: isActive
-                                ? Theme.of(context).colorScheme.primary
-                                : null,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (widget.config.countryCode != null)
-                          Text(
-                            widget.config.countryName,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
+                        // Flag or Smart Connect Icon
+                        Container(
+                          width: 48,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: Colors.grey.withOpacity(0.3),
+                              width: 1,
                             ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
+                          child: widget.config.isSmartConnect
+                              ? ClipRRect(
+                                  borderRadius: BorderRadius.circular(6),
+                                  child: Image.asset(
+                                    'assets/images/apk.png',
+                                    fit: BoxFit.cover,
+                                  ),
+                                )
+                              : Center(
+                                  child: Text(
+                                    widget.config.countryFlag,
+                                    style: const TextStyle(fontSize: 28),
+                                  ),
+                                ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            widget.config.getDisplayName(
+                              (key) => AppLocalizations.of(context).translate(key),
+                            ),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: isActive
+                                  ? Theme.of(context).colorScheme.primary
+                                  : Colors.white,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -159,45 +181,23 @@ class _ServerListItemState extends State<ServerListItem> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getConfigTypeColor(widget.config.configType),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          widget.config.configType.toString().toUpperCase(),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                          ),
-                        ),
+                  // Protocol Type Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getConfigTypeColor(widget.config.configType),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      widget.config.configType.toString().toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
                       ),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.blueGrey.withOpacity(0.2),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          _getSubscriptionName(context),
-                          style: const TextStyle(
-                            color: Colors.blueGrey,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
                   if (isSelected)
                     ElevatedButton(
@@ -242,23 +242,4 @@ class _ServerListItemState extends State<ServerListItem> {
     }
   }
 
-  // Removed _getPingColor method
-
-  String _getSubscriptionName(BuildContext context) {
-    final provider = Provider.of<V2RayProvider>(context, listen: false);
-    final subscriptions = provider.subscriptions;
-
-    // Find which subscription this config belongs to
-    String subscriptionName = context.tr(
-      TranslationKeys.serverListItemDefaultSubscription,
-    );
-    for (var subscription in subscriptions) {
-      if (subscription.configIds.contains(widget.config.id)) {
-        subscriptionName = subscription.name;
-        break;
-      }
-    }
-
-    return subscriptionName;
-  }
 }

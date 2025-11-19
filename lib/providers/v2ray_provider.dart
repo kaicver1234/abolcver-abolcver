@@ -15,8 +15,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   final AnalyticsService _analyticsService = AnalyticsService();
   bool statusPingOnly = false;
   List<V2RayConfig> _configs = [];
-  List<Subscription> _subscriptions = [];
   V2RayConfig? _selectedConfig;
+  List<Subscription> _subscriptions = [];
+  
+  // Subscriptions removed - using GitHub servers only
   bool _isConnecting = false;
   bool _isLoading = false;
   String _errorMessage = '';
@@ -31,8 +33,14 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   static const EventChannel _vpnStatusEventChannel = EventChannel('com.tiksarvpn.app/vpn_status_events');
   StreamSubscription? _vpnStatusSubscription;
 
-  List<V2RayConfig> get configs => _configs;
-  List<Subscription> get subscriptions => _subscriptions;
+  // Return configs with Smart Connect at the top
+  List<V2RayConfig> get configs {
+    final smartConnect = V2RayConfig.smartConnect();
+    return [smartConnect, ..._configs];
+  }
+  
+  // Get actual server configs (without Smart Connect)
+  List<V2RayConfig> get serverConfigs => _configs;
   V2RayConfig? get selectedConfig => _selectedConfig;
   V2RayConfig? get activeConfig => _v2rayService.activeConfig;
   bool get isConnecting => _isConnecting;
@@ -235,30 +243,32 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       await loadConfigs();
       debugPrint('✅ Configs loaded: ${_configs.length} servers');
 
-      // STEP 5: Load subscriptions
-      await loadSubscriptions();
-      debugPrint('✅ Subscriptions loaded: ${_subscriptions.length} subscriptions');
-
-      // STEP 6: Update subscriptions in background (don't block UI)
-      updateAllSubscriptions().then((_) {
-        debugPrint('✅ Subscriptions updated in background');
-      }).catchError((e) {
-        debugPrint('⚠️ Background subscription update failed: $e');
-      });
+      // Subscriptions removed - using GitHub servers only
       
-      // STEP 7: Final sync to ensure everything is correct
+      // STEP 5: Final sync to ensure everything is correct
       await _enhancedSyncWithVpnServiceState();
       
-      // Always auto-select first server (unless already connected)
+      // STEP 6: Smart server selection logic
       if (_configs.isNotEmpty) {
         final hasConnectedConfig = _configs.any((c) => c.isConnected);
         
         if (hasConnectedConfig) {
+          // Priority 1: Keep connected server
           _selectedConfig = _configs.firstWhere((c) => c.isConnected);
           debugPrint('✅ Keeping connected server: ${_selectedConfig?.remark}');
-        } else if (_selectedConfig == null) {
-          _selectedConfig = _configs.first;
-          debugPrint('✅ Auto-selected first server: ${_selectedConfig?.remark}');
+        } else {
+          // Priority 2: Load previously selected server
+          final savedServer = await _loadSelectedServer();
+          if (savedServer != null) {
+            _selectedConfig = savedServer;
+            debugPrint('✅ Restored saved server: ${_selectedConfig?.remark}');
+          } else if (_selectedConfig == null) {
+            // Priority 3: Default to Smart Connect (first time only)
+            _selectedConfig = V2RayConfig.smartConnect();
+            // Save Smart Connect as default
+            await _saveSelectedServer(_selectedConfig!);
+            debugPrint('✅ Auto-selected Smart Connect as default');
+          }
         }
         notifyListeners();
       }
@@ -342,7 +352,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           // If still no matching config found, add the active config temporarily
           if (!configFound) {
             debugPrint('⚠️ No matching config found, adding active config temporarily');
-            _configs.add(activeConfigFromService);
+            // Check if not already in list to avoid duplicates
+            if (!_configs.any((c) => c.id == activeConfigFromService.id)) {
+              _configs.add(activeConfigFromService);
+            }
             activeConfigFromService.isConnected = true;
             _selectedConfig = activeConfigFromService;
             debugPrint('✅ Added and selected: ${activeConfigFromService.remark}');
@@ -504,69 +517,16 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  // Subscription feature disabled - using GitHub servers only
   Future<void> loadSubscriptions() async {
-    _setLoading(true);
-    try {
-      _subscriptions = await _v2rayService.loadSubscriptions();
-
-      // Create default subscription if no subscriptions exist
-      if (_subscriptions.isEmpty) {
-        final defaultSubscription = Subscription(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          name: 'Default Subscription',
-          url:
-              'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub.txt',
-          lastUpdated: DateTime.now(),
-          configIds: [],
-        );
-        _subscriptions.add(defaultSubscription);
-        await _v2rayService.saveSubscriptions(_subscriptions);
-      }
-
-      // Ensure configs are loaded and match subscription config IDs
-      if (_configs.isEmpty) {
-        _configs = await _v2rayService.loadConfigs();
-      }
-
-      // Verify that all subscription config IDs exist in the configs list
-      // If not, it means the configs weren't properly saved or loaded
-      for (var subscription in _subscriptions) {
-        final configIds = subscription.configIds;
-        final existingConfigIds = _configs.map((c) => c.id).toSet();
-
-        // Check if any config IDs in the subscription are missing from the configs list
-        final missingConfigIds = configIds
-            .where((id) => !existingConfigIds.contains(id))
-            .toList();
-
-        if (missingConfigIds.isNotEmpty) {
-          // Warning: Found missing configs for subscription
-          // Update the subscription to remove missing config IDs
-          final updatedConfigIds = configIds
-              .where((id) => existingConfigIds.contains(id))
-              .toList();
-          final index = _subscriptions.indexWhere(
-            (s) => s.id == subscription.id,
-          );
-          if (index != -1) {
-            _subscriptions[index] = subscription.copyWith(
-              configIds: updatedConfigIds,
-            );
-          }
-        }
-      }
-
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to load subscriptions: $e');
-    } finally {
-      _setLoading(false);
-    }
+    // No-op: Subscriptions disabled
   }
 
   Future<void> addConfig(V2RayConfig config) async {
-    // Add config and display it immediately
-    _configs.add(config);
+    // Add config and display it immediately (avoid duplicates)
+    if (!_configs.any((c) => c.id == config.id)) {
+      _configs.add(config);
+    }
 
     // Save the configuration immediately to display it
     await _v2rayService.saveConfigs(_configs);
@@ -640,171 +600,26 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   }
 
   Future<void> addSubscription(String name, String url) async {
-    _setLoading(true);
-    _errorMessage = '';
-    try {
-      final configs = await _v2rayService.parseSubscriptionUrl(url);
-      if (configs.isEmpty) {
-        _setError('No valid configurations found in subscription');
-        return;
-      }
-
-      // Add configs and display them immediately
-      _configs.addAll(configs);
-
-      final newConfigIds = configs.map((c) => c.id).toList();
-
-      // Create subscription
-      final subscription = Subscription(
-        id: DateTime.now().millisecondsSinceEpoch.toString(),
-        name: name,
-        url: url,
-        lastUpdated: DateTime.now(),
-        configIds: newConfigIds,
-      );
-
-      _subscriptions.add(subscription);
-
-      // Save both configs and subscription
-      await _v2rayService.saveConfigs(_configs);
-      await _v2rayService.saveSubscriptions(_subscriptions);
-
-      // Update UI after everything is saved
-      notifyListeners();
-    } catch (e) {
-      String errorMsg = 'Failed to add subscription';
-
-      // Provide more specific error messages
-      if (e.toString().contains('Network error') ||
-          e.toString().contains('timeout') ||
-          e.toString().contains('SocketException')) {
-        errorMsg = 'Network error: Check your internet connection';
-      } else if (e.toString().contains('Invalid URL')) {
-        errorMsg = 'Invalid subscription URL format';
-      } else if (e.toString().contains('No valid servers')) {
-        errorMsg = 'No valid servers found in subscription';
-      } else if (e.toString().contains('HTTP')) {
-        errorMsg = 'Server error: ${e.toString()}';
-      } else {
-        errorMsg = 'Failed to add subscription: ${e.toString()}';
-      }
-
-      _setError(errorMsg);
-    } finally {
-      _setLoading(false);
-    }
+    // Disabled: Subscriptions not supported
+    _setError('Subscription feature is disabled');
   }
 
   Future<void> updateSubscription(Subscription subscription) async {
-    _setLoading(true);
-    _isLoadingServers = true;
-    _errorMessage = '';
-    notifyListeners();
-
-    try {
-      final configs = await _v2rayService.parseSubscriptionUrl(
-        subscription.url,
-      );
-      if (configs.isEmpty) {
-        _setError('No valid configurations found in subscription');
-        _isLoadingServers = false;
-        notifyListeners();
-        return;
-      }
-
-      // Clear ping cache for old configs before removing them
-      for (var configId in subscription.configIds) {
-        _v2rayService.clearPingCache(configId: configId);
-      }
-
-      // Remove old configs
-      _configs.removeWhere((c) => subscription.configIds.contains(c.id));
-
-      // Add new configs and display them immediately
-      _configs.addAll(configs);
-
-      final newConfigIds = configs.map((c) => c.id).toList();
-
-      // Update subscription
-      final index = _subscriptions.indexWhere((s) => s.id == subscription.id);
-      if (index != -1) {
-        _subscriptions[index] = subscription.copyWith(
-          lastUpdated: DateTime.now(),
-          configIds: newConfigIds,
-        );
-
-        // Save both configs and subscriptions to ensure persistence
-        await _v2rayService.saveConfigs(_configs);
-        await _v2rayService.saveSubscriptions(_subscriptions);
-      }
-
-      // Mark loading as complete
-      _isLoadingServers = false;
-      _setLoading(false);
-      notifyListeners();
-    } catch (e) {
-      String errorMsg = 'Failed to update subscription';
-
-      // Provide more specific error messages
-      if (e.toString().contains('Network error') ||
-          e.toString().contains('timeout') ||
-          e.toString().contains('SocketException')) {
-        errorMsg = 'Network error: Check your internet connection';
-      } else if (e.toString().contains('Invalid URL')) {
-        errorMsg = 'Invalid subscription URL format';
-      } else if (e.toString().contains('No valid servers')) {
-        errorMsg = 'No valid servers found in subscription';
-      } else if (e.toString().contains('HTTP')) {
-        errorMsg = 'Server error: ${e.toString()}';
-      } else {
-        errorMsg = 'Failed to update subscription: ${e.toString()}';
-      }
-
-      _setError(errorMsg);
-    } finally {
-      _setLoading(false);
-    }
+    // Disabled: Subscriptions not supported
+    _setError('Subscription feature is disabled');
   }
-
+  
   // Update subscription info without refreshing servers
   Future<void> updateSubscriptionInfo(Subscription subscription) async {
-    _setLoading(true);
-    _errorMessage = '';
-
-    try {
-      // Find and update the subscription
-      final index = _subscriptions.indexWhere((s) => s.id == subscription.id);
-      if (index != -1) {
-        _subscriptions[index] = subscription;
-        await _v2rayService.saveSubscriptions(_subscriptions);
-        notifyListeners();
-      } else {
-        _setError('Subscription not found');
-      }
-    } catch (e) {
-      String errorMsg = 'Failed to update subscription info';
-
-      // Provide more specific error messages
-      if (e.toString().contains('Network error') ||
-          e.toString().contains('timeout') ||
-          e.toString().contains('SocketException')) {
-        errorMsg = 'Network error: Check your internet connection';
-      } else if (e.toString().contains('Invalid URL')) {
-        errorMsg = 'Invalid subscription URL format';
-      } else if (e.toString().contains('Permission')) {
-        errorMsg = 'Permission error: Unable to save subscription';
-      } else {
-        errorMsg = 'Failed to update subscription info: ${e.toString()}';
-      }
-
-      _setError(errorMsg);
-    } finally {
-      _setLoading(false);
-    }
+    // Disabled: Subscriptions not supported
+    _setError('Subscription feature is disabled');
   }
-
+  
   // Update all subscriptions
   Future<void> updateAllSubscriptions() async {
+    // Disabled: Subscriptions not supported
+    return;
+    /*
     _setLoading(true);
     _errorMessage = '';
     _isLoadingServers = true;
@@ -831,8 +646,12 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           // Remove old configs for this subscription
           _configs.removeWhere((c) => subscription.configIds.contains(c.id));
 
-          // Add new configs
-          _configs.addAll(configs);
+          // Add new configs (avoid duplicates by checking ID)
+          for (var config in configs) {
+            if (!_configs.any((c) => c.id == config.id)) {
+              _configs.add(config);
+            }
+          }
 
           final newConfigIds = configs.map((c) => c.id).toList();
 
@@ -881,6 +700,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       _setLoading(false);
       _isLoadingServers = false;
     }
+    */
   }
 
   Future<void> removeSubscription(Subscription subscription) async {
@@ -895,19 +715,19 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
-  Future<void> connectToServer(V2RayConfig config) async {
+  Future<bool> connectToServer(V2RayConfig config) async {
     debugPrint('🚀 Starting connection to: ${config.remark}');
     
     // VALIDATION: Check if config is valid
     if (config.address.isEmpty || config.port <= 0) {
       _setError('Invalid server configuration: ${config.remark}');
-      return;
+      return false;
     }
     
     // SAFETY: Prevent multiple simultaneous connections
     if (_isConnecting) {
       debugPrint('⚠️ Connection already in progress, ignoring duplicate request');
-      return;
+      return false;
     }
     
     _isConnecting = true;
@@ -1028,7 +848,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           if (!configUpdated) {
             debugPrint('⚠️ Warning: Config ${config.id} not found in list, adding it');
             config.isConnected = true;
-            _configs.add(config);
+            // Check if not already in list to avoid duplicates
+            if (!_configs.any((c) => c.id == config.id)) {
+              _configs.add(config);
+            }
           }
           
           _selectedConfig = config;
@@ -1072,7 +895,11 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
             serverName: config.remark,
             serverAddress: config.address,
             serverPort: config.port,
-            country: config.remark.split('-').first.trim(),
+            country: config.remark.isNotEmpty 
+                ? (config.remark.contains('-') 
+                    ? config.remark.split('-').first.trim() 
+                    : config.remark.trim())
+                : 'Unknown',
             protocol: config.configType,
           ).catchError((e) {
             debugPrint('⚠️ Analytics error: $e');
@@ -1168,6 +995,8 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       notifyListeners();
       debugPrint('🏁 Connection process completed - UI notified');
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      return success;
     }
   }
 
@@ -1203,16 +1032,110 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         _configs[i].isConnected = false;
       }
 
-      // After disconnect, always reset to first server
-      if (_configs.isNotEmpty) {
-        _selectedConfig = _configs.first;
-        debugPrint('✅ Reset to first server after disconnect: ${_selectedConfig?.remark}');
-      }
+      // IMPORTANT: Keep the selected server after disconnect
+      // User's choice should persist until they manually change it
+      debugPrint('✅ Keeping selected server after disconnect: ${_selectedConfig?.remark}');
 
       // Persist the changes
       await _v2rayService.saveConfigs(_configs);
     } catch (e) {
       _setError('Error disconnecting: $e');
+    } finally {
+      _isConnecting = false;
+      notifyListeners();
+    }
+  }
+
+  // Smart Connect: Test top servers and connect to fastest one
+  Future<bool> smartConnect({int maxServersToTest = 5}) async {
+    if (_configs.isEmpty) {
+      _setError('No servers available');
+      return false;
+    }
+
+    _isConnecting = true;
+    _errorMessage = '';
+    notifyListeners();
+
+    try {
+      debugPrint('🧠 Smart Connect: Testing top $maxServersToTest servers...');
+      
+      // Get top servers to test (max 5 for speed)
+      final serversToTest = _configs.take(maxServersToTest).toList();
+      
+      // Test all servers in parallel using batch method
+      final pingResults = await _v2rayService.batchTestServerDelays(
+        serversToTest,
+        batchSize: 5,
+        useCache: false,
+      );
+      
+      // Find fastest responding server
+      V2RayConfig? fastestServer;
+      int lowestPing = 999999;
+      
+      for (final server in serversToTest) {
+        final ping = pingResults[server.id];
+        if (ping != null && ping < lowestPing && ping < 9999) {
+          lowestPing = ping;
+          fastestServer = server;
+        }
+      }
+      
+      if (fastestServer == null) {
+        // No server responded, try connecting to selected/first server anyway
+        debugPrint('⚠️ No server responded to ping, trying selected server...');
+        fastestServer = _selectedConfig ?? _configs.first;
+      } else {
+        debugPrint('✅ Fastest server found: ${fastestServer.remark} (${lowestPing}ms)');
+      }
+      
+      // Select and connect to fastest server
+      await selectConfig(fastestServer);
+      
+      _isConnecting = false;
+      notifyListeners();
+      
+      // Now connect
+      final success = await connectToServer(fastestServer);
+      
+      if (success) {
+        debugPrint('🎉 Smart Connect successful to ${fastestServer.remark}');
+        return true;
+      } else {
+        // If connection failed, try next best server
+        debugPrint('❌ Connection to ${fastestServer.remark} failed, trying alternatives...');
+        
+        // Sort servers by ping and try next ones
+        final sortedServers = serversToTest.where((s) {
+          final ping = pingResults[s.id];
+          return ping != null && ping < 9999 && s.id != fastestServer!.id;
+        }).toList()
+          ..sort((a, b) {
+            final pingA = pingResults[a.id] ?? 999999;
+            final pingB = pingResults[b.id] ?? 999999;
+            return pingA.compareTo(pingB);
+          });
+        
+        // Try up to 2 more servers
+        for (final server in sortedServers.take(2)) {
+          debugPrint('🔄 Trying alternative server: ${server.remark}');
+          await selectConfig(server);
+          
+          final altSuccess = await connectToServer(server);
+          if (altSuccess) {
+            debugPrint('✅ Connected to alternative server: ${server.remark}');
+            return true;
+          }
+        }
+        
+        _setError('Could not connect to any available server');
+        return false;
+      }
+    } catch (e) {
+      debugPrint('❌ Smart Connect error: $e');
+      _setError('Smart Connect failed: $e');
+      return false;
     } finally {
       _isConnecting = false;
       notifyListeners();
@@ -1225,8 +1148,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
 
   Future<void> selectConfig(V2RayConfig config) async {
     _selectedConfig = config;
-    // Note: We don't save selected server anymore - always defaults to first server
-    // User selection is temporary until disconnect
+    
+    // IMPORTANT: Save selected server to persist across app restarts
+    await _saveSelectedServer(config);
+    debugPrint('✅ Selected and saved server: ${config.remark}');
     
     // Log server selection analytics
     try {
@@ -1240,9 +1165,54 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     
     notifyListeners();
   }
+  
+  // Save selected server to SharedPreferences
+  Future<void> _saveSelectedServer(V2RayConfig config) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('selected_server_id', config.id);
+      debugPrint('💾 Saved selected server ID: ${config.id}');
+    } catch (e) {
+      debugPrint('❌ Error saving selected server: $e');
+    }
+  }
+  
+  // Load selected server from SharedPreferences
+  Future<V2RayConfig?> _loadSelectedServer() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final selectedServerId = prefs.getString('selected_server_id');
+      
+      if (selectedServerId != null) {
+        // Check if Smart Connect was selected
+        if (selectedServerId == 'smart_connect') {
+          debugPrint('📂 Loaded Smart Connect');
+          return V2RayConfig.smartConnect();
+        }
+        
+        // Try to find the saved server in configs
+        if (_configs.isNotEmpty) {
+          try {
+            final server = _configs.firstWhere(
+              (config) => config.id == selectedServerId,
+            );
+            debugPrint('📂 Loaded selected server: ${server.remark}');
+            return server;
+          } catch (e) {
+            debugPrint('⚠️ Saved server not found in configs');
+            return null;
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error loading selected server: $e');
+      return null;
+    }
+  }
 
   // Proxy mode feature removed for simplification
-
+  
   void _setLoading(bool loading) {
     _isLoading = loading;
     _isLoadingServers = loading; // Update server loading state as well
@@ -1258,7 +1228,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     _errorMessage = '';
     notifyListeners();
   }
-
+  
   Future<void> _handleNotificationDisconnect() async {
     debugPrint('🔔 Notification disconnect triggered');
     
@@ -1285,31 +1255,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     } catch (e) {
       debugPrint('❌ Error saving configs after notification disconnect: $e');
       notifyListeners();
-    }
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
-
-    // Handle app lifecycle changes
-    if (state == AppLifecycleState.resumed) {
-      debugPrint('📱 App resumed, checking VPN status immediately...');
-      
-      // CRITICAL: Notify listeners FIRST to show last known state immediately
-      notifyListeners();
-      
-      // CRITICAL: Like defyxVPN, check status IMMEDIATELY without delays
-      // This ensures UI is synced with actual VPN state right away
-      _syncVpnStatusOnResume();
-      
-    } else if (state == AppLifecycleState.paused) {
-      // App is paused, VPN status will be maintained in background
-      debugPrint('📱 App paused, VPN will continue in background');
-    } else if (state == AppLifecycleState.inactive) {
-      debugPrint('📱 App inactive');
-    } else if (state == AppLifecycleState.detached) {
-      debugPrint('📱 App detached');
     }
   }
   
@@ -1429,6 +1374,65 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
   
+  // OPTIMISTIC UI: Load saved state immediately for instant UI display
+  Future<void> _loadSavedStateAndShowUI() async {
+    try {
+      debugPrint('📂 Loading saved state for optimistic UI...');
+      
+      // Load configs from storage immediately (very fast, no network)
+      final savedConfigs = await _v2rayService.loadConfigs();
+      if (savedConfigs.isNotEmpty) {
+        _configs = savedConfigs;
+        debugPrint('📂 Loaded ${_configs.length} saved configs');
+        
+        // Try to load saved selected server first
+        final prefs = await SharedPreferences.getInstance();
+        final savedServerId = prefs.getString('selected_server_id');
+        
+        if (savedServerId != null) {
+          // Try to find the saved selected server
+          try {
+            final savedServerIndex = _configs.indexWhere(
+              (config) => config.id == savedServerId,
+            );
+            if (savedServerIndex != -1) {
+              _selectedConfig = _configs[savedServerIndex];
+              debugPrint('📂 Restored selected server: ${_selectedConfig?.remark}');
+            } else {
+              debugPrint('⚠️ Saved server not found in configs');
+            }
+          } catch (e) {
+            debugPrint('⚠️ Could not restore saved server: $e');
+          }
+        }
+        
+        // Check if any config is marked as connected
+        final connectedConfigIndex = _configs.indexWhere((c) => c.isConnected);
+        if (connectedConfigIndex != -1) {
+          _selectedConfig = _configs[connectedConfigIndex];
+          debugPrint('📂 Found connected config: ${_selectedConfig?.remark}');
+          
+          // CRITICAL: Force service to restore activeConfig immediately
+          // This ensures activeConfig is available when UI checks it
+          if (_v2rayService.activeConfig == null) {
+            debugPrint('🔄 Service activeConfig is null, triggering restore...');
+            // The service's initialize will call _tryRestoreActiveConfig
+            // which will restore it immediately in an optimistic way
+          }
+        }
+        
+        // Notify UI immediately with saved state
+        notifyListeners();
+        debugPrint('✅ Optimistic UI loaded and displayed');
+      } else {
+        debugPrint('📂 No saved configs found');
+      }
+    } catch (e) {
+      debugPrint('❌ Error loading saved state: $e');
+      // Error loading saved state, continue with empty list
+    }
+  }
+  
   // Method to fetch connection status from the notification
   Future<void> fetchNotificationStatus() async {
     try {
@@ -1487,66 +1491,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     } catch (e) {
       debugPrint('Error fetching notification status: $e');
       // Don't change connection state on errors
-    }
-  }
-
-
-  // OPTIMISTIC UI: Load saved state immediately for instant UI display
-  Future<void> _loadSavedStateAndShowUI() async {
-    try {
-      debugPrint('📂 Loading saved state for optimistic UI...');
-      
-      // Load configs from storage immediately (very fast, no network)
-      final savedConfigs = await _v2rayService.loadConfigs();
-      if (savedConfigs.isNotEmpty) {
-        _configs = savedConfigs;
-        debugPrint('📂 Loaded ${_configs.length} saved configs');
-        
-        // Try to load saved selected server first
-        final prefs = await SharedPreferences.getInstance();
-        final savedServerId = prefs.getString('selected_server_id');
-        
-        if (savedServerId != null) {
-          // Try to find the saved selected server
-          try {
-            final savedServerIndex = _configs.indexWhere(
-              (config) => config.id == savedServerId,
-            );
-            if (savedServerIndex != -1) {
-              _selectedConfig = _configs[savedServerIndex];
-              debugPrint('📂 Restored selected server: ${_selectedConfig?.remark}');
-            } else {
-              debugPrint('⚠️ Saved server not found in configs');
-            }
-          } catch (e) {
-            debugPrint('⚠️ Could not restore saved server: $e');
-          }
-        }
-        
-        // Check if any config is marked as connected
-        final connectedConfigIndex = _configs.indexWhere((c) => c.isConnected);
-        if (connectedConfigIndex != -1) {
-          _selectedConfig = _configs[connectedConfigIndex];
-          debugPrint('📂 Found connected config: ${_selectedConfig?.remark}');
-          
-          // CRITICAL: Force service to restore activeConfig immediately
-          // This ensures activeConfig is available when UI checks it
-          if (_v2rayService.activeConfig == null) {
-            debugPrint('🔄 Service activeConfig is null, triggering restore...');
-            // The service's initialize will call _tryRestoreActiveConfig
-            // which will restore it immediately in an optimistic way
-          }
-        }
-        
-        // Notify UI immediately with saved state
-        notifyListeners();
-        debugPrint('✅ Optimistic UI loaded and displayed');
-      } else {
-        debugPrint('📂 No saved configs found');
-      }
-    } catch (e) {
-      debugPrint('❌ Error loading saved state: $e');
-      // Error loading saved state, continue with empty list
     }
   }
 

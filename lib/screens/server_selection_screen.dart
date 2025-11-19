@@ -77,81 +77,52 @@ class _ServerSelectionScreenState
     
     _showSnackBar('Testing ${servers.length} servers with V2Ray Core...', Colors.blue, duration: 2);
     
-    int successCount = 0;
-    
-    // Test servers in batches of 2 for better reliability
-    for (int i = 0; i < servers.length; i += 2) {
-      final batch = servers.skip(i).take(2).toList();
-      final futures = batch.map((server) async {
-      try {
-        // Add timeout for each server test (10 seconds max to allow for waiting)
-        final ping = await _testSingleServerPing(server).timeout(
-          const Duration(seconds: 10),
-          onTimeout: () {
-            debugPrint('⚠️ Server ${server.remark} timed out');
-            return 9999;
-          },
-        );
-        
-        if (mounted) {
-          setState(() {
-            _serverPings[server.id] = ping;
-            if (ping < 9999) successCount++;
-          });
-        }
-        
-        return ping;
-      } catch (e) {
-        debugPrint('❌ Error testing ${server.remark}: $e');
-        if (mounted) {
-          setState(() {
-            _serverPings[server.id] = 9999;
-          });
-        }
-        return 9999;
-      }
-      }).toList();
+    try {
+      // IMPROVED: Use batch testing for much faster and more reliable results
+      // Tests 5 servers simultaneously with independent timeouts
+      final results = await provider.v2rayService.batchTestServerDelays(
+        servers,
+        batchSize: 5, // Test 5 servers at a time for optimal performance
+        useCache: false, // Don't use cache for manual testing
+      );
       
-      // Wait for this batch to complete
-      try {
-        await Future.wait(futures).timeout(
-          const Duration(seconds: 15),
-          onTimeout: () {
-            debugPrint('⚠️ Batch timeout after 15s');
-            return [];
-          },
-        );
-      } catch (e) {
-        debugPrint('❌ Error in batch: $e');
+      // Update UI with results
+      if (mounted) {
+        setState(() {
+          _serverPings = results;
+        });
       }
       
-      // Small delay between batches
-      await Future.delayed(const Duration(milliseconds: 200));
+      // Calculate statistics
+      final successCount = results.values.where((p) => p < 9999).length;
+      final avgPing = successCount > 0
+          ? results.values
+              .where((p) => p < 9999)
+              .reduce((a, b) => a + b) ~/ successCount
+          : 0;
+      
+      String message;
+      if (successCount == 0) {
+        message = '❌ No servers responded';
+      } else if (successCount == servers.length) {
+        message = '✅ All servers online (Avg: ${avgPing}ms)';
+      } else {
+        message = '✅ $successCount/${servers.length} servers online (Avg: ${avgPing}ms)';
+      }
+      
+      _showSnackBar(message, successCount > 0 ? Colors.green : Colors.red, duration: 2);
+      
+    } catch (e) {
+      debugPrint('❌ Error during batch ping test: $e');
+      _showSnackBar('Error testing servers: $e', Colors.red, duration: 2);
+    } finally {
+      _pingAnimationController.stop();
+      if (mounted) {
+        setState(() {
+          _isTestingPings = false;
+        });
+      }
     }
-    
-    _pingAnimationController.stop();
-    if (!mounted) return;
-    setState(() {
-      _isTestingPings = false;
-    });
-    
-    // Show final results with more details
-    final avgPing = successCount > 0
-        ? _serverPings.values
-            .where((p) => p < 9999)
-            .reduce((a, b) => a + b) ~/ successCount
-        : 0;
-    
-    String message;
-    if (successCount == 0) {
-      message = '❌ No servers responded';
-    } else if (successCount == servers.length) {
-      message = '✅ All servers online (Avg: ${avgPing}ms)';
-    } else {
-      message = '✅ $successCount/${servers.length} servers online (Avg: ${avgPing}ms)';
-    }
-    
-    _showSnackBar(message, successCount > 0 ? Colors.green : Colors.red, duration: 2);
   }
 
   Future<void> _connectToFastestServer() async {

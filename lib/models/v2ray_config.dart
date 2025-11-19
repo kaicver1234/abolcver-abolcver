@@ -201,4 +201,52 @@ class V2RayConfig {
     
     return countryNames[countryCode!.toUpperCase()] ?? countryCode!.toUpperCase();
   }
+  
+  // Check if this is a Smart Connect config
+  bool get isSmartConnect => id == 'smart_connect';
+  
+  // Factory method to create Smart Connect config
+  factory V2RayConfig.smartConnect() {
+    return V2RayConfig(
+      id: 'smart_connect',
+      remark: 'smart_connect_display', // Translation key
+      address: 'auto',
+      port: 0,
+      configType: 'smart',
+      fullConfig: 'smart_connect',
+      countryCode: null,
+      isConnected: false,
+    );
+  }
+  
+  // Get display name for Smart Connect (with icon)
+  String getDisplayName(String Function(String) translate) {
+    if (isSmartConnect) {
+      return '⚡ ${translate('server_selection.smart_connect')}';
+    }
+    return remark;
+  }
+  
+  // Create a copy with updated fields
+  V2RayConfig copyWith({
+    String? id,
+    String? remark,
+    String? address,
+    int? port,
+    String? configType,
+    String? fullConfig,
+    String? countryCode,
+    bool? isConnected,
+  }) {
+    return V2RayConfig(
+      id: id ?? this.id,
+      remark: remark ?? this.remark,
+      address: address ?? this.address,
+      port: port ?? this.port,
+      configType: configType ?? this.configType,
+      fullConfig: fullConfig ?? this.fullConfig,
+      countryCode: countryCode ?? this.countryCode,
+      isConnected: isConnected ?? this.isConnected,
+    );
+  }
 }

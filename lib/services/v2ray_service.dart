@@ -451,104 +451,153 @@ class V2RayService extends ChangeNotifier {
     }
   }
 
-  // Get server delay/ping for a specific config using V2Ray's built-in method
-  Future<int?> getServerDelay(V2RayConfig config) async {
+  // Get server delay/ping for a specific config using V2Ray Core
+  // IMPROVED: Better timeout handling and independent per-server testing
+  Future<int?> getServerDelay(V2RayConfig config, {bool useCache = true}) async {
     final configId = config.id;
     final hostKey = '${config.address}:${config.port}';
 
     try {
-      // Return cached ping if available and not expired (30 seconds)
-      if (_pingCache.containsKey(hostKey)) {
-        final cached = _pingCache[hostKey];
-        final ageSeconds = DateTime.now().difference(cached!.timestamp).inSeconds;
-        if (ageSeconds < 30) {
-          return cached.delay;
-        }
-      } else if (_pingCache.containsKey(configId)) {
-        final cached = _pingCache[configId];
-        final ageSeconds = DateTime.now().difference(cached!.timestamp).inSeconds;
-        if (ageSeconds < 30) {
-          return cached.delay;
+      // Return cached ping if available and not expired (60 seconds)
+      if (useCache) {
+        if (_pingCache.containsKey(hostKey)) {
+          final cached = _pingCache[hostKey];
+          final ageSeconds = DateTime.now().difference(cached!.timestamp).inSeconds;
+          if (ageSeconds < 60) {
+            debugPrint('📦 Using cached ping for ${config.remark}: ${cached.delay}ms');
+            return cached.delay;
+          }
+        } else if (_pingCache.containsKey(configId)) {
+          final cached = _pingCache[configId];
+          final ageSeconds = DateTime.now().difference(cached!.timestamp).inSeconds;
+          if (ageSeconds < 60) {
+            debugPrint('📦 Using cached ping for ${config.remark}: ${cached.delay}ms');
+            return cached.delay;
+          }
         }
       }
 
       // Check if ping is already in progress for this host or config
-      if (_pingInProgress[hostKey] == true ||
-          _pingInProgress[configId] == true) {
-        // Wait for the ongoing ping to complete (max 6 seconds)
+      if (_pingInProgress[hostKey] == true || _pingInProgress[configId] == true) {
+        debugPrint('⏳ Ping already in progress for ${config.remark}, waiting...');
+        // Wait for the ongoing ping to complete (max 8 seconds)
         int attempts = 0;
-        while ((_pingInProgress[hostKey] == true || _pingInProgress[configId] == true) && attempts < 60) {
+        while ((_pingInProgress[hostKey] == true || _pingInProgress[configId] == true) && attempts < 80) {
           await Future.delayed(const Duration(milliseconds: 100));
           attempts++;
           
           // Check if result is now available in cache
           if (_pingCache.containsKey(hostKey)) {
+            debugPrint('✅ Got result from ongoing ping: ${_pingCache[hostKey]!.delay}ms');
             return _pingCache[hostKey]!.delay;
           } else if (_pingCache.containsKey(configId)) {
+            debugPrint('✅ Got result from ongoing ping: ${_pingCache[configId]!.delay}ms');
             return _pingCache[configId]!.delay;
           }
         }
         
         // If still in progress after waiting, return cached or null
+        debugPrint('⚠️ Ping still in progress after 8s, returning cached or null');
         return _pingCache[hostKey]?.delay ?? _pingCache[configId]?.delay;
       }
 
       // Mark this host and config as having ping in progress
       _pingInProgress[hostKey] = true;
       _pingInProgress[configId] = true;
+      debugPrint('🏓 Starting ping test for ${config.remark}...');
 
       try {
-        // Use V2Ray's built-in ping method for better accuracy
+        // IMPROVED: Use V2Ray Core directly with optimized timeout
         await initialize();
-
         final parser = FlutterV2ray.parseFromURL(config.fullConfig);
+        
+        // CRITICAL: Reduced timeout from 15s to 8s for faster failure detection
         final delay = await _flutterV2ray
             .getServerDelay(config: parser.getFullConfiguration())
             .timeout(
               const Duration(seconds: 8),
               onTimeout: () {
-                debugPrint('⚠️ Ping timeout for ${config.remark}');
-                throw Exception('V2Ray ping timeout');
+                debugPrint('⏱️ V2Ray ping timeout (8s) for ${config.remark}');
+                return 9999;
               },
             );
-
-        // Cache the result by both host and config ID with timestamp
-        if (delay >= -1 && delay < 10000) {
+        
+        // Validate delay
+        if (delay >= 0 && delay < 9999) {
+          debugPrint('✅ Ping ${config.remark}: ${delay}ms');
+          
+          // Cache the successful result
           final now = DateTime.now();
           _pingCache[hostKey] = (delay: delay, timestamp: now);
           _pingCache[configId] = (delay: delay, timestamp: now);
-
-          _pingInProgress[hostKey] = false;
-          _pingInProgress[configId] = false;
-
+          
           return delay;
         } else {
-          _pingInProgress[hostKey] = false;
-          _pingInProgress[configId] = false;
-          _pingCache.remove(hostKey);
-          _pingCache.remove(configId);
+          debugPrint('❌ Invalid ping result for ${config.remark}: ${delay}ms');
           return null;
         }
       } catch (e) {
         debugPrint('❌ Error testing ${config.remark}: $e');
-        _pingInProgress[hostKey] = false;
-        _pingInProgress[configId] = false;
-        _pingCache.remove(hostKey);
-        _pingCache.remove(configId);
         return null;
       } finally {
-        // Always cleanup progress flags
+        // CRITICAL: Always cleanup progress flags
         _pingInProgress[hostKey] = false;
         _pingInProgress[configId] = false;
       }
     } catch (e) {
       // Unexpected error in getServerDelay
-      debugPrint('❌ Unexpected error in getServerDelay: $e');
+      debugPrint('❌ Unexpected error in getServerDelay for ${config.remark}: $e');
       // Ensure cleanup even in unexpected errors
       _pingInProgress[hostKey] = false;
       _pingInProgress[configId] = false;
       return null;
     }
+  }
+  
+  // IMPROVED: Batch ping testing with parallel execution
+  // Tests multiple servers simultaneously for much faster results
+  Future<Map<String, int>> batchTestServerDelays(
+    List<V2RayConfig> configs, {
+    int batchSize = 5, // Test 5 servers at a time
+    bool useCache = true,
+  }) async {
+    final results = <String, int>{};
+    
+    debugPrint('🚀 Starting batch ping test for ${configs.length} servers (batch size: $batchSize)');
+    
+    // Process servers in batches
+    for (int i = 0; i < configs.length; i += batchSize) {
+      final batch = configs.skip(i).take(batchSize).toList();
+      debugPrint('📦 Testing batch ${(i ~/ batchSize) + 1}/${(configs.length / batchSize).ceil()}: ${batch.length} servers');
+      
+      // Test all servers in this batch simultaneously
+      final batchResults = await Future.wait(
+        batch.map((config) async {
+          try {
+            final delay = await getServerDelay(config, useCache: useCache);
+            return MapEntry(config.id, delay ?? 9999);
+          } catch (e) {
+            debugPrint('❌ Error in batch test for ${config.remark}: $e');
+            return MapEntry(config.id, 9999);
+          }
+        }),
+      );
+      
+      // Add batch results to main results
+      for (final entry in batchResults) {
+        results[entry.key] = entry.value;
+      }
+      
+      // Small delay between batches to avoid overwhelming the system
+      if (i + batchSize < configs.length) {
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+    }
+    
+    final successCount = results.values.where((d) => d < 9999).length;
+    debugPrint('✅ Batch test complete: $successCount/${configs.length} servers responded');
+    
+    return results;
   }
 
   Future<List<V2RayConfig>> parseSubscriptionUrl(String url) async {
@@ -594,11 +643,12 @@ class V2RayService extends ChangeNotifier {
         if (line.isEmpty) continue;
 
         try {
-          // Extract country code if present: [CC] config
+          // Extract country code if present: [CC] config or from remark
           String? countryCode;
           String configLine = line;
           
-          final countryCodeMatch = RegExp(r'^\[([A-Z]{2})\]\s+(.+)$').firstMatch(line);
+          // Try to extract country code from beginning: [CC] config
+          final countryCodeMatch = RegExp(r'^\[([A-Z]{2})\]\s*(.+)$').firstMatch(line);
           if (countryCodeMatch != null) {
             countryCode = countryCodeMatch.group(1);
             configLine = countryCodeMatch.group(2)!;
@@ -621,6 +671,15 @@ class V2RayService extends ChangeNotifier {
               configType = 'trojan';
             }
 
+            // If no country code from line, try to extract from remark
+            if (countryCode == null && parser.remark.isNotEmpty) {
+              // Try patterns: [CC], (CC), CC-, -CC-, CC|, |CC|
+              final remarkMatch = RegExp(r'[\[\(]([A-Z]{2})[\]\)]|^([A-Z]{2})[-\s]|[-\s]([A-Z]{2})[-\s]|[\|\s]([A-Z]{2})[\|\s]').firstMatch(parser.remark);
+              if (remarkMatch != null) {
+                countryCode = remarkMatch.group(1) ?? remarkMatch.group(2) ?? remarkMatch.group(3) ?? remarkMatch.group(4);
+              }
+            }
+
             // Use the parsed address and port from the V2RayURL parser
             String address = parser.address;
             int port = parser.port;
@@ -635,7 +694,7 @@ class V2RayService extends ChangeNotifier {
                 address: address,
                 port: port,
                 configType: configType,
-                fullConfig: line,
+                fullConfig: configLine, // Use cleaned config without [CC] prefix
               ),
             );
           }
