@@ -25,6 +25,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   bool _isLoadingServers = false;
   bool _isInitializing = true; // Track initialization state
   DateTime? _lastSuccessfulConnection; // Track last successful connection time
+  bool _wasUsingSmartConnect = false; // Track if user selected Smart Connect
   
   // Method channel for VPN control
   static const platform = MethodChannel('com.tiksarvpn.app/vpn_control');
@@ -233,6 +234,15 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       // Wait for both quick sync and service init
       await Future.wait([quickSyncFuture, serviceInitFuture]);
       debugPrint('✅ Quick sync and service init complete');
+      
+      // STEP 2.5: RETRY SYNC - If VPN was connected but sync failed, retry after delay
+      // This handles cases where device was restarted and VPN needs time to restore
+      if (_configs.any((c) => c.isConnected) && _v2rayService.activeConfig == null) {
+        debugPrint('⚠️ Config marked as connected but no activeConfig, retrying sync...');
+        await Future.delayed(const Duration(seconds: 2));
+        await _enhancedSyncWithVpnServiceState();
+        debugPrint('✅ Retry sync complete');
+      }
 
       // Set up callback for notification disconnects
       _v2rayService.setDisconnectedCallback(() {
@@ -326,7 +336,16 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('🔄 Starting VPN state synchronization...');
       
       // Check if VPN is actually running using the improved method
-      final isActuallyConnected = await _v2rayService.isActuallyConnected();
+      // Use longer timeout for initial check (handles device restart scenarios)
+      final isActuallyConnected = await _v2rayService.isActuallyConnected()
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              debugPrint('⚠️ VPN status check timeout, checking saved state...');
+              // If timeout, check if we have a saved connected config
+              return _configs.any((c) => c.isConnected);
+            },
+          );
       debugPrint('🔍 VPN actually connected: $isActuallyConnected');
       
       // IMPORTANT: Don't reset states before checking!
@@ -1038,6 +1057,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     try {
       // Log analytics event for disconnection
       final activeConfig = _v2rayService.activeConfig;
+      
       if (activeConfig != null) {
         try {
           await _analyticsService.logVpnDisconnect(
@@ -1063,9 +1083,15 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         _configs[i].isConnected = false;
       }
 
-      // IMPORTANT: Keep the selected server after disconnect
-      // User's choice should persist until they manually change it
-      debugPrint('✅ Keeping selected server after disconnect: ${_selectedConfig?.remark}');
+      // IMPORTANT: If user was using Smart Connect, reset to Smart Connect after disconnect
+      // Otherwise keep the manually selected server
+      if (_wasUsingSmartConnect) {
+        _selectedConfig = V2RayConfig.smartConnect();
+        await _saveSelectedServer(_selectedConfig!);
+        debugPrint('✅ Reset to Smart Connect after disconnect');
+      } else {
+        debugPrint('✅ Keeping selected server after disconnect: ${_selectedConfig?.remark}');
+      }
 
       // Persist the changes
       await _v2rayService.saveConfigs(_configs);
@@ -1083,6 +1109,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       _setError('No servers available');
       return false;
     }
+
+    // Mark that user is using Smart Connect
+    _wasUsingSmartConnect = true;
 
     _isConnecting = true;
     _errorMessage = '';
@@ -1179,6 +1208,15 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
 
   Future<void> selectConfig(V2RayConfig config) async {
     _selectedConfig = config;
+    
+    // Track if user selected Smart Connect or a manual server
+    if (config.isSmartConnect) {
+      _wasUsingSmartConnect = true;
+      debugPrint('✅ User selected Smart Connect');
+    } else {
+      _wasUsingSmartConnect = false;
+      debugPrint('✅ User selected manual server: ${config.remark}');
+    }
     
     // IMPORTANT: Save selected server to persist across app restarts
     await _saveSelectedServer(config);
@@ -1447,8 +1485,18 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           // This ensures activeConfig is available when UI checks it
           if (_v2rayService.activeConfig == null) {
             debugPrint('🔄 Service activeConfig is null, triggering restore...');
-            // The service's initialize will call _tryRestoreActiveConfig
-            // which will restore it immediately in an optimistic way
+            // Try to restore immediately in background
+            _v2rayService.initialize().then((_) {
+              debugPrint('✅ Service initialized, checking activeConfig...');
+              if (_v2rayService.activeConfig != null) {
+                debugPrint('✅ ActiveConfig restored: ${_v2rayService.activeConfig?.remark}');
+                notifyListeners();
+              } else {
+                debugPrint('⚠️ ActiveConfig still null after init');
+              }
+            }).catchError((e) {
+              debugPrint('❌ Error initializing service: $e');
+            });
           }
         }
         

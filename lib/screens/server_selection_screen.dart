@@ -70,7 +70,10 @@ class _ServerSelectionScreenState
     _pingAnimationController.repeat();
     
     final provider = Provider.of<V2RayProvider>(context, listen: false);
-    final servers = _getFilteredServers(provider);
+    final allServers = _getFilteredServers(provider);
+    
+    // IMPORTANT: Exclude Smart Connect from ping testing
+    final servers = allServers.where((s) => !s.isSmartConnect).toList();
     
     // Clear any stuck ping progress flags before starting
     provider.v2rayService.clearPingProgress();
@@ -168,16 +171,33 @@ class _ServerSelectionScreenState
   List<V2RayConfig> _getFilteredServers(V2RayProvider provider) {
     var servers = provider.configs.toList();
     
-    // Sort by ping if available
+    // Separate Smart Connect from regular servers
+    V2RayConfig? smartConnect;
+    List<V2RayConfig> regularServers = [];
+    
+    for (var server in servers) {
+      if (server.isSmartConnect) {
+        smartConnect = server;
+      } else {
+        regularServers.add(server);
+      }
+    }
+    
+    // Sort regular servers by ping if available
     if (_serverPings.isNotEmpty) {
-      servers.sort((a, b) {
+      regularServers.sort((a, b) {
         final pingA = _serverPings[a.id] ?? 999999;
         final pingB = _serverPings[b.id] ?? 999999;
         return pingA.compareTo(pingB);
       });
     }
     
-    return servers;
+    // IMPORTANT: Smart Connect always stays at the top
+    if (smartConnect != null) {
+      return [smartConnect, ...regularServers];
+    }
+    
+    return regularServers;
   }
 
   void _showSnackBar(String message, Color color, {int duration = 4}) {

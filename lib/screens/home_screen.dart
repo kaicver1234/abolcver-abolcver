@@ -1005,8 +1005,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               if (selectedConfig.isSmartConnect)
                 // Smart Connect Icon
                 Container(
-                  width: 36,
-                  height: 36,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(8),
                     image: const DecorationImage(
@@ -1016,10 +1016,19 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   ),
                 )
               else
-                // Country Flag (always show flag for servers)
-                Text(
-                  selectedConfig.countryFlag,
-                  style: const TextStyle(fontSize: 36),
+                // Country Flag (same size as Smart Connect)
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(8),
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    selectedConfig.countryFlag,
+                    style: const TextStyle(fontSize: 32),
+                  ),
                 ),
               const SizedBox(width: 12),
             ],
@@ -1047,14 +1056,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (selectedConfig?.countryCode != null)
-                    Text(
-                      selectedConfig!.countryName,
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 12,
-                      ),
-                    ),
                 ],
               ),
             ),
