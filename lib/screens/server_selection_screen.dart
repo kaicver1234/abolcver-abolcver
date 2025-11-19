@@ -155,7 +155,10 @@ class _ServerSelectionScreenState
       await provider.selectConfig(server);
       await provider.connectToServer(server);
       
-      _showSnackBar('Connected to fastest server: ${server.remark} ($lowestPing ms)', Colors.green);
+      final serverName = server.isSmartConnect 
+          ? AppLocalizations.of(context).translate('server_selection.smart_connect')
+          : server.remark;
+      _showSnackBar('Connected to fastest server: $serverName ($lowestPing ms)', Colors.green);
       Navigator.pop(context, server);
     } else {
       _showSnackBar('No fast server found', Colors.red);
@@ -522,7 +525,10 @@ class _ServerSelectionScreenState
                 await provider.selectConfig(server);
                 if (!mounted) return;
                 Navigator.pop(context, server);
-                _showSnackBar('Server selected: ${server.remark}', Colors.blue);
+                final serverName = server.isSmartConnect 
+                    ? AppLocalizations.of(context).translate('server_selection.smart_connect')
+                    : server.remark;
+                _showSnackBar('Server selected: $serverName', Colors.blue);
               },
             );
           },
@@ -624,7 +630,9 @@ class _ServerSelectionScreenState
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    server.remark,
+                    server.isSmartConnect 
+                        ? AppLocalizations.of(context).translate('server_selection.smart_connect')
+                        : server.remark,
                     style: TextStyle(
                       color: isActive ? Colors.white : Colors.white.withOpacity(0.95),
                       fontSize: 15,

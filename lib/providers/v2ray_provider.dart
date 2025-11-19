@@ -239,25 +239,40 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         _handleNotificationDisconnect();
       });
 
-      // STEP 4: Load configurations from storage
-      await loadConfigs();
-      debugPrint('✅ Configs loaded from storage: ${_configs.length} servers');
+      // STEP 4: Load configurations from storage (already loaded in STEP 1)
+      // Skip if already loaded in _loadSavedStateAndShowUI
+      if (_configs.isEmpty) {
+        await loadConfigs();
+        debugPrint('✅ Configs loaded from storage: ${_configs.length} servers');
+      } else {
+        debugPrint('✅ Configs already loaded: ${_configs.length} servers');
+      }
 
       // STEP 5: Fetch fresh servers from GitHub
-      // If no servers in storage, wait for fetch. Otherwise fetch in background.
+      // Strategy: ALWAYS fetch in background to keep servers updated
+      //           Show cached servers immediately if available
       if (_configs.isEmpty) {
-        debugPrint('📥 No servers in storage, fetching from GitHub...');
+        debugPrint('📥 No cached servers, fetching from GitHub (blocking)...');
+        _isLoadingServers = true;
+        notifyListeners();
+        
         await fetchServers(customUrl: 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt');
         debugPrint('✅ Fresh servers fetched: ${_configs.length} servers');
+        
+        _isLoadingServers = false;
+        notifyListeners();
       } else {
-        debugPrint('📥 Fetching fresh servers in background...');
-        // Fetch in background to update servers
+        debugPrint('✅ Using cached servers (${_configs.length} servers)');
+        debugPrint('📥 Updating servers from GitHub in background...');
+        
+        // Fetch in background to update servers without blocking UI
         fetchServers(customUrl: 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt')
           .then((_) {
             debugPrint('✅ Background server update complete: ${_configs.length} servers');
           })
           .catchError((e) {
             debugPrint('⚠️ Background server update failed: $e');
+            // Keep using cached servers on error
           });
       }
       

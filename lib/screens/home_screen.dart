@@ -91,8 +91,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           
           if (mounted) {
             if (success && provider.activeConfig != null) {
+              final serverName = provider.activeConfig!.isSmartConnect 
+                  ? AppLocalizations.of(context).translate('server_selection.smart_connect')
+                  : provider.activeConfig!.remark;
               debugPrint('✅ Smart Connect successful to: ${provider.activeConfig!.remark}');
-              _showSnackBar('Connected to ${provider.activeConfig!.remark}', Colors.green);
+              _showSnackBar('Connected to $serverName', Colors.green);
             } else if (provider.errorMessage.isNotEmpty) {
               debugPrint('❌ Smart Connect failed: ${provider.errorMessage}');
               _showSnackBar(provider.errorMessage, Colors.red);
@@ -102,15 +105,21 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           }
         } else if (selectedConfig != null) {
           // Manual Connect: User selected a specific server
+          final serverName = selectedConfig.isSmartConnect 
+              ? AppLocalizations.of(context).translate('server_selection.smart_connect')
+              : selectedConfig.remark;
           debugPrint('🎯 Manual Connect to: ${selectedConfig.remark}');
-          _showSnackBar('Connecting to ${selectedConfig.remark}...', Colors.blue);
+          _showSnackBar('Connecting to $serverName...', Colors.blue);
           
           final success = await provider.connectToServer(selectedConfig);
           
           if (mounted) {
             if (success && provider.activeConfig != null) {
+              final connectedServerName = provider.activeConfig!.isSmartConnect 
+                  ? AppLocalizations.of(context).translate('server_selection.smart_connect')
+                  : provider.activeConfig!.remark;
               debugPrint('✅ Connected to: ${provider.activeConfig!.remark}');
-              _showSnackBar('Connected to ${provider.activeConfig!.remark}', Colors.green);
+              _showSnackBar('Connected to $connectedServerName', Colors.green);
             } else if (provider.errorMessage.isNotEmpty) {
               debugPrint('❌ Connection failed: ${provider.errorMessage}');
               _showSnackBar(provider.errorMessage, Colors.red);
@@ -130,8 +139,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           
           if (mounted) {
             if (success && provider.activeConfig != null) {
+              final serverName = provider.activeConfig!.isSmartConnect 
+                  ? AppLocalizations.of(context).translate('server_selection.smart_connect')
+                  : provider.activeConfig!.remark;
               debugPrint('✅ Smart Connect successful to: ${provider.activeConfig!.remark}');
-              _showSnackBar('Connected to ${provider.activeConfig!.remark}', Colors.green);
+              _showSnackBar('Connected to $serverName', Colors.green);
             } else if (provider.errorMessage.isNotEmpty) {
               debugPrint('❌ Smart Connect failed: ${provider.errorMessage}');
               _showSnackBar(provider.errorMessage, Colors.red);
