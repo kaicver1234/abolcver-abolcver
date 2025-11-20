@@ -820,7 +820,6 @@ class _ServerSelectionScreenState
                   ),
                 ),
               ),
-              ),
           ],
         ),
       ),
