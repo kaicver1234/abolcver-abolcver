@@ -1,8 +1,10 @@
 import 'dart:ui';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:http/http.dart' as http;
 import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
 import '../widgets/vpn_gradient_background.dart';
@@ -26,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   late PageController _pageController;
   int _currentPage = 0;
   BoxDecoration? _statsDecoration; // Cache decoration for performance
+  String _currentIp = 'Loading...';
   
   @override
   bool get wantKeepAlive => true;
@@ -39,6 +42,39 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     );
     // Listen to app lifecycle to force rebuild when resumed
     WidgetsBinding.instance.addObserver(this);
+    
+    // Check VPN status when screen loads
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final provider = Provider.of<V2RayProvider>(context, listen: false);
+        provider.forceCheckVpnStatus();
+      }
+    });
+  }
+  
+  Future<void> _fetchCurrentIp() async {
+    setState(() {
+      _currentIp = 'Loading...';
+    });
+    
+    try {
+      final response = await http.get(
+        Uri.parse('https://api.ipify.org?format=json'),
+      ).timeout(const Duration(seconds: 5));
+      
+      if (response.statusCode == 200 && mounted) {
+        final data = json.decode(response.body);
+        setState(() {
+          _currentIp = data['ip'] ?? 'Unknown';
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _currentIp = 'Unknown';
+        });
+      }
+    }
   }
   
   @override
@@ -46,12 +82,15 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed && mounted) {
       // Force rebuild UI when app comes back from background
-      debugPrint('🏠 HomeScreen: App resumed, forcing UI rebuild...');
+      debugPrint('🏠 HomeScreen: App resumed, checking VPN status...');
       
-      // Single rebuild is enough - Consumer2 will handle the rest
-      if (mounted) {
-        setState(() {});
-      }
+      // Force check actual VPN status from service
+      final provider = Provider.of<V2RayProvider>(context, listen: false);
+      provider.forceCheckVpnStatus().then((_) {
+        if (mounted) {
+          setState(() {});
+        }
+      });
     }
   }
   
@@ -163,6 +202,16 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         setState(() {
           _isConnecting = false;
         });
+        
+        // Reset IP when disconnected, fetch when connected
+        final provider = Provider.of<V2RayProvider>(context, listen: false);
+        if (provider.activeConfig != null) {
+          _fetchCurrentIp();
+        } else {
+          setState(() {
+            _currentIp = 'Loading...';
+          });
+        }
       }
     }
   }
@@ -1018,21 +1067,21 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 )
               else
                 // Country Flag (same size as Smart Connect)
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.white.withOpacity(0.1),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: CachedNetworkImage(
-                      imageUrl: selectedConfig.countryFlagUrl,
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: CachedNetworkImage(
+                    imageUrl: selectedConfig.countryFlagUrl,
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
                       width: 48,
                       height: 48,
-                      fit: BoxFit.cover,
-                      placeholder: (context, url) => Center(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                      child: Center(
                         child: SizedBox(
                           width: 20,
                           height: 20,
@@ -1044,7 +1093,15 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                           ),
                         ),
                       ),
-                      errorWidget: (context, url, error) => Center(
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      width: 48,
+                      height: 48,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        color: Colors.white.withOpacity(0.1),
+                      ),
+                      child: Center(
                         child: Text(
                           selectedConfig.countryFlag,
                           style: const TextStyle(fontSize: 32),
@@ -1096,6 +1153,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   Widget _buildStatsGrid(V2RayProvider provider) {
     final v2rayService = provider.v2rayService;
     
+    // Fetch IP when stats grid is first displayed
+    if (_currentIp == 'Loading...') {
+      _fetchCurrentIp();
+    }
+    
     // بهینه‌سازی: هر 2 ثانیه به جای 1 ثانیه (کاهش 50% rebuild)
     return RepaintBoundary(
       child: StreamBuilder(
@@ -1135,7 +1197,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       icon: Icons.timer,
                       label: 'Duration',
                       value: v2rayService.getFormattedConnectedTime(),
-                      color: Colors.blue,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(width: 10),
@@ -1144,7 +1206,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       icon: Icons.upload,
                       label: 'Upload',
                       value: v2rayService.getFormattedUpload(),
-                      color: Colors.green,
+                      color: Colors.white,
                     ),
                   ),
                 ],
@@ -1157,43 +1219,16 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       icon: Icons.download,
                       label: 'Download',
                       value: v2rayService.getFormattedDownload(),
-                      color: Colors.orange,
+                      color: Colors.white,
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
-                    child: StreamBuilder<int?>(
-                      stream: Stream.periodic(
-                        const Duration(seconds: 5),
-                        (_) => v2rayService.getCurrentPing(),
-                      ).asyncMap((future) => future),
-                      builder: (context, snapshot) {
-                        String latencyValue = '-- ms';
-                        Color latencyColor = Colors.purple;
-                        
-                        if (snapshot.connectionState == ConnectionState.waiting) {
-                          latencyValue = 'Testing...';
-                        } else if (snapshot.hasData && snapshot.data != null) {
-                          final ping = snapshot.data!;
-                          latencyValue = '${ping} ms';
-                          
-                          // Color based on ping quality
-                          if (ping < 100) {
-                            latencyColor = Colors.green;
-                          } else if (ping < 300) {
-                            latencyColor = Colors.orange;
-                          } else {
-                            latencyColor = Colors.red;
-                          }
-                        }
-                        
-                        return _buildStatItem(
-                          icon: Icons.speed,
-                          label: 'Latency',
-                          value: latencyValue,
-                          color: latencyColor,
-                        );
-                      },
+                    child: _buildStatItem(
+                      icon: Icons.public,
+                      label: 'IP Address',
+                      value: _currentIp,
+                      color: Colors.white,
                     ),
                   ),
                 ],
@@ -1213,47 +1248,33 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     required Color color,
   }) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            color.withOpacity(0.15),
-            color.withOpacity(0.08),
-          ],
-        ),
+        color: Colors.white.withOpacity(0.05),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: color.withOpacity(0.3),
+          color: Colors.white.withOpacity(0.1),
           width: 1,
         ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 18,
-            ),
+          Icon(
+            icon,
+            color: Colors.white.withOpacity(0.8),
+            size: 20,
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.7),
+              color: Colors.white.withOpacity(0.6),
               fontSize: 10,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             value,
             style: const TextStyle(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/v2ray_config.dart';
 import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
@@ -49,15 +50,15 @@ class _ServerListItemState extends State<ServerListItem> {
     bool isSelected,
   ) {
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: isSelected ? 4 : 1,
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      elevation: isSelected ? 3 : 1,
       color: isSelected ? Theme.of(context).colorScheme.primaryContainer : null,
       child: InkWell(
         onTap: () async {
           await provider.selectConfig(widget.config);
         },
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(12),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -70,8 +71,8 @@ class _ServerListItemState extends State<ServerListItem> {
                       children: [
                         // Flag or Smart Connect Icon
                         Container(
-                          width: 48,
-                          height: 36,
+                          width: 40,
+                          height: 30,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(6),
                             border: Border.all(
@@ -88,27 +89,48 @@ class _ServerListItemState extends State<ServerListItem> {
                           ),
                           child: widget.config.isSmartConnect
                               ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
+                                  borderRadius: BorderRadius.circular(5),
                                   child: Image.asset(
                                     'assets/images/apk.png',
                                     fit: BoxFit.cover,
                                   ),
                                 )
-                              : Center(
-                                  child: Text(
-                                    widget.config.countryFlag,
-                                    style: const TextStyle(fontSize: 28),
+                              : ClipRRect(
+                                  borderRadius: BorderRadius.circular(5),
+                                  child: CachedNetworkImage(
+                                    imageUrl: widget.config.countryFlagUrl,
+                                    width: 40,
+                                    height: 30,
+                                    fit: BoxFit.fill,
+                                    placeholder: (context, url) => Center(
+                                      child: SizedBox(
+                                        width: 12,
+                                        height: 12,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 1.5,
+                                          valueColor: AlwaysStoppedAnimation<Color>(
+                                            Colors.grey.withOpacity(0.5),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    errorWidget: (context, url, error) => Center(
+                                      child: Text(
+                                        widget.config.countryFlag,
+                                        style: const TextStyle(fontSize: 20),
+                                      ),
+                                    ),
                                   ),
                                 ),
                         ),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Text(
                             widget.config.getDisplayName(
                               (key) => AppLocalizations.of(context).translate(key),
                             ),
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: isActive
                                   ? Theme.of(context).colorScheme.primary
@@ -172,12 +194,12 @@ class _ServerListItemState extends State<ServerListItem> {
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Text(
                 '${widget.config.address}:${widget.config.port}',
-                style: const TextStyle(color: Colors.grey),
+                style: const TextStyle(color: Colors.grey, fontSize: 12),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [

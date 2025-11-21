@@ -1145,18 +1145,25 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       if (fastestServer == null) {
         // No server responded, try connecting to selected/first server anyway
         debugPrint('⚠️ No server responded to ping, trying selected server...');
-        fastestServer = _selectedConfig ?? _configs.first;
+        if (_selectedConfig != null) {
+          fastestServer = _selectedConfig;
+        } else if (_configs.isNotEmpty) {
+          fastestServer = _configs.first;
+        } else {
+          _setError('No servers available');
+          return;
+        }
       } else {
         debugPrint('✅ Fastest server found: ${fastestServer.remark} (${lowestPing}ms)');
       }
       
-      // Select and connect to fastest server
-      await selectConfig(fastestServer);
+      // IMPORTANT: Don't call selectConfig here to keep Smart Connect as selected
+      // Just connect directly to the fastest server
       
       _isConnecting = false;
       notifyListeners();
       
-      // Now connect
+      // Now connect to fastest server (without changing selectedConfig)
       final success = await connectToServer(fastestServer);
       
       if (success) {
@@ -1177,10 +1184,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
             return pingA.compareTo(pingB);
           });
         
-        // Try up to 2 more servers
+        // Try up to 2 more servers (without changing selectedConfig)
         for (final server in sortedServers.take(2)) {
           debugPrint('🔄 Trying alternative server: ${server.remark}');
-          await selectConfig(server);
           
           final altSuccess = await connectToServer(server);
           if (altSuccess) {
@@ -1604,14 +1610,18 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         }
         
         // CRITICAL: Ensure UI shows connected state
-        final connectedConfig = _configs.firstWhere(
-          (c) => c.isConnected,
-          orElse: () => _configs.first,
-        );
-        
-        debugPrint('✅ VPN status confirmed: CONNECTED');
-        debugPrint('✅ Active server: ${_v2rayService.activeConfig?.remark ?? "Unknown"}');
-        debugPrint('✅ UI showing: ${connectedConfig.remark} as connected');
+        if (_configs.isNotEmpty) {
+          final connectedConfig = _configs.firstWhere(
+            (c) => c.isConnected,
+            orElse: () => _configs.first,
+          );
+          
+          debugPrint('✅ VPN status confirmed: CONNECTED');
+          debugPrint('✅ Active server: ${_v2rayService.activeConfig?.remark ?? "Unknown"}');
+          debugPrint('✅ UI showing: ${connectedConfig.remark} as connected');
+        } else {
+          debugPrint('⚠️ VPN connected but no configs loaded yet');
+        }
       } else {
         // VPN is not running, clear all connection states
         bool stateChanged = false;

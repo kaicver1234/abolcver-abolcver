@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 
@@ -318,21 +319,38 @@ class CloudflareSpeedTestService {
     try {
       debugPrint('      🔧 Generating ${(bytes / 1000000).toStringAsFixed(1)}MB upload data...');
       
-      // Generate random data more efficiently
+      // Generate random data very efficiently (fill with pattern instead of random for speed)
       final data = Uint8List(bytes);
-      final random = Random();
-      for (int i = 0; i < bytes; i++) {
-        data[i] = random.nextInt(256);
+      // Fill with a repeating pattern (faster than random, still valid for upload test)
+      for (int i = 0; i < bytes; i += 8) {
+        data[i] = 0xFF;
+        if (i + 1 < bytes) data[i + 1] = 0xAA;
+        if (i + 2 < bytes) data[i + 2] = 0x55;
+        if (i + 3 < bytes) data[i + 3] = 0x00;
+        if (i + 4 < bytes) data[i + 4] = 0xCC;
+        if (i + 5 < bytes) data[i + 5] = 0x33;
+        if (i + 6 < bytes) data[i + 6] = 0x99;
+        if (i + 7 < bytes) data[i + 7] = 0x66;
       }
       
       debugPrint('      🚀 Starting upload to Cloudflare...');
       final startTime = DateTime.now();
       DateTime? lastUpdateTime;
       int lastSent = 0;
+      bool progressCallbackCalled = false;
       
-      final response = await _dio.post(
+      // Split data into smaller chunks for better live progress tracking
+      const chunkSize = 64 * 1024; // 64KB chunks for smooth progress
+      List<List<int>> chunks = [];
+      for (int i = 0; i < bytes; i += chunkSize) {
+        final end = (i + chunkSize < bytes) ? i + chunkSize : bytes;
+        chunks.add(data.sublist(i, end));
+      }
+      debugPrint('      📦 Split into ${chunks.length} chunks for live progress');
+      
+      await _dio.post(
         '/__up',
-        data: Stream.fromIterable([data]),
+        data: Stream.fromIterable(chunks),
         queryParameters: {
           'measId': _measurementId,
           'during': 'upload',
@@ -340,30 +358,44 @@ class CloudflareSpeedTestService {
         options: Options(
           headers: {
             'Content-Type': 'application/octet-stream',
-            'Content-Length': bytes,
+            'Content-Length': bytes.toString(),
           },
           sendTimeout: const Duration(seconds: 30),
           receiveTimeout: const Duration(seconds: 30),
         ),
         onSendProgress: (sent, total) {
+          if (!progressCallbackCalled) {
+            debugPrint('      ✅ Upload progress callback working! sent=$sent, total=$total');
+            progressCallbackCalled = true;
+          }
+          
           if (_isCancelled) return;
           
           final now = DateTime.now();
           final elapsed = now.difference(startTime).inMilliseconds / 1000.0;
           
-          // Update speed more frequently and ensure progress
+          // Update speed more frequently for live display
           if (elapsed > 0.01 && sent > lastSent) {
             final speedMbps = (sent * 8) / (elapsed * 1000000);
             
+            // Update every 50ms for smooth live display
             if (lastUpdateTime == null || now.difference(lastUpdateTime!).inMilliseconds > 50) {
               onSpeedUpdate(speedMbps);
               lastUpdateTime = now;
               lastSent = sent;
-              debugPrint('         📊 Upload progress: ${(sent / bytes * 100).toStringAsFixed(0)}% - ${speedMbps.toStringAsFixed(2)} Mbps');
+              
+              // Log less frequently to avoid spam (every 10%)
+              if (sent % (bytes ~/ 10) < 100000 || sent == total) {
+                debugPrint('         📊 Upload: ${(sent / bytes * 100).toStringAsFixed(0)}% - ${speedMbps.toStringAsFixed(2)} Mbps');
+              }
             }
           }
         },
       );
+      
+      if (!progressCallbackCalled) {
+        debugPrint('      ⚠️ WARNING: Upload progress callback was NEVER called!');
+      }
       
       if (_isCancelled) return 0.0;
       
@@ -379,6 +411,12 @@ class CloudflareSpeedTestService {
       
       final mbps = (bytes * 8) / (durationSeconds * 1000000);
       debugPrint('      📈 Final upload speed: ${mbps.toStringAsFixed(2)} Mbps');
+      
+      // If progress callback wasn't called, at least update with final speed
+      if (!progressCallbackCalled && mbps > 0) {
+        debugPrint('      🔧 Updating UI with final speed since progress callback failed');
+        onSpeedUpdate(mbps);
+      }
       
       return mbps;
     } catch (e, stackTrace) {
