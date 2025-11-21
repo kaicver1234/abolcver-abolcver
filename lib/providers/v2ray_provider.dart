@@ -23,9 +23,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   bool _isLoading = false;
   String _errorMessage = '';
   bool _isLoadingServers = false;
-  bool _isInitializing = true; // Track initialization state
-  DateTime? _lastSuccessfulConnection; // Track last successful connection time
-  bool _wasUsingSmartConnect = false; // Track if user selected Smart Connect
+  bool _isInitializing = true;
+  DateTime? _lastSuccessfulConnection;
+  bool _wasUsingSmartConnect = false;
+  DateTime? _lastStatusCheck;
   
   // Method channel for VPN control
   static const platform = MethodChannel('com.tiksarvpn.app/vpn_control');
@@ -60,6 +61,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     _setupVpnStatusListener();
     _initialize();
     platform.setMethodCallHandler(_handleMethodCall);
+    _startPersistentConnectionMonitoring();
   }
 
   
@@ -77,6 +79,52 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   void _onV2RayServiceChanged() {
     // When V2RayService state changes, notify our listeners
     notifyListeners();
+  }
+  
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    
+    if (state == AppLifecycleState.resumed) {
+      debugPrint('📱 App resumed - checking VPN connection status...');
+      
+      // CRITICAL: When app comes back from background, immediately check VPN status
+      // This ensures UI shows correct connection state even if app was killed/restarted
+      Future.delayed(const Duration(milliseconds: 300), () async {
+        try {
+          debugPrint('🔄 Starting VPN status check after app resume...');
+          
+          // Force check actual VPN connection status
+          await forceCheckVpnStatus();
+          
+          debugPrint('✅ VPN status check completed after app resume');
+        } catch (e) {
+          debugPrint('❌ Error checking VPN status after resume: $e');
+          // Still notify to show last known state
+          notifyListeners();
+        }
+      });
+    } else if (state == AppLifecycleState.paused) {
+      debugPrint('📱 App paused');
+    }
+  }
+  
+  /// سیستم مانیتورینگ هوشمند - بدون مصرف باتری
+  /// فقط روی event-driven و lifecycle تکیه می‌کنه
+  void _startPersistentConnectionMonitoring() {
+    debugPrint('🔄 Starting smart connection monitoring (event-driven)...');
+    
+    // به جای تایمر دوره‌ای، فقط در مواقع خاص چک می‌کنیم:
+    // 1. وقتی برنامه resume می‌شه (در didChangeAppLifecycleState)
+    // 2. وقتی native event می‌فرسته (در _setupVpnStatusListener)
+    // 3. وقتی کاربر دستی چک می‌کنه (در forceCheckVpnStatus)
+    
+    // این رویکرد:
+    // ✅ صفر مصرف باتری در background
+    // ✅ بلافاصله وقتی برنامه باز می‌شه چک می‌کنه
+    // ✅ از native events برای تغییرات real-time استفاده می‌کنه
+    
+    debugPrint('✅ Smart monitoring active (zero battery drain)');
   }
   
   /// Setup VPN status event listener (inspired by defyxVPN)
@@ -314,6 +362,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         notifyListeners();
       }
 
+      // STEP 8: چک کردن برای auto-reconnect
+      // اگه قبلاً متصل بودیم ولی الان نیستیم (مثلاً نت قطع شده بود)
+      await checkAndAutoReconnect();
+      
       debugPrint('? Initialization complete');
       notifyListeners();
     } catch (e) {
@@ -936,6 +988,11 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           _v2rayService.saveConfigs(_configs).catchError((e) {
             debugPrint('?? Error saving configs: $e');
           });
+          
+          // ذخیره وضعیت اتصال به‌صورت جداگانه برای بازیابی سریع‌تر
+          _saveConnectionState(config).catchError((e) {
+            debugPrint('?? Error saving connection state: $e');
+          });
 
           _v2rayService.resetUsageStats().catchError((e) {
             debugPrint('?? Error resetting stats: $e');
@@ -1077,6 +1134,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       
       // Clear the grace period timer
       _lastSuccessfulConnection = null;
+      
+      // پاک کردن وضعیت اتصال ذخیره شده
+      await _clearConnectionState();
       
       // Update config status
       for (int i = 0; i < _configs.length; i++) {
@@ -1339,6 +1399,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         _configs = savedConfigs;
         debugPrint('?? Loaded ${_configs.length} saved configs');
         
+        // بازیابی وضعیت اتصال ذخیره شده
+        await _restoreConnectionState();
+        
         // Try to load saved selected server first
         final prefs = await SharedPreferences.getInstance();
         final savedServerId = prefs.getString('selected_server_id');
@@ -1462,18 +1525,34 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   /// This method directly queries the VPN service for actual status
   /// Use this after app resume or when you need to verify connection state
   Future<void> forceCheckVpnStatus() async {
+    // بهینه‌سازی: اگه کمتر از 3 ثانیه پیش چک شده، دوباره چک نکن
+    // این از چک‌های مکرر و بی‌مورد جلوگیری می‌کنه
+    if (_lastStatusCheck != null) {
+      final timeSinceLastCheck = DateTime.now().difference(_lastStatusCheck!);
+      if (timeSinceLastCheck.inSeconds < 3) {
+        debugPrint('⏭️ Skipping status check (checked ${timeSinceLastCheck.inSeconds}s ago)');
+        return;
+      }
+    }
+    
     try {
       debugPrint('?? Force checking VPN status from service...');
+      _lastStatusCheck = DateTime.now();
       
-      // Get actual connection status from service with timeout
-      final isActuallyConnected = await _v2rayService.isActuallyConnected()
+      // روش defyxVPN: اول از isTunnelRunning استفاده کن (سریع‌تر)
+      final isTunnelRunning = await _v2rayService.isTunnelRunning()
           .timeout(
-            const Duration(seconds: 5),
+            const Duration(seconds: 3),
             onTimeout: () {
-              debugPrint('?? VPN status check timeout, assuming last known state');
-              return _v2rayService.activeConfig != null;
+              debugPrint('?? Tunnel check timeout');
+              return false;
             },
           );
+      
+      debugPrint('?? Tunnel running: $isTunnelRunning');
+      
+      // اگه tunnel در حال اجراست، مطمئناً متصلیم
+      final isActuallyConnected = isTunnelRunning;
       
       debugPrint('?? VPN actually connected: $isActuallyConnected');
       debugPrint('?? Active config: ${_v2rayService.activeConfig?.remark ?? "none"}');
@@ -1600,6 +1679,127 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('? Error checking connection status: $e');
       // Don't change connection state on errors, but still notify UI
       notifyListeners();
+    }
+  }
+  
+  /// ذخیره وضعیت اتصال به‌صورت جداگانه - برای بازیابی سریع
+  Future<void> _saveConnectionState(V2RayConfig config) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // ذخیره اطلاعات اتصال فعلی
+      await prefs.setString('last_connected_server_id', config.id);
+      await prefs.setString('last_connected_server_name', config.remark);
+      await prefs.setString('last_connected_server_address', config.address);
+      await prefs.setInt('last_connected_server_port', config.port);
+      await prefs.setString('last_connection_time', DateTime.now().toIso8601String());
+      await prefs.setBool('is_vpn_connected', true);
+      
+      debugPrint('💾 Connection state saved: ${config.remark}');
+    } catch (e) {
+      debugPrint('❌ Error saving connection state: $e');
+    }
+  }
+  
+  /// بازیابی وضعیت اتصال از SharedPreferences
+  Future<void> _restoreConnectionState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      final isConnected = prefs.getBool('is_vpn_connected') ?? false;
+      
+      if (!isConnected) {
+        debugPrint('📂 No saved connection state found');
+        return;
+      }
+      
+      final serverId = prefs.getString('last_connected_server_id');
+      final serverName = prefs.getString('last_connected_server_name') ?? 'Unknown';
+      final lastConnectionTime = prefs.getString('last_connection_time');
+      
+      if (serverId == null) {
+        debugPrint('⚠️ Saved connection state incomplete');
+        return;
+      }
+      
+      debugPrint('📂 Found saved connection state:');
+      debugPrint('   Server: $serverName');
+      debugPrint('   ID: $serverId');
+      debugPrint('   Last connected: $lastConnectionTime');
+      
+      // پیدا کردن config مربوطه
+      final config = _configs.firstWhere(
+        (c) => c.id == serverId,
+        orElse: () => _configs.first,
+      );
+      
+      // علامت‌گذاری به‌عنوان متصل
+      for (var c in _configs) {
+        c.isConnected = (c.id == serverId);
+      }
+      
+      _selectedConfig = config;
+      
+      debugPrint('✅ Connection state restored: ${config.remark}');
+    } catch (e) {
+      debugPrint('❌ Error restoring connection state: $e');
+    }
+  }
+  
+  /// پاک کردن وضعیت اتصال ذخیره شده
+  Future<void> _clearConnectionState() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      await prefs.remove('last_connected_server_id');
+      await prefs.remove('last_connected_server_name');
+      await prefs.remove('last_connected_server_address');
+      await prefs.remove('last_connected_server_port');
+      await prefs.remove('last_connection_time');
+      await prefs.setBool('is_vpn_connected', false);
+      
+      debugPrint('🗑️ Connection state cleared');
+    } catch (e) {
+      debugPrint('❌ Error clearing connection state: $e');
+    }
+  }
+  
+  Future<void> checkAndAutoReconnect() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      final wasConnected = prefs.getBool('is_vpn_connected') ?? false;
+      
+      if (!wasConnected) {
+        return;
+      }
+      
+      final isCurrentlyConnected = await _v2rayService.isTunnelRunning()
+          .timeout(const Duration(seconds: 2));
+      
+      if (isCurrentlyConnected) {
+        debugPrint('✅ VPN still connected');
+        return;
+      }
+      
+      debugPrint('🔄 VPN was connected but now disconnected, auto-reconnecting...');
+      
+      final serverId = prefs.getString('last_connected_server_id');
+      if (serverId == null) {
+        return;
+      }
+      
+      final server = _configs.firstWhere(
+        (c) => c.id == serverId,
+        orElse: () => _configs.first,
+      );
+      
+      debugPrint('🔄 Reconnecting to: ${server.remark}');
+      
+      await connectToServer(server);
+      
+    } catch (e) {
+      debugPrint('❌ Auto-reconnect failed: $e');
     }
   }
   

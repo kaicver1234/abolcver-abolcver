@@ -2,9 +2,8 @@ import 'dart:async';
 import 'dart:math';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import '../models/speed_test_state.dart';
 
-/// Cloudflare Speed Test Service
-/// Time-based testing: 30s download + 30s upload + real ping
 class CloudflareSpeedTestService {
   final Dio _dio = Dio();
   bool _isCancelled = false;
@@ -466,31 +465,4 @@ class CloudflareSpeedTestService {
   }
 }
 
-/// Test phases
-enum TestPhase {
-  loading,   // Latency test
-  download,  // Download test
-  upload,    // Upload test
-}
 
-/// Speed test result
-class SpeedTestResult {
-  final double downloadSpeed; // Mbps (90th percentile)
-  final double uploadSpeed;   // Mbps (90th percentile)
-  final int ping;            // ms (average)
-  final int jitter;          // ms
-  
-  const SpeedTestResult({
-    this.downloadSpeed = 0.0,
-    this.uploadSpeed = 0.0,
-    this.ping = 0,
-    this.jitter = 0,
-  });
-  
-  @override
-  String toString() {
-    return 'SpeedTestResult(download: ${downloadSpeed.toStringAsFixed(2)} Mbps, '
-           'upload: ${uploadSpeed.toStringAsFixed(2)} Mbps, '
-           'ping: $ping ms, jitter: $jitter ms)';
-  }
-}

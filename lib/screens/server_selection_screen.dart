@@ -717,7 +717,11 @@ class _ServerSelectionScreenState
                               errorWidget: (context, url, error) => Center(
                                 child: Text(
                                   server.countryFlag,
-                                  style: const TextStyle(fontSize: 18),
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    height: 1.0,
+                                  ),
+                                  textAlign: TextAlign.center,
                                 ),
                               ),
                             ),

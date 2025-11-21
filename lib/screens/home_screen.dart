@@ -42,6 +42,16 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     );
     // Listen to app lifecycle to force rebuild when resumed
     WidgetsBinding.instance.addObserver(this);
+    
+    // چک کردن وضعیت اتصال فقط یک بار وقتی صفحه باز می‌شه
+    // این کار باتری رو خالی نمی‌کنه چون فقط یک بار اجرا می‌شه
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<V2RayProvider>(context, listen: false);
+      // فقط اگه برنامه initialize شده باشه
+      if (!provider.isInitializing) {
+        provider.forceCheckVpnStatus();
+      }
+    });
   }
   
   Future<void> _fetchCurrentIp() async {
@@ -75,6 +85,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     if (state == AppLifecycleState.resumed && mounted) {
       // Force rebuild UI when app comes back from background
       debugPrint('🏠 HomeScreen: App resumed, forcing UI rebuild...');
+      
+      // CRITICAL: Force check VPN status when app resumes
+      final provider = Provider.of<V2RayProvider>(context, listen: false);
+      provider.forceCheckVpnStatus();
       
       // Single rebuild is enough - Consumer2 will handle the rest
       if (mounted) {
@@ -1090,10 +1104,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                         borderRadius: BorderRadius.circular(8),
                         color: Colors.white.withValues(alpha: 0.1),
                       ),
-                      child: Center(
-                        child: Text(
-                          selectedConfig.countryFlag,
-                          style: const TextStyle(fontSize: 32),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Center(
+                          child: Text(
+                            selectedConfig.countryFlag,
+                            style: const TextStyle(
+                              fontSize: 32,
+                              height: 1.0,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
                         ),
                       ),
                     ),

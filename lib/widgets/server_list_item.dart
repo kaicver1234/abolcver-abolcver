@@ -86,20 +86,24 @@ class _ServerListItemState extends State<ServerListItem> {
                               ),
                             ],
                           ),
-                          child: widget.config.isSmartConnect
-                              ? ClipRRect(
-                                  borderRadius: BorderRadius.circular(6),
-                                  child: Image.asset(
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(6),
+                            child: widget.config.isSmartConnect
+                                ? Image.asset(
                                     'assets/images/apk.png',
                                     fit: BoxFit.cover,
+                                  )
+                                : Center(
+                                    child: Text(
+                                      widget.config.countryFlag,
+                                      style: const TextStyle(
+                                        fontSize: 28,
+                                        height: 1.0,
+                                      ),
+                                      textAlign: TextAlign.center,
+                                    ),
                                   ),
-                                )
-                              : Center(
-                                  child: Text(
-                                    widget.config.countryFlag,
-                                    style: const TextStyle(fontSize: 28),
-                                  ),
-                                ),
+                          ),
                         ),
                         const SizedBox(width: 12),
                         Expanded(
