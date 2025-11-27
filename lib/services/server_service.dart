@@ -31,10 +31,10 @@ class ServerService {
             String? countryCode;
             String configLine = line;
             
-            // Try to extract country code from beginning: [CC] config
-            final countryCodeMatch = RegExp(r'^\[([A-Z]{2})\]\s*(.+)').firstMatch(line);
+            // Try to extract country code from beginning: [CC] config (case insensitive)
+            final countryCodeMatch = RegExp(r'^\[([A-Za-z]{2})\]\s*(.+)').firstMatch(line);
             if (countryCodeMatch != null) {
-              countryCode = countryCodeMatch.group(1);
+              countryCode = countryCodeMatch.group(1)!.toUpperCase();
               configLine = countryCodeMatch.group(2)!;
             }
             
@@ -111,10 +111,10 @@ class ServerService {
             configType = 'trojan';
           }
 
-          // If no country code from line, try to extract from remark
+          // If no country code from line prefix, try to extract from remark
           if (countryCode == null && parser.remark.isNotEmpty) {
             // Try patterns: [CC], (CC), CC-, -CC-, CC|, |CC|
-            final remarkMatch = RegExp(r'[\[\(]([A-Z]{2})[\]\)]|^([A-Z]{2})[-\s]|[-\s]([A-Z]{2})[-\s]|[\|\s]([A-Z]{2})[\|\s]').firstMatch(parser.remark);
+            final remarkMatch = RegExp(r'[\[\(]([A-Z]{2})[\]\)]|^([A-Z]{2})[-\s]|[-\s]([A-Z]{2})[-\s]|[\|\s]([A-Z]{2})[\|\s]').firstMatch(parser.remark.toUpperCase());
             if (remarkMatch != null) {
               countryCode = remarkMatch.group(1) ?? remarkMatch.group(2) ?? remarkMatch.group(3) ?? remarkMatch.group(4);
             }
@@ -123,10 +123,16 @@ class ServerService {
           // Use the parsed address and port from the V2RayURL parser
           String address = parser.address;
           int port = parser.port;
+          
+          // Build remark with country code prefix if available
+          String finalRemark = parser.remark;
+          if (countryCode != null && !finalRemark.toUpperCase().contains('[$countryCode]')) {
+            finalRemark = '[$countryCode] $finalRemark';
+          }
 
           return V2RayConfig(
             id: '${DateTime.now().millisecondsSinceEpoch}_${address}_$port',
-            remark: parser.remark,
+            remark: finalRemark,
             countryCode: countryCode,
             address: address,
             port: port,

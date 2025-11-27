@@ -1,13 +1,6 @@
 enum SpeedTestStep {
   ready,
   loading,
-  testing,
-  completed,
-  error,
-}
-
-enum TestPhase {
-  loading,
   download,
   upload,
 }
@@ -16,30 +9,34 @@ class SpeedTestResult {
   final double downloadSpeed;
   final double uploadSpeed;
   final int ping;
+  final int latency;
+  final double packetLoss;
   final int jitter;
-  final bool isConnectionStable;
 
   const SpeedTestResult({
     this.downloadSpeed = 0.0,
     this.uploadSpeed = 0.0,
     this.ping = 0,
+    this.latency = 0,
+    this.packetLoss = 0.0,
     this.jitter = 0,
-    this.isConnectionStable = true,
   });
 
   SpeedTestResult copyWith({
     double? downloadSpeed,
     double? uploadSpeed,
     int? ping,
+    int? latency,
+    double? packetLoss,
     int? jitter,
-    bool? isConnectionStable,
   }) {
     return SpeedTestResult(
       downloadSpeed: downloadSpeed ?? this.downloadSpeed,
       uploadSpeed: uploadSpeed ?? this.uploadSpeed,
       ping: ping ?? this.ping,
+      latency: latency ?? this.latency,
+      packetLoss: packetLoss ?? this.packetLoss,
       jitter: jitter ?? this.jitter,
-      isConnectionStable: isConnectionStable ?? this.isConnectionStable,
     );
   }
 
@@ -53,45 +50,49 @@ class SpeedTestResult {
 
 class SpeedTestState {
   final SpeedTestStep step;
-  final TestPhase? currentPhase;
   final SpeedTestResult result;
   final double progress;
-  final double currentSpeed;
   final bool isConnectionStable;
   final String? errorMessage;
+  final String currentPhase;
+  final double currentSpeed;
   final bool hadError;
+  final bool testCompleted;
 
   const SpeedTestState({
     this.step = SpeedTestStep.ready,
-    this.currentPhase,
     this.result = const SpeedTestResult(),
     this.progress = 0.0,
-    this.currentSpeed = 0.0,
     this.isConnectionStable = true,
     this.errorMessage,
+    this.currentPhase = '',
+    this.currentSpeed = 0.0,
     this.hadError = false,
+    this.testCompleted = false,
   });
 
   SpeedTestState copyWith({
     SpeedTestStep? step,
-    TestPhase? currentPhase,
     SpeedTestResult? result,
     double? progress,
-    double? currentSpeed,
     bool? isConnectionStable,
     String? errorMessage,
-    bool clearError = false,
+    bool clearErrorMessage = false,
+    String? currentPhase,
+    double? currentSpeed,
     bool? hadError,
+    bool? testCompleted,
   }) {
     return SpeedTestState(
       step: step ?? this.step,
-      currentPhase: currentPhase ?? this.currentPhase,
       result: result ?? this.result,
       progress: progress ?? this.progress,
-      currentSpeed: currentSpeed ?? this.currentSpeed,
       isConnectionStable: isConnectionStable ?? this.isConnectionStable,
-      errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      errorMessage: clearErrorMessage ? null : (errorMessage ?? this.errorMessage),
+      currentPhase: currentPhase ?? this.currentPhase,
+      currentSpeed: currentSpeed ?? this.currentSpeed,
       hadError: hadError ?? this.hadError,
+      testCompleted: testCompleted ?? this.testCompleted,
     );
   }
 }

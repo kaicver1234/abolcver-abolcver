@@ -197,12 +197,20 @@ class AboutScreen extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.code,
-                color: Colors.white.withValues(alpha: 0.5),
-                size: 18,
+              Text(
+                AppLocalizations.of(context).translate('about.developed_with'),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 14,
+                ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 6),
+              const Icon(
+                Icons.favorite,
+                color: Colors.red,
+                size: 16,
+              ),
+              const SizedBox(width: 6),
               Text(
                 AppLocalizations.of(context).translate('about.developer'),
                 style: const TextStyle(
@@ -277,7 +285,7 @@ class AboutScreen extends StatelessWidget {
         // Instagram - Tiksar
         _buildSocialItem(
           context: context,
-          icon: Icons.location_on_outlined,
+          icon: Icons.camera_alt_outlined,
           title: AppLocalizations.of(context).translate('about.tiksar_village_page'),
           subtitle: '@tiksaar_leyl_gilan',
           color: const Color(0xFF833AB4),
@@ -356,41 +364,12 @@ class AboutScreen extends StatelessWidget {
   }
 
   Widget _buildFooter(BuildContext context) {
-    return Column(
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(
-              '${AppLocalizations.of(context).translate('about.developed_with')} ',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
-                fontSize: 12,
-              ),
-            ),
-            const Icon(
-              Icons.favorite,
-              color: Colors.red,
-              size: 14,
-            ),
-            Text(
-              ' ${AppLocalizations.of(context).translate('about.developer')}',
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.4),
-                fontSize: 12,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          AppLocalizations.of(context).translate('about.copyright'),
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.3),
-            fontSize: 11,
-          ),
-        ),
-      ],
+    return Text(
+      AppLocalizations.of(context).translate('about.copyright'),
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.3),
+        fontSize: 11,
+      ),
     );
   }
 }

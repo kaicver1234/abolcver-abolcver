@@ -8,6 +8,7 @@ import 'providers/speed_test_provider.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/privacy_welcome_screen.dart';
 import 'screens/language_selection_screen.dart';
+import 'screens/splash_loading_screen.dart';
 import 'screens/update_check_wrapper.dart';
 import 'services/notification_service.dart';
 import 'package:firebase_core/firebase_core.dart';
@@ -106,20 +107,24 @@ class MyApp extends StatelessWidget {
         builder: (context, langProvider, child) {
           debugPrint('🌍 Language: ${langProvider.currentLanguage.code}');
           
-          Widget homeScreen;
+          // Determine the target screen after splash
+          Widget targetScreen;
           
           if (!languageSelected) {
             debugPrint('🌐 → LanguageSelectionScreen');
-            homeScreen = const LanguageSelectionScreen();
+            targetScreen = const LanguageSelectionScreen();
           } else if (!privacyAccepted) {
             debugPrint('🔒 → PrivacyWelcomeScreen');
-            homeScreen = const PrivacyWelcomeScreen();
+            targetScreen = const PrivacyWelcomeScreen();
           } else {
             debugPrint('🏠 → MainNavigationScreen');
-            homeScreen = const MainNavigationScreen();
+            targetScreen = const MainNavigationScreen();
           }
           
-          debugPrint('✅ Building MaterialApp with ${homeScreen.runtimeType}');
+          // Wrap with splash screen
+          final homeScreen = SplashLoadingScreen(nextScreen: targetScreen);
+          
+          debugPrint('✅ Building MaterialApp with Splash → ${targetScreen.runtimeType}');
           
           return MaterialApp(
             title: 'Tiksar VPN',

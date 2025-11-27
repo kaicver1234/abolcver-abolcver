@@ -8,6 +8,7 @@ import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
 import '../widgets/vpn_gradient_background.dart';
 import '../models/app_language.dart';
+import '../models/v2ray_config.dart';
 import '../utils/app_localizations.dart';
 import '../utils/app_colors.dart';
 import '../screens/ip_info_screen.dart';
@@ -114,33 +115,48 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
            _showSnackBar(AppLocalizations.of(context).translate('home.disconnected'), Colors.grey);
         }
       } else {
-        // Connect (Smart Connect)
-        debugPrint('🧠 Auto Smart Connect: Finding best server...');
+        // Connect based on selected config
+        final selectedConfig = provider.selectedConfig;
+        bool success = false;
         
-        // Show finding server state
-        setState(() {
-          _isConnecting = true;
-          _isFindingServer = true;
-        });
-        
-        final success = await provider.smartConnect();
-        
-        // Hide finding server state
-        if (mounted) {
+        // Check if Smart Connect is selected or no specific server selected
+        if (selectedConfig == null || selectedConfig.isSmartConnect) {
+          // Smart Connect - find best server
+          debugPrint('🧠 Smart Connect: Finding best server...');
+          
           setState(() {
+            _isConnecting = true;
+            _isFindingServer = true;
+          });
+          
+          success = await provider.smartConnect();
+          
+          if (mounted) {
+            setState(() {
+              _isFindingServer = false;
+            });
+          }
+        } else {
+          // Direct connect to selected server
+          debugPrint('🔌 Direct Connect to: ${selectedConfig.remark}');
+          
+          setState(() {
+            _isConnecting = true;
             _isFindingServer = false;
           });
+          
+          success = await provider.connectToServer(selectedConfig);
         }
         
         if (mounted) {
           if (success && provider.activeConfig != null) {
-            final serverName = provider.activeConfig!.isSmartConnect 
-                ? AppLocalizations.of(context).translate('server_selection.smart_connect')
+            final serverName = provider.wasUsingSmartConnect 
+                ? '${AppLocalizations.of(context).translate('server_selection.smart_connect')} (${provider.activeConfig!.remark})'
                 : provider.activeConfig!.remark;
-            debugPrint('✅ Smart Connect successful to: ${provider.activeConfig!.remark}');
+            debugPrint('✅ Connection successful to: ${provider.activeConfig!.remark}');
             _showSnackBar('${AppLocalizations.of(context).translate('home.connected_to')}: $serverName', Colors.green);
           } else if (provider.errorMessage.isNotEmpty) {
-            debugPrint('❌ Smart Connect failed: ${provider.errorMessage}');
+            debugPrint('❌ Connection failed: ${provider.errorMessage}');
             _showSnackBar(provider.errorMessage, Colors.red);
           } else {
             _showSnackBar(AppLocalizations.of(context).translate('home.connection_failed'), Colors.red);
@@ -196,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         
         final languages = [
           {'name': 'English', 'code': 'en', 'flag': '🇬🇧'},
-          {'name': 'فارسی', 'code': 'fa', 'flag': '🇮🇷'},
+          {'name': 'فارسی', 'code': 'fa', 'flag': '🦁'},
         ];
         
         return AlertDialog(
@@ -811,10 +827,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             
             // Search Animation Rings when finding server
             if (_isFindingServer)
-              ...List.generate(3, (index) {
+              ...List.generate(2, (index) {
                 return _SearchRing(
-                  delay: index * 0.3,
-                  size: 180.0,
+                  delay: index * 0.4,
+                  size: 170.0,
                 );
               }),
             
@@ -836,14 +852,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                           ]
                         : _isFindingServer
                             ? [
-                                AppColors.bottomGradientConnecting.withValues(alpha: 0.9),
-                                AppColors.middleGradientConnecting,
-                                AppColors.topGradientConnecting,
+                                const Color(0xFF6366F1).withValues(alpha: 0.9),
+                                const Color(0xFF8B5CF6),
+                                const Color(0xFF7C3AED),
                               ]
                             : [
-                                AppColors.topGradientReadyToConnect,
-                                AppColors.middleGradient,
-                                AppColors.bottomGradient,
+                                const Color(0xFF6366F1).withValues(alpha: 0.9),
+                                const Color(0xFF4F46E5),
+                                const Color(0xFF4338CA),
                               ],
                     stops: const [0.0, 0.6, 1.0],
                   ),
@@ -852,10 +868,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       color: isConnected
                           ? AppColors.bottomGradientConnected.withValues(alpha: 0.5)
                           : _isFindingServer
-                              ? AppColors.bottomGradientConnecting.withValues(alpha: 0.5)
-                              : Colors.black.withValues(alpha: 0.4),
-                      blurRadius: isConnected || _isFindingServer ? 40 : 20,
-                      spreadRadius: isConnected || _isFindingServer ? 5 : 0,
+                              ? const Color(0xFF8B5CF6).withValues(alpha: 0.5)
+                              : const Color(0xFF6366F1).withValues(alpha: 0.4),
+                      blurRadius: isConnected || _isFindingServer ? 40 : 25,
+                      spreadRadius: isConnected || _isFindingServer ? 5 : 2,
                     ),
                   ],
                 ),
@@ -902,11 +918,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                     );
                   },
                   child: _isFindingServer
-                      ? const Icon(
+                      ? const SizedBox(
                           key: ValueKey('searching'),
-                          Icons.search,
-                          size: 50,
-                          color: Colors.white,
+                          width: 45,
+                          height: 45,
+                          child: CircularProgressIndicator(
+                            color: Colors.white,
+                            strokeWidth: 3,
+                          ),
                         )
                       : _isConnecting
                           ? const SizedBox(
@@ -943,7 +962,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   AppLocalizations.of(context).translate('server_selection.finding_best_server'),
                   key: const ValueKey('finding'),
                   style: const TextStyle(
-                    color: AppColors.bottomGradientConnecting,
+                    color: Color(0xFF8B5CF6),
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
@@ -984,38 +1003,72 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   Widget _buildAutoServerInfo(V2RayProvider provider) {
     final activeConfig = provider.activeConfig;
-    final isSmartConnect = provider.wasUsingSmartConnect || (activeConfig?.isSmartConnect ?? false);
+    final selectedConfig = provider.selectedConfig;
+    final isConnected = activeConfig != null;
     
-    // Determine the display name
-    String serverName;
-    if (activeConfig == null) {
-      serverName = AppLocalizations.of(context).translate('home.best_server_auto');
-    } else if (isSmartConnect) {
-      serverName = '${AppLocalizations.of(context).translate('home.connected_to')}: ${AppLocalizations.of(context).translate('server_selection.smart_connect')}';
-    } else {
-      serverName = '${AppLocalizations.of(context).translate('home.connected_to')}: ${activeConfig.remark}';
-    }
-
-    // Determine the icon/flag
+    // Determine what to show based on connection state and selection
+    String titleText;
+    String subtitleText;
     Widget iconWidget;
-    if (activeConfig != null && activeConfig.countryFlagUrl.isNotEmpty) {
-      iconWidget = ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: CachedNetworkImage(
-          imageUrl: activeConfig.countryFlagUrl,
-          width: 32,
-          height: 24,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => const Icon(Icons.flag, color: Colors.white, size: 24),
-          errorWidget: (context, url, error) => const Icon(Icons.public, color: Colors.white, size: 24),
-        ),
-      );
+    
+    if (isConnected) {
+      // Connected - show what we're connected to
+      if (provider.wasUsingSmartConnect) {
+        titleText = AppLocalizations.of(context).translate('server_selection.smart_connect');
+        subtitleText = '${AppLocalizations.of(context).translate('home.connected_to')}: ${activeConfig.remark}';
+      } else {
+        titleText = activeConfig.remark;
+        subtitleText = AppLocalizations.of(context).translate('home.connected');
+      }
+      
+      // Show flag - try countryCode first, then extract from remark
+      final flagUrl = _getCountryFlagUrl(activeConfig);
+      if (flagUrl != null) {
+        iconWidget = ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: CachedNetworkImage(
+            imageUrl: flagUrl,
+            width: 32,
+            height: 24,
+            fit: BoxFit.cover,
+            placeholder: (context, url) => const Icon(Icons.flag, color: Colors.white, size: 24),
+            errorWidget: (context, url, error) => const Icon(Icons.public, color: Colors.white, size: 24),
+          ),
+        );
+      } else {
+        iconWidget = const Icon(Icons.auto_awesome, color: Colors.white, size: 28);
+      }
     } else {
-      iconWidget = const Icon(
-        Icons.auto_awesome,
-        color: Colors.white,
-        size: 28,
-      );
+      // Not connected - show selected server
+      if (selectedConfig != null && selectedConfig.isSmartConnect) {
+        titleText = AppLocalizations.of(context).translate('server_selection.smart_connect');
+        subtitleText = AppLocalizations.of(context).translate('server_selection.smart_connect_description');
+        iconWidget = const Icon(Icons.auto_awesome, color: Colors.white, size: 28);
+      } else if (selectedConfig != null) {
+        titleText = selectedConfig.remark;
+        subtitleText = AppLocalizations.of(context).translate('home.tap_to_connect');
+        final flagUrl = _getCountryFlagUrl(selectedConfig);
+        if (flagUrl != null) {
+          iconWidget = ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: CachedNetworkImage(
+              imageUrl: flagUrl,
+              width: 32,
+              height: 24,
+              fit: BoxFit.cover,
+              placeholder: (context, url) => const Icon(Icons.flag, color: Colors.white, size: 24),
+              errorWidget: (context, url, error) => const Icon(Icons.public, color: Colors.white, size: 24),
+            ),
+          );
+        } else {
+          iconWidget = const Icon(Icons.public, color: Colors.white, size: 28);
+        }
+      } else {
+        // Default to Smart Connect
+        titleText = AppLocalizations.of(context).translate('server_selection.smart_connect');
+        subtitleText = AppLocalizations.of(context).translate('server_selection.smart_connect_description');
+        iconWidget = const Icon(Icons.auto_awesome, color: Colors.white, size: 28);
+      }
     }
     
     return GestureDetector(
@@ -1057,9 +1110,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    isSmartConnect 
-                        ? AppLocalizations.of(context).translate('server_selection.smart_connect')
-                        : AppLocalizations.of(context).translate('home.auto_server_selection'),
+                    titleText,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 16,
@@ -1068,7 +1119,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    serverName,
+                    subtitleText,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.7),
                       fontSize: 13,
@@ -1142,7 +1193,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   Expanded(
                     child: _buildStatItem(
                       icon: Icons.timer,
-                      label: 'Duration',
+                      label: AppLocalizations.of(context).translate('home.duration'),
                       value: v2rayService.getFormattedConnectedTime(),
                       color: Colors.white,
                     ),
@@ -1151,7 +1202,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   Expanded(
                     child: _buildStatItem(
                       icon: Icons.upload,
-                      label: 'Upload',
+                      label: AppLocalizations.of(context).translate('home.upload'),
                       value: v2rayService.getFormattedUpload(),
                       color: Colors.white,
                     ),
@@ -1164,7 +1215,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   Expanded(
                     child: _buildStatItem(
                       icon: Icons.download,
-                      label: 'Download',
+                      label: AppLocalizations.of(context).translate('home.download'),
                       value: v2rayService.getFormattedDownload(),
                       color: Colors.white,
                     ),
@@ -1173,7 +1224,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   Expanded(
                     child: _buildStatItem(
                       icon: Icons.public,
-                      label: 'IP Address',
+                      label: AppLocalizations.of(context).translate('home.ip_address'),
                       value: _currentIp,
                       color: Colors.white,
                     ),
@@ -1236,6 +1287,22 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     );
   }
 
+  // Helper to get country flag URL from config
+  String? _getCountryFlagUrl(V2RayConfig config) {
+    // First try countryCode from config
+    if (config.countryCode != null && config.countryCode!.length == 2) {
+      return 'https://flagcdn.com/w80/${config.countryCode!.toLowerCase()}.png';
+    }
+    
+    // Try to extract from remark: [CC] or (CC) format
+    final remarkMatch = RegExp(r'[\[\(]([A-Za-z]{2})[\]\)]').firstMatch(config.remark);
+    if (remarkMatch != null) {
+      final code = remarkMatch.group(1)!.toLowerCase();
+      return 'https://flagcdn.com/w80/$code.png';
+    }
+    
+    return null;
+  }
 }
 
 // Pulse Ring Animation Widget (for connected state)
@@ -1339,15 +1406,15 @@ class _SearchRingState extends State<_SearchRing>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 1500),
       vsync: this,
     );
 
-    _scaleAnimation = Tween<double>(begin: 0.7, end: 1.3).animate(
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.4).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
 
-    _opacityAnimation = Tween<double>(begin: 0.8, end: 0.0).animate(
+    _opacityAnimation = Tween<double>(begin: 0.6, end: 0.0).animate(
       CurvedAnimation(parent: _controller, curve: Curves.easeOut),
     );
 
@@ -1380,7 +1447,7 @@ class _SearchRingState extends State<_SearchRing>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: AppColors.bottomGradientConnecting,
+                  color: const Color(0xFF8B5CF6),
                   width: 2,
                 ),
               ),

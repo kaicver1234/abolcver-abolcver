@@ -12,17 +12,98 @@ class ServerSelectionScreen extends StatefulWidget {
   State<ServerSelectionScreen> createState() => _ServerSelectionScreenState();
 }
 
-class _ServerSelectionScreenState extends State<ServerSelectionScreen> {
+class _ServerSelectionScreenState extends State<ServerSelectionScreen>
+    with SingleTickerProviderStateMixin {
   bool _isTesting = false;
+  bool _isRefreshing = false;
   Map<String, int> _pingResults = {};
-  List<V2RayConfig>? _sortedConfigs; // For sorted server list
+  List<V2RayConfig>? _sortedConfigs;
+  late AnimationController _refreshAnimController;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+  }
 
   @override
   void dispose() {
-    // Clean up to prevent memory leaks
+    _refreshAnimController.dispose();
     _sortedConfigs = null;
     _pingResults.clear();
     super.dispose();
+  }
+  
+  Future<void> _refreshServers() async {
+    if (_isRefreshing || !mounted) return;
+    
+    setState(() => _isRefreshing = true);
+    _refreshAnimController.repeat();
+    
+    try {
+      final provider = Provider.of<V2RayProvider>(context, listen: false);
+      await provider.fetchServers(
+        customUrl: 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt',
+      );
+      
+      if (mounted) {
+        setState(() {
+          _sortedConfigs = null;
+          _pingResults.clear();
+        });
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Text(
+                  AppLocalizations.of(context).translate('server_selection.servers_updated'),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF10B981),
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error refreshing servers: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.error_outline, color: Colors.white, size: 20),
+                const SizedBox(width: 12),
+                Text(
+                  AppLocalizations.of(context).translate('server_selection.error_updating'),
+                ),
+              ],
+            ),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        _refreshAnimController.stop();
+        _refreshAnimController.reset();
+        setState(() => _isRefreshing = false);
+      }
+    }
   }
 
   @override
@@ -50,6 +131,11 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen> {
               Expanded(
                 child: Consumer<V2RayProvider>(
                   builder: (context, provider, child) {
+                    // Show loading state
+                    if (provider.isLoadingServers) {
+                      return _buildLoadingState();
+                    }
+                    
                     // Use sorted configs if available, otherwise use original
                     final configs = _sortedConfigs ?? provider.configs;
                     
@@ -114,9 +200,46 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen> {
             ),
           ),
           
+          // Refresh button
+          _buildRefreshButton(),
+          const SizedBox(width: 8),
           // Ping test button
           _buildPingTestButton(context),
         ],
+      ),
+    );
+  }
+  
+  Widget _buildRefreshButton() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: _isRefreshing
+            ? LinearGradient(
+                colors: [
+                  const Color(0xFF10B981).withValues(alpha: 0.3),
+                  const Color(0xFF059669).withValues(alpha: 0.2),
+                ],
+              )
+            : null,
+        color: _isRefreshing ? null : Colors.white.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _isRefreshing
+              ? const Color(0xFF10B981).withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.2),
+        ),
+      ),
+      child: IconButton(
+        icon: RotationTransition(
+          turns: _refreshAnimController,
+          child: Icon(
+            Icons.refresh,
+            color: _isRefreshing ? const Color(0xFF10B981) : Colors.white,
+            size: 20,
+          ),
+        ),
+        onPressed: _isRefreshing ? null : _refreshServers,
+        tooltip: 'Refresh servers',
       ),
     );
   }
@@ -327,7 +450,8 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen> {
   }
 
   Widget _buildServerCard(BuildContext context, V2RayProvider provider, V2RayConfig config, bool isSelected) {
-    final countryCode = _extractCountryCode(config.remark);
+    // Use countryCode from config first, fallback to extracting from remark
+    final countryCode = config.countryCode ?? _extractCountryCode(config.remark);
     final ping = _pingResults[config.id];
     
     return Container(
@@ -509,6 +633,27 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen> {
     );
   }
 
+  Widget _buildLoadingState() {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircularProgressIndicator(
+            color: Color(0xFF10B981),
+          ),
+          SizedBox(height: 16),
+          Text(
+            'Loading servers...',
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildEmptyState(BuildContext context) {
     return Center(
       child: Column(
@@ -532,6 +677,20 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen> {
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.7),
               fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Refresh button in empty state
+          ElevatedButton.icon(
+            onPressed: _isRefreshing ? null : _refreshServers,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Refresh'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF10B981),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
           ),
         ],

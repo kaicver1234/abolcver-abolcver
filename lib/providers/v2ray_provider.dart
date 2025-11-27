@@ -1071,72 +1071,23 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('? Stack trace: ${StackTrace.current}');
       _setError('Unexpected error connecting to ${config.remark}: $e');
     } finally {
-      debugPrint('?? Entering finally block...');
-      debugPrint('?? Success: $success');
-      debugPrint('?? _isConnecting: $_isConnecting');
-      
+      debugPrint('🏁 Connection process finished - Success: $success');
       _isConnecting = false;
       
-      // CRITICAL SAFETY CHECK: Verify connection state integrity
+      // Simple state verification - only if success
       if (success && _v2rayService.activeConfig != null) {
-        debugPrint('?? Final state verification...');
-        
-        // Find the config that should be connected
-        V2RayConfig? connectedConfig;
-        try {
-          connectedConfig = _configs.firstWhere(
-            (c) => c.id == config.id,
-            orElse: () {
-              debugPrint('?? Config not found in list, using provided config');
-              return config;
-            },
-          );
-        } catch (e) {
-          debugPrint('? Error finding config: $e');
-          connectedConfig = config;
-        }
-        
-        // Verify and restore if needed
-        if (!connectedConfig.isConnected) {
-          debugPrint('?? CRITICAL: Connected state was corrupted! Restoring...');
-          debugPrint('   Config: ${connectedConfig.remark}');
-          debugPrint('   Should be connected: true');
-          debugPrint('   Current state: ${connectedConfig.isConnected}');
-          
-          // Restore the correct state
-          connectedConfig.isConnected = true;
-          for (var c in _configs) {
-            if (c.id != config.id && c.isConnected) {
-              debugPrint('   Disconnecting: ${c.remark}');
-              c.isConnected = false;
-            }
+        // Ensure the connected config is marked correctly
+        for (var c in _configs) {
+          if (c.id == config.id) {
+            c.isConnected = true;
+          } else if (c.isConnected) {
+            c.isConnected = false;
           }
-          
-          debugPrint('? State restored successfully');
-        } else {
-          debugPrint('? State integrity verified - all good!');
         }
-        
-        // Final verification
-        final activeRemark = _v2rayService.activeConfig?.remark ?? 'Unknown';
-        final connectedCount = _configs.where((c) => c.isConnected).length;
-        debugPrint('?? Final state summary:');
-        debugPrint('   Active config: $activeRemark');
-        debugPrint('   Connected configs count: $connectedCount');
-        debugPrint('   Selected config: ${_selectedConfig?.remark ?? 'None'}');
-        
-        if (connectedCount != 1) {
-          debugPrint('?? WARNING: Expected 1 connected config, got $connectedCount');
-        }
-      } else if (success && _v2rayService.activeConfig == null) {
-        debugPrint('?? WARNING: Success but no activeConfig!');
-        debugPrint('   This indicates a serious problem');
       }
       
-      // Always notify UI at the end to ensure latest state
+      // Single notify at the end
       notifyListeners();
-      debugPrint('?? Connection process completed - UI notified');
-      debugPrint('????????????????????????????????????????');
     }
     
     return success;
@@ -1364,20 +1315,24 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   // Removed pingServer and pingAllServers methods as requested
 
   Future<void> selectConfig(V2RayConfig config) async {
+    debugPrint('🔧 selectConfig called for: ${config.remark}');
+    debugPrint('   isSmartConnect: ${config.isSmartConnect}');
+    debugPrint('   config.id: ${config.id}');
+    
     _selectedConfig = config;
     
     // Track if user selected Smart Connect or a manual server
     if (config.isSmartConnect) {
       _wasUsingSmartConnect = true;
-      debugPrint('? User selected Smart Connect');
+      debugPrint('✅ User selected Smart Connect');
     } else {
       _wasUsingSmartConnect = false;
-      debugPrint('? User selected manual server: ${config.remark}');
+      debugPrint('✅ User selected manual server: ${config.remark}');
     }
     
     // IMPORTANT: Save selected server to persist across app restarts
     await _saveSelectedServer(config);
-    debugPrint('? Selected and saved server: ${config.remark}');
+    debugPrint('💾 Selected and saved server: ${config.remark}');
     
     // Log server selection analytics
     try {
@@ -1390,6 +1345,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     }
     
     notifyListeners();
+    debugPrint('📢 notifyListeners called after selectConfig');
   }
   
   // Save selected server to SharedPreferences
