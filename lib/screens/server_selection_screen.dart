@@ -203,7 +203,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
               children: [
                 _buildRefreshButton(),
                 const SizedBox(width: 10),
-                Expanded(child: _buildPingTestButtonSmall(context)),
+                _buildPingTestButtonSmall(context),
               ],
             ),
           ],

@@ -149,10 +149,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         
         if (mounted) {
           if (success && provider.activeConfig != null) {
+            final cleanName = _cleanServerName(provider.activeConfig!.remark);
             final serverName = provider.wasUsingSmartConnect 
-                ? '${AppLocalizations.of(context).translate('server_selection.smart_connect')} (${provider.activeConfig!.remark})'
-                : provider.activeConfig!.remark;
-            debugPrint('✅ Connection successful to: ${provider.activeConfig!.remark}');
+                ? '${AppLocalizations.of(context).translate('server_selection.smart_connect')} ($cleanName)'
+                : cleanName;
+            debugPrint('✅ Connection successful to: $cleanName');
             _showSnackBar('${AppLocalizations.of(context).translate('home.connected_to')}: $serverName', Colors.green);
           } else if (provider.errorMessage.isNotEmpty) {
             debugPrint('❌ Connection failed: ${provider.errorMessage}');
@@ -813,8 +814,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         Stack(
           alignment: Alignment.center,
           children: [
-            // Pulse Animation Rings when connected
-            if (isConnected)
+            // Pulse Animation Rings when connected (disabled during connecting to prevent freeze)
+            if (isConnected && !_isConnecting)
               ...List.generate(2, (index) {
                 return _PulseRing(
                   delay: index * 0.5,
@@ -823,7 +824,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               }),
             
             // Search Animation Rings when finding server
-            if (_isFindingServer)
+            if (_isFindingServer && !_isConnecting)
               ...List.generate(2, (index) {
                 return _SearchRing(
                   delay: index * 0.4,
@@ -875,8 +876,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
-                    // Animated Border Gradient
-                    if (isConnected)
+                    // Animated Border Gradient (disabled during connecting)
+                    if (isConnected && !_isConnecting)
                       TweenAnimationBuilder<double>(
                         tween: Tween<double>(begin: 0, end: 1),
                         duration: const Duration(seconds: 2),

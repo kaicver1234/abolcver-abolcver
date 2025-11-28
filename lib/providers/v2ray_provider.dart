@@ -289,31 +289,44 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
     
     try {
-      debugPrint('?? Starting app initialization...');
+      debugPrint('🚀 Starting app initialization...');
       
       // STEP 1: INSTANT UI - Load saved state and show immediately (0-50ms)
-      await _loadSavedStateAndShowUI();
-      debugPrint('? Saved state loaded and UI displayed');
+      await _loadSavedStateAndShowUI().timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint('⏱️ Load saved state timeout, continuing...');
+        },
+      );
+      debugPrint('✅ Saved state loaded and UI displayed');
       
-      // STEP 2: QUICK SYNC - Check VPN status IMMEDIATELY (50-200ms)
-      // This is the most critical step for showing connection state
-      final quickSyncFuture = _enhancedSyncWithVpnServiceState();
-      
-      // STEP 3: Initialize service in parallel
-      final serviceInitFuture = _v2rayService.initialize();
-      
-      // Wait for both quick sync and service init
-      await Future.wait([quickSyncFuture, serviceInitFuture]);
-      debugPrint('? Quick sync and service init complete');
-      
-      // STEP 2.5: RETRY SYNC - If VPN was connected but sync failed, retry after delay
-      // This handles cases where device was restarted and VPN needs time to restore
-      if (_configs.any((c) => c.isConnected) && _v2rayService.activeConfig == null) {
-        debugPrint('?? Config marked as connected but no activeConfig, retrying sync...');
-        await Future.delayed(const Duration(seconds: 2));
-        await _enhancedSyncWithVpnServiceState();
-        debugPrint('? Retry sync complete');
+      // STEP 2: QUICK SYNC - Check VPN status with timeout
+      try {
+        await _enhancedSyncWithVpnServiceState().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            debugPrint('⏱️ VPN sync timeout, continuing...');
+          },
+        );
+      } catch (e) {
+        debugPrint('⚠️ VPN sync error: $e');
       }
+      
+      // STEP 3: Initialize service with timeout
+      try {
+        await _v2rayService.initialize().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            debugPrint('⏱️ Service init timeout, continuing...');
+          },
+        );
+      } catch (e) {
+        debugPrint('⚠️ Service init error: $e');
+      }
+      debugPrint('✅ Quick sync and service init complete');
+      
+      // STEP 2.5: Skip retry sync if it might cause hang
+      // Only do quick check without blocking
 
       // Set up callback for notification disconnects
       _v2rayService.setDisconnectedCallback(() {
@@ -329,75 +342,70 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         debugPrint('? Configs already loaded: ${_configs.length} servers');
       }
 
-      // STEP 5: Fetch fresh servers from GitHub
-      // Strategy: ALWAYS fetch in background to keep servers updated
-      //           Show cached servers immediately if available
+      // STEP 5: Fetch fresh servers from GitHub with timeout
       if (_configs.isEmpty) {
-        debugPrint('?? No cached servers, fetching from GitHub (blocking)...');
+        debugPrint('📡 No cached servers, fetching from GitHub...');
         _isLoadingServers = true;
         notifyListeners();
         
-        await fetchServers(customUrl: 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt');
-        debugPrint('? Fresh servers fetched: ${_configs.length} servers');
+        try {
+          await fetchServers(customUrl: 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt')
+            .timeout(const Duration(seconds: 10));
+          debugPrint('✅ Fresh servers fetched: ${_configs.length} servers');
+        } catch (e) {
+          debugPrint('⚠️ Server fetch failed/timeout: $e');
+        }
         
         _isLoadingServers = false;
         notifyListeners();
       } else {
-        debugPrint('? Using cached servers (${_configs.length} servers)');
-        debugPrint('?? Updating servers from GitHub in background...');
+        debugPrint('✅ Using cached servers (${_configs.length} servers)');
         
-        // Fetch in background to update servers without blocking UI
+        // Fetch in background without blocking
         fetchServers(customUrl: 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt')
-          .then((_) {
-            debugPrint('? Background server update complete: ${_configs.length} servers');
-          })
-          .catchError((e) {
-            debugPrint('?? Background server update failed: $e');
-            // Keep using cached servers on error
-          });
+          .timeout(const Duration(seconds: 15))
+          .then((_) => debugPrint('✅ Background server update complete'))
+          .catchError((e) => debugPrint('⚠️ Background update failed: $e'));
       }
       
-      // STEP 6: Final sync to ensure everything is correct
-      await _enhancedSyncWithVpnServiceState();
+      // STEP 6: Skip final sync - already done above
       
       // STEP 7: Smart server selection logic
       if (_configs.isNotEmpty) {
         final hasConnectedConfig = _configs.any((c) => c.isConnected);
         
         if (hasConnectedConfig) {
-          // Priority 1: Keep connected server
           _selectedConfig = _configs.firstWhere((c) => c.isConnected);
-          debugPrint('? Keeping connected server: ${_selectedConfig?.remark}');
+          debugPrint('✅ Keeping connected server: ${_selectedConfig?.remark}');
         } else {
-          // Priority 2: Load previously selected server
-          final savedServer = await _loadSelectedServer();
-          if (savedServer != null) {
-            _selectedConfig = savedServer;
-            debugPrint('? Restored saved server: ${_selectedConfig?.remark}');
-          } else if (_selectedConfig == null) {
-            // Priority 3: Default to Smart Connect (first time only)
+          try {
+            final savedServer = await _loadSelectedServer().timeout(const Duration(seconds: 2));
+            if (savedServer != null) {
+              _selectedConfig = savedServer;
+              debugPrint('✅ Restored saved server: ${_selectedConfig?.remark}');
+            } else if (_selectedConfig == null) {
+              _selectedConfig = V2RayConfig.smartConnect();
+              debugPrint('✅ Auto-selected Smart Connect as default');
+            }
+          } catch (e) {
             _selectedConfig = V2RayConfig.smartConnect();
-            // Save Smart Connect as default
-            await _saveSelectedServer(_selectedConfig!);
-            debugPrint('? Auto-selected Smart Connect as default');
+            debugPrint('⚠️ Load saved server failed, using Smart Connect');
           }
         }
         notifyListeners();
       }
-
-      // STEP 8: چک کردن برای auto-reconnect
-      // اگه قبلاً متصل بودیم ولی الان نیستیم (مثلاً نت قطع شده بود)
-      // await checkAndAutoReconnect(); // Removed as logic is moved to sync state
       
-      debugPrint('? Initialization complete');
+      debugPrint('🏁 Initialization complete');
       notifyListeners();
     } catch (e) {
-      debugPrint('? Failed to initialize: $e');
+      debugPrint('❌ Failed to initialize: $e');
       _setError('Failed to initialize: $e');
     } finally {
+      // CRITICAL: Always finish initialization even on error
       _setLoading(false);
       _isInitializing = false;
       notifyListeners();
+      debugPrint('🏁 Initialization finally block executed');
     }
   }
   
@@ -410,20 +418,23 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     try {
       debugPrint('🔄 Starting VPN state synchronization...');
       
-      // CRITICAL: Ensure service is initialized before checking
-      await _v2rayService.initialize();
+      // CRITICAL: Ensure service is initialized with short timeout
+      try {
+        await _v2rayService.initialize().timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('⚠️ Service init timeout in sync: $e');
+      }
       
-      // Check if VPN is actually running using the improved method
-      // Use longer timeout for initial check (handles device restart scenarios)
-      final isActuallyConnected = await _v2rayService.isActuallyConnected()
-          .timeout(
-            const Duration(seconds: 10),
-            onTimeout: () {
-              debugPrint('⏱️ VPN status check timeout, checking saved state...');
-              // If timeout, check if we have a saved connected config or activeConfig
-              return _configs.any((c) => c.isConnected) || _v2rayService.activeConfig != null;
-            },
-          );
+      // Check if VPN is actually running with SHORT timeout to prevent hang
+      bool isActuallyConnected = false;
+      try {
+        isActuallyConnected = await _v2rayService.isActuallyConnected()
+            .timeout(const Duration(seconds: 3));
+      } catch (e) {
+        debugPrint('⏱️ VPN status check timeout/error: $e');
+        // Fallback to saved state
+        isActuallyConnected = _configs.any((c) => c.isConnected) || _v2rayService.activeConfig != null;
+      }
       debugPrint('🔎 VPN actually connected: $isActuallyConnected');
       
       // IMPORTANT: Don't reset states before checking!
@@ -877,240 +888,56 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   }
 
   Future<bool> connectToServer(V2RayConfig config) async {
-    debugPrint('?? Starting connection to: ${config.remark}');
+    debugPrint('🔌 Connecting to: ${config.remark}');
     
-    // VALIDATION: Check if config is valid
     if (config.address.isEmpty || config.port <= 0) {
-      _setError('Invalid server configuration: ${config.remark}');
+      _setError('Invalid server configuration');
       return false;
     }
     
-    // SAFETY: Prevent multiple simultaneous connections
-    if (_isConnecting) {
-      debugPrint('?? Connection already in progress, ignoring duplicate request');
-      return false;
-    }
+    if (_isConnecting) return false;
     
     _isConnecting = true;
     _errorMessage = '';
-    notifyListeners();
-
-    // Connection configuration
-    const int maxAttempts = 3;
-    const int retryDelaySeconds = 1;
-    const int connectionTimeout = 30;
-    
-    // Track connection success for finally block
     bool success = false;
-    String lastError = '';
 
     try {
-      debugPrint('?? Connection parameters:');
-      debugPrint('   - Server: ${config.remark}');
-      debugPrint('   - Address: ${config.address}:${config.port}');
-      debugPrint('   - Protocol: ${config.configType}');
-      debugPrint('   - Max attempts: $maxAttempts');
-      
-      // STEP 1: Disconnect from current server if connected
+      // Quick disconnect if needed
       if (_v2rayService.activeConfig != null) {
-        debugPrint('?? Disconnecting from current server: ${_v2rayService.activeConfig?.remark}');
         try {
-          await _v2rayService.disconnect()
-              .timeout(const Duration(seconds: 5));
-          debugPrint('? Disconnected from previous server');
-          
-          // Small delay to ensure clean disconnect
-          await Future.delayed(const Duration(milliseconds: 300));
-        } catch (e) {
-          debugPrint('?? Error disconnecting from current server: $e');
-          // Continue with connection attempt even if disconnect failed
-        }
+          await _v2rayService.disconnect().timeout(const Duration(seconds: 3));
+        } catch (_) {}
       }
 
-      // STEP 2: Try to connect with automatic retry
-      for (int attempt = 1; attempt <= maxAttempts; attempt++) {
-        debugPrint('?? Connection attempt $attempt/$maxAttempts...');
-        
-        try {
-          // Attempt connection with timeout
-          success = await _v2rayService
-              .connect(config)
-              .timeout(
-                Duration(seconds: connectionTimeout),
-                onTimeout: () {
-                  debugPrint('?? Connection timeout after ${connectionTimeout}s');
-                  return false;
-                },
-              );
+      // Connect with timeout
+      success = await _v2rayService.connect(config).timeout(
+        const Duration(seconds: 12),
+        onTimeout: () => false,
+      );
 
-          if (success) {
-            debugPrint('?? Connection attempt $attempt succeeded!');
-            break;
-          } else {
-            lastError = 'Failed to connect to ${config.remark} on attempt $attempt';
-            debugPrint('? $lastError');
-
-            // If this is not the last attempt, wait before retrying
-            if (attempt < maxAttempts) {
-              debugPrint('? Waiting ${retryDelaySeconds}s before retry...');
-              await Future.delayed(Duration(seconds: retryDelaySeconds));
-            }
-          }
-        } catch (e) {
-          // Handle different types of errors
-          if (e.toString().contains('timeout')) {
-            lastError = 'Connection timeout on attempt $attempt';
-            debugPrint('?? $lastError: $e');
-          } else if (e.toString().contains('permission')) {
-            lastError = 'VPN permission denied';
-            debugPrint('?? $lastError: $e');
-            // Don't retry on permission errors
-            break;
-          } else {
-            lastError = 'Error on connection attempt $attempt';
-            debugPrint('? $lastError: $e');
-          }
-
-          // If this is not the last attempt, wait before retrying
-          if (attempt < maxAttempts && !e.toString().contains('permission')) {
-            debugPrint('? Waiting ${retryDelaySeconds}s before retry...');
-            await Future.delayed(Duration(seconds: retryDelaySeconds));
-          }
-        }
-      }
-
-      // STEP 3: Handle connection result
       if (success) {
-        try {
-          debugPrint('? VPN connection successful, updating UI state...');
-          
-          // CRITICAL PHASE 1: Establish grace period FIRST
-          // This MUST be the very first thing to prevent race conditions
-          _lastSuccessfulConnection = DateTime.now();
-          debugPrint('??? Grace period activated for 8 seconds');
-          debugPrint('??? Start time: ${_lastSuccessfulConnection!.toIso8601String()}');
-          
-          // CRITICAL PHASE 2: Update internal state IMMEDIATELY
-          _errorMessage = '';
-          
-          // Update all configs: only connected one should be marked
-          bool configUpdated = false;
-          for (int i = 0; i < _configs.length; i++) {
-            if (_configs[i].id == config.id) {
-              _configs[i].isConnected = true;
-              configUpdated = true;
-              debugPrint('? Marked ${_configs[i].remark} as connected');
-            } else if (_configs[i].isConnected) {
-              _configs[i].isConnected = false;
-              debugPrint('?? Unmarked ${_configs[i].remark}');
-            }
-          }
-          
-          if (!configUpdated) {
-            debugPrint('?? Warning: Config ${config.id} not found in list, adding it');
-            config.isConnected = true;
-            // Check if not already in list to avoid duplicates
-            if (!_configs.any((c) => c.id == config.id)) {
-              _configs.add(config);
-            }
-          }
-          
-          _selectedConfig = config;
-          debugPrint('? Selected config updated: ${config.remark}');
-          
-          // CRITICAL PHASE 3: Verify activeConfig from service
-          if (_v2rayService.activeConfig == null) {
-            debugPrint('?? WARNING: activeConfig is null after connection!');
-            debugPrint('?? This should not happen - connection may be unstable');
-          } else {
-            final activeRemark = _v2rayService.activeConfig?.remark ?? 'Unknown';
-            debugPrint('? Service activeConfig verified: $activeRemark');
-            
-            // Double-check it matches our config
-            if (_v2rayService.activeConfig?.id != config.id) {
-              debugPrint('?? Warning: activeConfig mismatch!');
-              debugPrint('   Expected: ${config.id}');
-              debugPrint('   Got: ${_v2rayService.activeConfig?.id}');
-            }
-          }
-          
-          // CRITICAL PHASE 4: Notify UI IMMEDIATELY
-          notifyListeners();
-          debugPrint('? UI notified - Connected: true, Error: cleared');
-          
-          // PHASE 5: Small delay to ensure UI renders
-          await Future.delayed(const Duration(milliseconds: 150));
-          
-          // PHASE 6: Background tasks (non-blocking)
-          debugPrint('?? Starting background tasks...');
-          
-          _v2rayService.saveConfigs(_configs).catchError((e) {
-            debugPrint('?? Error saving configs: $e');
-          });
-          
-          // ذخیره وضعیت اتصال به‌صورت جداگانه برای بازیابی سریع‌تر
-          _saveConnectionState(config).catchError((e) {
-            debugPrint('?? Error saving connection state: $e');
-          });
-
-          _v2rayService.resetUsageStats().catchError((e) {
-            debugPrint('?? Error resetting stats: $e');
-          });
-          
-          _analyticsService.logVpnConnect(
-            serverName: config.remark,
-            serverAddress: config.address,
-            serverPort: config.port,
-            country: config.remark.isNotEmpty 
-                ? (config.remark.contains('-') 
-                    ? config.remark.split('-').first.trim() 
-                    : config.remark.trim())
-                : 'Unknown',
-            protocol: config.configType,
-          ).catchError((e) {
-            debugPrint('?? Analytics error: $e');
-          });
-          
-          debugPrint('?? Connection fully established to ${config.remark}!');
-          
-        } catch (e) {
-          debugPrint('? CRITICAL: Error in post-connection setup: $e');
-          debugPrint('? Stack trace: ${StackTrace.current}');
-          // Don't set error - connection succeeded, just setup failed
-          // Still notify UI to show connected state
-          notifyListeners();
+        _lastSuccessfulConnection = DateTime.now();
+        _errorMessage = '';
+        
+        // Update config states
+        for (var c in _configs) {
+          c.isConnected = (c.id == config.id);
         }
+        _selectedConfig = config;
+        
+        // Background saves
+        _v2rayService.saveConfigs(_configs).catchError((_) {});
+        _saveConnectionState(config).catchError((_) {});
+        
+        debugPrint('✅ Connected to ${config.remark}');
       } else {
-        // Connection failed after all attempts
-        debugPrint('?? Connection failed after $maxAttempts attempts');
-        debugPrint('?? Last error: $lastError');
-        _setError(
-          'Failed to connect to ${config.remark} after $maxAttempts attempts: $lastError',
-        );
+        _setError('Connection failed');
       }
     } catch (e) {
-      // Unexpected error in connection process
-      debugPrint('? FATAL: Unexpected error in connection process');
-      debugPrint('? Error: $e');
-      debugPrint('? Stack trace: ${StackTrace.current}');
-      _setError('Unexpected error connecting to ${config.remark}: $e');
+      debugPrint('❌ Connection error: $e');
+      _setError('Connection error: $e');
     } finally {
-      debugPrint('🏁 Connection process finished - Success: $success');
       _isConnecting = false;
-      
-      // Simple state verification - only if success
-      if (success && _v2rayService.activeConfig != null) {
-        // Ensure the connected config is marked correctly
-        for (var c in _configs) {
-          if (c.id == config.id) {
-            c.isConnected = true;
-          } else if (c.isConnected) {
-            c.isConnected = false;
-          }
-        }
-      }
-      
-      // Single notify at the end
       notifyListeners();
     }
     
@@ -1223,109 +1050,113 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     return null;
   }
 
-  // Smart Connect: Test top servers and connect to fastest one
-  Future<bool> smartConnect({int maxServersToTest = 3}) async {
+  // Smart Connect: Test 7 servers and connect to fastest (real-time sorting)
+  Future<bool> smartConnect({int maxServersToTest = 7}) async {
     if (_configs.isEmpty) {
       _setError('No servers available');
       return false;
     }
 
-    // Mark that user is using Smart Connect
     _wasUsingSmartConnect = true;
-
     _isConnecting = true;
     _errorMessage = '';
     notifyListeners();
 
     try {
-      debugPrint('🧠 Smart Connect: Testing top $maxServersToTest servers...');
+      debugPrint('🧠 Smart Connect: Testing $maxServersToTest servers (real-time)...');
       
-      // Get top servers to test
       final serversToTest = _configs.take(maxServersToTest).toList();
-      
-      // Test all servers in parallel using batch method
-      final pingResults = await _v2rayService.batchTestServerDelays(
-        serversToTest,
-        batchSize: 2,
-        useCache: false,
-      );
-      
-      // Find fastest responding server
+      final pingResults = <String, int>{};
       V2RayConfig? fastestServer;
-      int lowestPing = 999999;
+      int fastestPing = 99999;
+      bool connected = false;
       
-      for (final server in serversToTest) {
-        final ping = pingResults[server.id];
-        if (ping != null && ping < lowestPing && ping < 9999) {
-          lowestPing = ping;
-          fastestServer = server;
-        }
-      }
+      // Create completer to signal when we should connect
+      final completer = Completer<V2RayConfig?>();
+      Timer? connectTimer;
       
-      if (fastestServer == null) {
-        // No server responded, try connecting to selected/first server anyway
-        debugPrint('⚠️ No server responded to ping, trying selected server...');
-        if (_selectedConfig != null) {
-          fastestServer = _selectedConfig;
-        } else if (_configs.isNotEmpty) {
-          fastestServer = _configs.first;
-        } else {
-          _setError('No servers available');
-          return false;
-        }
-      } else {
-        debugPrint('? Fastest server found: ${fastestServer.remark} (${lowestPing}ms)');
-      }
-      
-      // IMPORTANT: Don't call selectConfig here to keep Smart Connect as selected
-      // Just connect directly to the fastest server
-      
-      _isConnecting = false;
-      notifyListeners();
-      
-      // Now connect to fastest server (without changing selectedConfig)
-      final success = await connectToServer(fastestServer!);
-      
-      if (success) {
-        // CRITICAL: Keep Smart Connect flag true so disconnect returns to Smart Connect
-        _wasUsingSmartConnect = true;
-        debugPrint('?? Smart Connect successful to ${fastestServer.remark}');
-        debugPrint('?? Keeping Smart Connect as default for next disconnect');
-        return true;
-      } else {
-        // If connection failed, try next best server
-        debugPrint('? Connection to ${fastestServer.remark} failed, trying alternatives...');
-        
-        // Sort servers by ping and try next ones
-        final sortedServers = serversToTest.where((s) {
-          final ping = pingResults[s.id];
-          return ping != null && ping < 9999 && s.id != fastestServer!.id;
-        }).toList()
-          ..sort((a, b) {
-            final pingA = pingResults[a.id] ?? 999999;
-            final pingB = pingResults[b.id] ?? 999999;
-            return pingA.compareTo(pingB);
-          });
-        
-        // Try up to 2 more servers (without changing selectedConfig)
-        for (final server in sortedServers.take(2)) {
-          debugPrint('🔄 Trying alternative server: ${server.remark}');
+      // Start all ping tests simultaneously
+      final pingFutures = serversToTest.map((server) async {
+        try {
+          final delay = await _v2rayService.getServerDelay(server, useCache: false)
+              .timeout(const Duration(seconds: 6));
           
-          final altSuccess = await connectToServer(server);
-          if (altSuccess) {
-            // CRITICAL: Keep Smart Connect flag true for alternative servers too
+          if (delay != null && delay < 9999) {
+            pingResults[server.id] = delay;
+            debugPrint('📶 ${server.remark}: ${delay}ms');
+            
+            // Real-time: Update fastest immediately when result comes in
+            if (delay < fastestPing && !connected) {
+              fastestPing = delay;
+              fastestServer = server;
+              debugPrint('🏆 New fastest: ${server.remark} (${delay}ms)');
+              
+              // Reset timer - wait 1.5s after each new fastest before connecting
+              connectTimer?.cancel();
+              connectTimer = Timer(const Duration(milliseconds: 1500), () {
+                if (!completer.isCompleted && !connected) {
+                  completer.complete(fastestServer);
+                }
+              });
+            }
+          }
+        } catch (e) {
+          debugPrint('❌ Ping failed for ${server.remark}: $e');
+        }
+      }).toList();
+      
+      // Wait for either: fastest found (with delay) or all pings complete
+      Future.wait(pingFutures).then((_) {
+        if (!completer.isCompleted) {
+          completer.complete(fastestServer);
+        }
+      });
+      
+      // Also set a max timeout
+      Future.delayed(const Duration(seconds: 8), () {
+        if (!completer.isCompleted) {
+          completer.complete(fastestServer);
+        }
+      });
+      
+      // Wait for the signal to connect
+      final serverToConnect = await completer.future;
+      connectTimer?.cancel();
+      
+      if (serverToConnect != null) {
+        debugPrint('🔌 Connecting to fastest: ${serverToConnect.remark} (${fastestPing}ms)');
+        connected = true;
+        
+        _isConnecting = false;
+        final success = await connectToServer(serverToConnect);
+        
+        if (success) {
+          _wasUsingSmartConnect = true;
+          debugPrint('✅ Smart Connect success: ${serverToConnect.remark}');
+          return true;
+        }
+        
+        // If fastest failed, try others sorted by ping
+        debugPrint('⚠️ Fastest failed, trying others...');
+        final sortedServers = serversToTest
+            .where((s) => s.id != serverToConnect.id && pingResults.containsKey(s.id))
+            .toList()
+          ..sort((a, b) => (pingResults[a.id] ?? 99999).compareTo(pingResults[b.id] ?? 99999));
+        
+        for (final server in sortedServers) {
+          final success = await connectToServer(server);
+          if (success) {
             _wasUsingSmartConnect = true;
-            debugPrint('? Connected to alternative server: ${server.remark}');
-            debugPrint('?? Keeping Smart Connect as default for next disconnect');
+            debugPrint('✅ Smart Connect fallback: ${server.remark}');
             return true;
           }
         }
-        
-        _setError('Could not connect to any available server');
-        return false;
       }
+      
+      _setError('Could not connect to any server');
+      return false;
     } catch (e) {
-      debugPrint('? Smart Connect error: $e');
+      debugPrint('❌ Smart Connect error: $e');
       _setError('Smart Connect failed: $e');
       return false;
     } finally {

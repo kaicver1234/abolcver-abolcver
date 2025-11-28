@@ -223,15 +223,24 @@ class V2RayService extends ChangeNotifier {
         notificationIconResourceName: "ic_notification",
       );
       _isInitialized = true;
-
-      // Try to restore active config if VPN is still running
-      await _tryRestoreActiveConfig();
+      
+      // Restore in background - don't block
+      _tryRestoreActiveConfig().catchError((e) {
+        debugPrint('⚠️ Restore error: $e');
+      });
     }
   }
 
   Future<bool> connect(V2RayConfig config) async {
     try {
-      await initialize();
+      // Quick initialize without restore (to prevent hang)
+      if (!_isInitialized) {
+        await _flutterV2ray.initializeV2Ray(
+          notificationIconResourceType: "drawable",
+          notificationIconResourceName: "ic_notification",
+        );
+        _isInitialized = true;
+      }
 
       // Parse the configuration
       V2RayURL parser = FlutterV2ray.parseFromURL(config.fullConfig);
@@ -242,11 +251,11 @@ class V2RayService extends ChangeNotifier {
         return false;
       }
 
-      // Start V2Ray in VPN mode - simplified without extra features
+      // Start V2Ray in VPN mode
       await _flutterV2ray.startV2Ray(
         remark: config.remark,
         config: parser.getFullConfiguration(),
-        proxyOnly: false, // Always use VPN mode (not proxy mode)
+        proxyOnly: false,
         notificationDisconnectButtonName: "DISCONNECT",
       );
 
@@ -256,26 +265,22 @@ class V2RayService extends ChangeNotifier {
       // Notify listeners immediately for UI update
       notifyListeners();
 
-      // Save active config to persistent storage
-      await _saveActiveConfig(config);
-
-      // Start monitoring usage statistics
+      // Background tasks - don't await
+      _saveActiveConfig(config).catchError((e) => debugPrint('Save error: $e'));
       _startUsageMonitoring();
 
-      // Fetch IP information after a 2-second delay to ensure connection is stable
-      Future.delayed(const Duration(seconds: 2), () {
-        fetchIpInfo()
-            .then((ipInfo) {
-              // IP Info fetched after connection
-            })
-            .catchError((e) {
-              // Error fetching IP info after connection
-            });
+      // Fetch IP info in background after delay
+      Future.delayed(const Duration(seconds: 3), () async {
+        try {
+          await fetchIpInfo();
+        } catch (e) {
+          debugPrint('IP fetch error: $e');
+        }
       });
 
       return true;
     } catch (e) {
-      // Error connecting to V2Ray
+      debugPrint('❌ Error connecting to V2Ray: $e');
       return false;
     }
   }
