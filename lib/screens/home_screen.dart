@@ -98,7 +98,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   Future<void> _handleConnectionToggle() async {
     if (_isConnecting) return;
-
     if (!mounted) return;
     
     final provider = Provider.of<V2RayProvider>(context, listen: false);
@@ -111,39 +110,31 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         });
         await provider.disconnect();
         if (mounted) {
-           _showSnackBar(AppLocalizations.of(context).translate('home.disconnected'), Colors.grey);
+          _showSnackBar(AppLocalizations.of(context).translate('home.disconnected'), Colors.grey);
         }
       } else {
-        // Connect based on selected config
+        // Connect
         final selectedConfig = provider.selectedConfig;
         bool success = false;
         
-        // Check if Smart Connect is selected or no specific server selected
         if (selectedConfig == null || selectedConfig.isSmartConnect) {
-          // Smart Connect - find best server
-          debugPrint('🧠 Smart Connect: Finding best server...');
-          
+          debugPrint('🧠 Smart Connect...');
           setState(() {
             _isConnecting = true;
             _isFindingServer = true;
           });
-          
           success = await provider.smartConnect();
-          
           if (mounted) {
             setState(() {
               _isFindingServer = false;
             });
           }
         } else {
-          // Direct connect to selected server
           debugPrint('🔌 Direct Connect to: ${selectedConfig.remark}');
-          
           setState(() {
             _isConnecting = true;
             _isFindingServer = false;
           });
-          
           success = await provider.connectToServer(selectedConfig);
         }
         
@@ -153,10 +144,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             final serverName = provider.wasUsingSmartConnect 
                 ? '${AppLocalizations.of(context).translate('server_selection.smart_connect')} ($cleanName)'
                 : cleanName;
-            debugPrint('✅ Connection successful to: $cleanName');
             _showSnackBar('${AppLocalizations.of(context).translate('home.connected_to')}: $serverName', Colors.green);
           } else if (provider.errorMessage.isNotEmpty) {
-            debugPrint('❌ Connection failed: ${provider.errorMessage}');
             _showSnackBar(provider.errorMessage, Colors.red);
           } else {
             _showSnackBar(AppLocalizations.of(context).translate('home.connection_failed'), Colors.red);
@@ -177,7 +166,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           _isFindingServer = false;
         });
         
-        // Reset IP when disconnected, fetch when connected
         if (provider.activeConfig != null) {
           _fetchCurrentIp();
         } else {

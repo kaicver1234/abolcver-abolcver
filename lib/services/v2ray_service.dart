@@ -233,25 +233,22 @@ class V2RayService extends ChangeNotifier {
 
   Future<bool> connect(V2RayConfig config) async {
     try {
-      // Quick initialize without restore (to prevent hang)
-      if (!_isInitialized) {
-        await _flutterV2ray.initializeV2Ray(
-          notificationIconResourceType: "drawable",
-          notificationIconResourceName: "ic_notification",
-        );
-        _isInitialized = true;
-      }
+      debugPrint('🔌 Connecting to ${config.remark}...');
+      
+      await initialize();
 
       // Parse the configuration
       V2RayURL parser = FlutterV2ray.parseFromURL(config.fullConfig);
 
-      // Request permission if needed (for VPN mode)
+      // Request permission if needed
       bool hasPermission = await _flutterV2ray.requestPermission();
       if (!hasPermission) {
+        debugPrint('❌ Permission denied');
         return false;
       }
 
-      // Start V2Ray in VPN mode
+      // Start V2Ray
+      debugPrint('🚀 Starting V2Ray...');
       await _flutterV2ray.startV2Ray(
         remark: config.remark,
         config: parser.getFullConfiguration(),
@@ -262,25 +259,19 @@ class V2RayService extends ChangeNotifier {
       _activeConfig = config;
       _lastConnectionTime = DateTime.now();
       
-      // Notify listeners immediately for UI update
+      debugPrint('✅ V2Ray started successfully');
       notifyListeners();
 
-      // Background tasks - don't await
-      _saveActiveConfig(config).catchError((e) => debugPrint('Save error: $e'));
+      // Background tasks
+      _saveActiveConfig(config).catchError((_) {});
       _startUsageMonitoring();
-
-      // Fetch IP info in background after delay
-      Future.delayed(const Duration(seconds: 3), () async {
-        try {
-          await fetchIpInfo();
-        } catch (e) {
-          debugPrint('IP fetch error: $e');
-        }
+      Future.delayed(const Duration(seconds: 2), () {
+        fetchIpInfo().catchError((_) => IpInfo.error('Failed to fetch IP'));
       });
 
       return true;
     } catch (e) {
-      debugPrint('❌ Error connecting to V2Ray: $e');
+      debugPrint('❌ Connection error: $e');
       return false;
     }
   }
@@ -905,168 +896,102 @@ class V2RayService extends ChangeNotifier {
   
   Future<bool> isTunnelRunning() async {
     try {
-      // First check if we have a saved active config
-      final savedConfig = await _loadActiveConfig();
-      
-      // Try to get delay with longer timeout for cold start
-      final delay = await _flutterV2ray.getConnectedServerDelay()
-          .timeout(const Duration(seconds: 5));
-      
-      final isRunning = delay >= 0 && delay < 10000;
-      
-      // If running but no activeConfig, restore it
-      if (isRunning && _activeConfig == null && savedConfig != null) {
-        _activeConfig = savedConfig;
-        debugPrint('✅ Restored activeConfig during tunnel check: ${savedConfig.remark}');
-        notifyListeners();
+      // OPTIMIZED: Check memory first (instant)
+      if (_activeConfig != null) {
+        debugPrint('✅ Tunnel running (memory check)');
+        return true;
       }
       
-      return isRunning;
-    } catch (e) {
-      // On error, check saved config as fallback
+      // Quick delay check with SHORT timeout
+      try {
+        final delay = await _flutterV2ray.getConnectedServerDelay()
+            .timeout(const Duration(seconds: 2));
+        
+        final isRunning = delay >= 0 && delay < 10000;
+        
+        if (isRunning && _activeConfig == null) {
+          // Restore config in background
+          _tryRestoreActiveConfig().catchError((_) {});
+        }
+        
+        return isRunning;
+      } catch (e) {
+        debugPrint('⏱️ Delay check timeout: $e');
+      }
+      
+      // Fallback: check saved config
       final savedConfig = await _loadActiveConfig();
       if (savedConfig != null) {
         _activeConfig = savedConfig;
-        debugPrint('⚠️ Tunnel check failed, using saved config: ${savedConfig.remark}');
-        return true; // Assume connected if we have saved config
+        return true;
       }
+      
       return false;
+    } catch (e) {
+      debugPrint('❌ Tunnel check error: $e');
+      return _activeConfig != null;
     }
   }
   
   Future<bool> isActuallyConnected() async {
     try {
-      debugPrint('🔎 Checking VPN connection...');
+      debugPrint('🔎 Quick VPN connection check...');
       
-      final currentState = _currentStatus?.state.toLowerCase() ?? '';
-      debugPrint('🔎 State: $currentState');
-      
-      // If status explicitly says connected, verify it
-      if (currentState.contains('connect') || currentState == 'connected') {
-        debugPrint('✅ V2Ray reports connected');
-        
-        // Double-check with delay test
-        try {
-          final delay = await _flutterV2ray.getConnectedServerDelay()
-              .timeout(const Duration(seconds: 3));
-          final hasValidConnection = delay >= 0 && delay < 10000;
-          
-          if (hasValidConnection) {
-            debugPrint('✅ Connection verified with delay: ${delay}ms');
-            // Update active config if needed
-            if (_activeConfig == null) {
-              await _tryRestoreActiveConfig();
-            }
-            return true;
-          } else {
-            debugPrint('⚠️ Delay check failed: ${delay}ms');
-          }
-        } catch (delayError) {
-          debugPrint('⚠️ Delay check error: $delayError');
-          // Status says connected but delay check failed
-          // Check saved config as fallback
-          final savedConfig = await _loadActiveConfig();
-          if (savedConfig != null) {
-            _activeConfig = savedConfig;
-            debugPrint('✅ Connected (verified via saved config)');
-            return true;
-          }
-        }
+      // OPTIMIZED: Check memory state first (instant, no I/O)
+      if (_activeConfig != null) {
+        debugPrint('✅ Active config in memory: ${_activeConfig!.remark}');
+        return true;
       }
       
-      // If status explicitly says disconnected
+      final currentState = _currentStatus?.state.toLowerCase() ?? '';
+      
+      // Quick state check (no network calls)
+      if (currentState.contains('connect') || currentState == 'connected') {
+        debugPrint('✅ V2Ray status: connected');
+        // Restore config in background if needed
+        if (_activeConfig == null) {
+          _tryRestoreActiveConfig().catchError((_) {});
+        }
+        return true;
+      }
+      
+      // If explicitly disconnected, return false quickly
       if (currentState.contains('disconnect') || 
           currentState.contains('stop') || 
-          currentState.contains('idle') ||
-          currentState == 'disconnected' ||
-          currentState.isEmpty) {
-        debugPrint('❌ V2Ray reports disconnected');
-        
-        // Triple-check with saved config and delay
-        final savedConfig = await _loadActiveConfig();
-        if (savedConfig != null) {
-          debugPrint('🔎 Found saved config, verifying with delay test...');
-          
-          try {
-            final delay = await _flutterV2ray.getConnectedServerDelay()
-                .timeout(const Duration(seconds: 3));
-            final hasValidConnection = delay >= 0 && delay < 10000;
-            
-            if (hasValidConnection) {
-              _activeConfig = savedConfig;
-              debugPrint('✅ Connected (state wrong but delay test passed)');
-              return true;
-            }
-          } catch (delayError) {
-            debugPrint('❌ Delay test failed, truly disconnected');
-          }
-        }
-        
-        // Truly disconnected
-        if (_activeConfig != null) {
-          _activeConfig = null;
-          await _clearActiveConfig();
-          notifyListeners();
-        }
+          currentState == 'disconnected') {
+        debugPrint('❌ V2Ray status: disconnected');
         return false;
       }
 
-      // Method 2: Status is unknown/unclear, use delay test
-      debugPrint('🔎 Status unclear, using delay test...');
+      // Only do delay test if status is unclear (with SHORT timeout)
+      debugPrint('🔎 Status unclear, quick delay test...');
       try {
         final delay = await _flutterV2ray.getConnectedServerDelay()
-            .timeout(const Duration(seconds: 5));
+            .timeout(const Duration(seconds: 2));
         final isConnected = delay >= 0 && delay < 10000;
         
-        debugPrint('🔎 Delay test result: ${delay}ms, connected: $isConnected');
+        debugPrint('🔎 Delay: ${delay}ms, connected: $isConnected');
         
         if (isConnected && _activeConfig == null) {
-          // Connected but no active config, try to restore
-          await _tryRestoreActiveConfig();
-        } else if (!isConnected && _activeConfig != null) {
-          // Not connected but we have active config, clear it
-          _activeConfig = null;
-          await _clearActiveConfig();
-          notifyListeners();
+          _tryRestoreActiveConfig().catchError((_) {});
         }
         
         return isConnected;
-      } catch (timeoutError) {
-        debugPrint('⚠️ Delay test timeout: $timeoutError');
+      } catch (e) {
+        debugPrint('⚠️ Delay test failed: $e');
         
-        // Method 3: Fallback to saved config check
+        // Fallback: check saved config
         final savedConfig = await _loadActiveConfig();
         if (savedConfig != null) {
           _activeConfig = savedConfig;
-          debugPrint('✅ Connected (based on saved config)');
           return true;
         }
         
-        if (_activeConfig != null) {
-          // Assume still connected if we have active config in memory
-          debugPrint('✅ Connected (based on active config in memory)');
-          return true;
-        }
-        
-        debugPrint('❌ All checks failed, disconnected');
         return false;
       }
     } catch (e) {
-      debugPrint('❌ Error checking connection: $e');
-      
-      // Final fallback - check saved config
-      try {
-        final savedConfig = await _loadActiveConfig();
-        if (savedConfig != null) {
-          _activeConfig = savedConfig;
-          debugPrint('✅ Connected (fallback to saved config)');
-          return true;
-        }
-      } catch (restoreError) {
-        debugPrint('❌ Failed to restore config: $restoreError');
-      }
-      
-      return false;
+      debugPrint('❌ Connection check error: $e');
+      return _activeConfig != null;
     }
   }
 
@@ -1129,17 +1054,70 @@ class V2RayService extends ChangeNotifier {
     }
   }
 
+  /// Batch ping multiple servers using V2Ray core (sequential with UI yield)
+  Future<Map<String, int?>> batchPingServers(List<V2RayConfig> configs) async {
+    if (configs.isEmpty) return {};
+
+    try {
+      debugPrint('🏓 V2Ray Core: Pinging ${configs.length} servers...');
+      
+      await initialize();
+      
+      final Map<String, int?> configResults = {};
+      
+      for (final config in configs) {
+        // Yield to UI thread to prevent freeze
+        await Future.delayed(Duration.zero);
+        
+        try {
+          final parser = FlutterV2ray.parseFromURL(config.fullConfig);
+          
+          final delay = await _flutterV2ray
+              .getServerDelay(config: parser.getFullConfiguration())
+              .timeout(
+                const Duration(seconds: 3),
+                onTimeout: () => 9999,
+              );
+          
+          if (delay >= 0 && delay < 9999) {
+            debugPrint('📶 ${config.remark}: ${delay}ms');
+            configResults[config.id] = delay;
+            
+            // Cache result
+            final hostKey = '${config.address}:${config.port}';
+            _pingCache[hostKey] = (delay: delay, timestamp: DateTime.now());
+            _pingCache[config.id] = (delay: delay, timestamp: DateTime.now());
+          } else {
+            debugPrint('❌ ${config.remark}: timeout');
+            configResults[config.id] = null;
+          }
+        } catch (e) {
+          debugPrint('❌ ${config.remark}: error');
+          configResults[config.id] = null;
+        }
+      }
+
+      final successCount = configResults.values.where((v) => v != null).length;
+      debugPrint('✅ V2Ray ping complete: $successCount/${configs.length} responded');
+      return configResults;
+    } catch (e) {
+      debugPrint('❌ Batch ping error: $e');
+      return {};
+    }
+  }
+
   /// Get fastest server from a list of configs using V2Ray ping
   Future<V2RayConfig?> getFastestServer(List<V2RayConfig> configs) async {
     if (configs.isEmpty) return null;
 
     try {
+      final pingResults = await batchPingServers(configs);
+
       V2RayConfig? fastestConfig;
       int? lowestLatency;
 
-      // Ping each config sequentially using V2Ray's built-in method
       for (final config in configs) {
-        final latency = await getServerDelay(config);
+        final latency = pingResults[config.id];
         if (latency != null &&
             latency > 0 &&
             (lowestLatency == null || latency < lowestLatency)) {
