@@ -20,8 +20,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   Map<String, int> _pingResults = {};
   List<V2RayConfig>? _sortedConfigs;
   late AnimationController _refreshAnimController;
-  late TabController _tabController;
-  int _currentTab = 0;
+  int _currentTab = 0; // 0 = Free, 1 = Premium
 
   @override
   void initState() {
@@ -30,20 +29,11 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        setState(() {
-          _currentTab = _tabController.index;
-        });
-      }
-    });
   }
 
   @override
   void dispose() {
     _refreshAnimController.dispose();
-    _tabController.dispose();
     _sortedConfigs = null;
     _pingResults.clear();
     super.dispose();
@@ -66,39 +56,17 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           _sortedConfigs = null;
           _pingResults.clear();
         });
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.check_circle, color: Colors.white, size: 20),
-                const SizedBox(width: 12),
-                Text(AppLocalizations.of(context).translate('server_selection.servers_updated')),
-              ],
-            ),
-            backgroundColor: const Color(0xFF10B981),
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            duration: const Duration(seconds: 2),
-          ),
+        _showSnackBar(
+          AppLocalizations.of(context).translate('server_selection.servers_updated'),
+          const Color(0xFF10B981),
         );
       }
     } catch (e) {
       debugPrint('❌ Error refreshing servers: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(Icons.error_outline, color: Colors.white, size: 20),
-                const SizedBox(width: 12),
-                Text(AppLocalizations.of(context).translate('server_selection.error_updating')),
-              ],
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+        _showSnackBar(
+          AppLocalizations.of(context).translate('server_selection.error_updating'),
+          Colors.red,
         );
       }
     } finally {
@@ -110,6 +78,18 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     }
   }
 
+  void _showSnackBar(String message, Color color) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final languageProvider = Provider.of<LanguageProvider>(context);
@@ -117,31 +97,25 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     return Directionality(
       textDirection: languageProvider.textDirection,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F172A),
-        extendBodyBehindAppBar: true,
+        backgroundColor: const Color(0xFF0A0E1A),
         body: Container(
           decoration: const BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0xFF1E293B), Color(0xFF0F172A), Color(0xFF020617)],
-              stops: [0.0, 0.5, 1.0],
+              colors: [Color(0xFF0F1629), Color(0xFF0A0E1A)],
             ),
           ),
           child: SafeArea(
             child: Column(
               children: [
-                _buildAppBar(context),
+                _buildHeader(context),
+                _buildTabButtons(),
+                if (_currentTab == 0) _buildActionButtons(),
                 Expanded(
-                  child: TabBarView(
-                    controller: _tabController,
-                    children: [
-                      // Free Servers Tab
-                      _buildFreeServersTab(),
-                      // Premium Servers Tab
-                      _buildPremiumTab(),
-                    ],
-                  ),
+                  child: _currentTab == 0 
+                      ? _buildFreeServersTab() 
+                      : _buildPremiumTab(),
                 ),
               ],
             ),
@@ -151,193 +125,242 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     );
   }
 
-  Widget _buildAppBar(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      child: Column(
+  Widget _buildHeader(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+      child: Row(
         children: [
-          // Top row: Back button and title
-          Row(
+          // Back button
+          GestureDetector(
+            onTap: () => Navigator.pop(context),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.arrow_back_ios_new,
+                color: Colors.white,
+                size: 18,
+              ),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Title
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-                  onPressed: () => Navigator.pop(context),
+              Text(
+                AppLocalizations.of(context).translate('server_selection.title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: -0.5,
                 ),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      AppLocalizations.of(context).translate('server_selection.title'),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
-                    Text(
-                      AppLocalizations.of(context).translate('server_selection.select_server'),
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12),
-                    ),
-                  ],
+              const SizedBox(height: 2),
+              Text(
+                AppLocalizations.of(context).translate('server_selection.select_server'),
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  fontSize: 13,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          // Tab Bar (Free / Premium)
-          _buildTabBar(),
-          // Action buttons (only show for Free tab)
-          if (_currentTab == 0) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _buildRefreshButton(),
-                const SizedBox(width: 10),
-                _buildPingTestButtonSmall(context),
-              ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTabButtons() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        height: 52,
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          children: [
+            // Free Tab
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _currentTab = 0),
+                child: Container(
+                  margin: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    gradient: _currentTab == 0
+                        ? const LinearGradient(
+                            colors: [Color(0xFF10B981), Color(0xFF059669)],
+                          )
+                        : null,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.public,
+                        color: _currentTab == 0 
+                            ? Colors.white 
+                            : Colors.white.withValues(alpha: 0.4),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        AppLocalizations.of(context).translate('server_selection.free'),
+                        style: TextStyle(
+                          color: _currentTab == 0 
+                              ? Colors.white 
+                              : Colors.white.withValues(alpha: 0.4),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            // Premium Tab
+            Expanded(
+              child: GestureDetector(
+                onTap: () => setState(() => _currentTab = 1),
+                child: Container(
+                  margin: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    gradient: _currentTab == 1
+                        ? const LinearGradient(
+                            colors: [Color(0xFF10B981), Color(0xFF059669)],
+                          )
+                        : null,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.workspace_premium,
+                        color: _currentTab == 1 
+                            ? Colors.white 
+                            : Colors.white.withValues(alpha: 0.4),
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        AppLocalizations.of(context).translate('server_selection.premium'),
+                        style: TextStyle(
+                          color: _currentTab == 1 
+                              ? Colors.white 
+                              : Colors.white.withValues(alpha: 0.4),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [Color(0xFF10B981), Color(0xFF059669)],
-          ),
-          borderRadius: BorderRadius.circular(10),
         ),
-        indicatorSize: TabBarIndicatorSize.tab,
-        dividerColor: Colors.transparent,
-        labelColor: Colors.white,
-        unselectedLabelColor: Colors.white.withValues(alpha: 0.5),
-        labelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
-        padding: const EdgeInsets.all(4),
-        tabs: [
-          Tab(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.public, size: 18),
-                const SizedBox(width: 8),
-                Text(AppLocalizations.of(context).translate('server_selection.free')),
-              ],
-            ),
-          ),
-          Tab(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.workspace_premium, size: 18),
-                const SizedBox(width: 8),
-                Text(AppLocalizations.of(context).translate('server_selection.premium')),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }
 
-  Widget _buildPingTestButtonSmall(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: _isTesting
-            ? LinearGradient(colors: [Colors.grey.shade600, Colors.grey.shade700])
-            : const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: _isTesting ? null : _testAllServerPings,
-          borderRadius: BorderRadius.circular(12),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_isTesting)
-                  const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                  )
-                else
-                  const Icon(Icons.speed, color: Colors.white, size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  _isTesting ? '...' : AppLocalizations.of(context).translate('server_selection.test_ping'),
-                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+  Widget _buildActionButtons() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      child: Row(
+        children: [
+          // Refresh button
+          GestureDetector(
+            onTap: _isRefreshing ? null : _refreshServers,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: RotationTransition(
+                turns: _refreshAnimController,
+                child: Icon(
+                  Icons.refresh,
+                  color: _isRefreshing 
+                      ? const Color(0xFF10B981) 
+                      : Colors.white.withValues(alpha: 0.7),
+                  size: 22,
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRefreshButton() {
-    return Container(
-      decoration: BoxDecoration(
-        gradient: _isRefreshing
-            ? LinearGradient(colors: [
-                const Color(0xFF10B981).withValues(alpha: 0.3),
-                const Color(0xFF059669).withValues(alpha: 0.2),
-              ])
-            : null,
-        color: _isRefreshing ? null : Colors.white.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: _isRefreshing
-              ? const Color(0xFF10B981).withValues(alpha: 0.5)
-              : Colors.white.withValues(alpha: 0.2),
-        ),
-      ),
-      child: IconButton(
-        icon: RotationTransition(
-          turns: _refreshAnimController,
-          child: Icon(
-            Icons.refresh,
-            color: _isRefreshing ? const Color(0xFF10B981) : Colors.white,
-            size: 20,
+          const SizedBox(width: 12),
+          // Test Ping button
+          GestureDetector(
+            onTap: _isTesting ? null : _testAllServerPings,
+            child: Container(
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF10B981), Color(0xFF059669)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isTesting)
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  else
+                    const Icon(Icons.speed, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isTesting 
+                        ? '...' 
+                        : AppLocalizations.of(context).translate('server_selection.test_ping'),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
-        ),
-        onPressed: _isRefreshing ? null : _refreshServers,
-        tooltip: 'Refresh servers',
+        ],
       ),
     );
   }
-
-
 
   Widget _buildFreeServersTab() {
     return Consumer<V2RayProvider>(
       builder: (context, provider, child) {
         if (provider.isLoadingServers) return _buildLoadingState();
-        final configs = _sortedConfigs ?? provider.configs;
-        if (configs.isEmpty) return _buildEmptyState(context);
+        
+        List<V2RayConfig> configs;
+        if (_sortedConfigs != null) {
+          configs = _sortedConfigs!;
+        } else {
+          final smartConnect = V2RayConfig.smartConnect();
+          configs = [smartConnect, ...provider.configs];
+        }
+        
+        if (configs.length <= 1) return _buildEmptyState(context);
         return _buildServerList(context, provider, configs);
       },
     );
@@ -351,23 +374,19 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: [
-                    const Color(0xFFFFD700).withValues(alpha: 0.2),
-                    const Color(0xFFFFA500).withValues(alpha: 0.1),
+                    const Color(0xFFFFD700).withValues(alpha: 0.15),
+                    const Color(0xFFFFA500).withValues(alpha: 0.08),
                   ],
                 ),
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: const Color(0xFFFFD700).withValues(alpha: 0.3),
-                  width: 2,
-                ),
               ),
               child: const Icon(
                 Icons.workspace_premium,
-                size: 64,
+                size: 56,
                 color: Color(0xFFFFD700),
               ),
             ),
@@ -376,27 +395,17 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
               AppLocalizations.of(context).translate('server_selection.premium'),
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 24,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
               AppLocalizations.of(context).translate('server_selection.coming_soon'),
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
-                fontSize: 16,
+                color: Colors.white.withValues(alpha: 0.6),
+                fontSize: 15,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              AppLocalizations.of(context).translate('server_selection.coming_soon_desc'),
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
-                fontSize: 14,
-              ),
-              textAlign: TextAlign.center,
             ),
           ],
         ),
@@ -406,88 +415,104 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
 
   Widget _buildServerList(BuildContext context, V2RayProvider provider, List<V2RayConfig> configs) {
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      physics: const ClampingScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      physics: const BouncingScrollPhysics(),
       itemCount: configs.length,
       itemBuilder: (context, index) {
         final config = configs[index];
         if (config.isSmartConnect) {
-          return _buildSmartConnectCard(context, provider, config);
+          return _buildSmartConnectCard(context, provider);
         }
-        final isSelected = !provider.wasUsingSmartConnect && provider.selectedConfig?.id == config.id;
+        final isSelected = !provider.wasUsingSmartConnect && 
+            provider.selectedConfig?.id == config.id;
         return _buildServerCard(context, provider, config, isSelected);
       },
     );
   }
 
-  Widget _buildSmartConnectCard(BuildContext context, V2RayProvider provider, V2RayConfig config) {
+  Widget _buildSmartConnectCard(BuildContext context, V2RayProvider provider) {
     final isSelected = provider.wasUsingSmartConnect;
     return Container(
-      margin: const EdgeInsets.only(bottom: 8),
+      margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: isSelected
-              ? [const Color(0xFF10B981).withValues(alpha: 0.2), const Color(0xFF059669).withValues(alpha: 0.15)]
-              : [Colors.white.withValues(alpha: 0.08), Colors.white.withValues(alpha: 0.04)],
-        ),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isSelected ? const Color(0xFF10B981).withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.1),
+          color: isSelected 
+              ? const Color(0xFF10B981).withValues(alpha: 0.5) 
+              : Colors.transparent,
+          width: 1.5,
         ),
       ),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            provider.selectConfig(config);
+            provider.selectConfig(V2RayConfig.smartConnect());
             Navigator.pop(context);
           },
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.all(14),
             child: Row(
               children: [
+                // VPN Icon
                 Container(
-                  width: 40,
-                  height: 40,
+                  width: 48,
+                  height: 48,
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(colors: [Color(0xFF10B981), Color(0xFF059669)]),
-                    borderRadius: BorderRadius.circular(10),
+                    color: const Color(0xFF1A2332),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                    ),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: Image.asset('assets/images/apk.png', fit: BoxFit.cover),
+                  child: Center(
+                    child: Image.asset(
+                      'assets/images/apk.png',
+                      width: 32,
+                      height: 32,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.vpn_key,
+                          color: Color(0xFF10B981),
+                          size: 24,
+                        );
+                      },
+                    ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 14),
+                // Text
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         AppLocalizations.of(context).translate('server_selection.smart_connect'),
-                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
+                      const SizedBox(height: 3),
                       Text(
                         AppLocalizations.of(context).translate('server_selection.smart_connect_description'),
-                        style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 11),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          fontSize: 12,
+                        ),
                       ),
                     ],
                   ),
                 ),
-                if (isSelected)
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
-                    child: const Icon(Icons.check, color: Colors.white, size: 14),
-                  )
-                else
-                  Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withValues(alpha: 0.3), size: 14),
+                // Arrow
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.white.withValues(alpha: 0.3),
+                  size: 16,
+                ),
               ],
             ),
           ),
@@ -499,13 +524,17 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   Widget _buildServerCard(BuildContext context, V2RayProvider provider, V2RayConfig config, bool isSelected) {
     final countryCode = config.countryCode ?? _extractCountryCode(config.remark);
     final ping = _pingResults[config.id];
+    
     return Container(
-      margin: const EdgeInsets.only(bottom: 6),
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: isSelected ? const Color(0xFF10B981).withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(10),
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: isSelected ? const Color(0xFF10B981).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.08),
+          color: isSelected 
+              ? const Color(0xFF10B981).withValues(alpha: 0.5) 
+              : Colors.transparent,
+          width: 1.5,
         ),
       ),
       child: Material(
@@ -515,31 +544,38 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
             provider.selectConfig(config);
             Navigator.pop(context);
           },
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(14),
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
             child: Row(
               children: [
+                // Country Flag
                 _buildCountryFlag(countryCode),
-                const SizedBox(width: 10),
+                const SizedBox(width: 14),
+                // Server Name
                 Expanded(
                   child: Text(
                     _cleanServerName(config.remark),
-                    style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w500),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w500,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                if (ping != null) _buildPingIndicator(ping),
-                const SizedBox(width: 8),
-                if (isSelected)
-                  Container(
-                    padding: const EdgeInsets.all(3),
-                    decoration: const BoxDecoration(color: Color(0xFF10B981), shape: BoxShape.circle),
-                    child: const Icon(Icons.check, color: Colors.white, size: 12),
-                  )
-                else
-                  Icon(Icons.arrow_forward_ios_rounded, color: Colors.white.withValues(alpha: 0.25), size: 12),
+                // Ping indicator
+                if (ping != null) ...[
+                  _buildPingIndicator(ping),
+                  const SizedBox(width: 10),
+                ],
+                // Arrow
+                Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.white.withValues(alpha: 0.25),
+                  size: 14,
+                ),
               ],
             ),
           ),
@@ -551,33 +587,48 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   Widget _buildCountryFlag(String? countryCode) {
     if (countryCode == null || countryCode.isEmpty) {
       return Container(
-        width: 36,
-        height: 24,
+        width: 40,
+        height: 28,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(4),
+          borderRadius: BorderRadius.circular(6),
         ),
-        child: const Icon(Icons.public, color: Colors.white, size: 16),
+        child: const Icon(Icons.public, color: Colors.white54, size: 18),
       );
     }
+    
     return Container(
-      width: 36,
-      height: 24,
+      width: 40,
+      height: 28,
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 0.5),
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(4),
+        borderRadius: BorderRadius.circular(6),
         child: CachedNetworkImage(
           imageUrl: 'https://flagcdn.com/w80/${countryCode.toLowerCase()}.png',
-          fit: BoxFit.contain,
-          alignment: Alignment.center,
-          placeholder: (context, url) => const Center(
-            child: SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1, color: Colors.white)),
+          fit: BoxFit.cover,
+          placeholder: (context, url) => Container(
+            color: Colors.white.withValues(alpha: 0.1),
+            child: const Center(
+              child: SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white54),
+              ),
+            ),
           ),
-          errorWidget: (context, url, error) => const Icon(Icons.public, color: Colors.white, size: 16),
+          errorWidget: (context, url, error) => Container(
+            color: Colors.white.withValues(alpha: 0.1),
+            child: const Icon(Icons.flag, color: Colors.white54, size: 18),
+          ),
         ),
       ),
     );
@@ -586,23 +637,38 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   Widget _buildPingIndicator(int ping) {
     Color pingColor;
     String pingText;
+    
     if (ping > 9999) {
       pingColor = Colors.red;
       pingText = '---';
     } else if (ping < 1000) {
+      // 1-999ms: سبز
       pingColor = const Color(0xFF10B981);
       pingText = '${ping}ms';
     } else if (ping < 2000) {
+      // 1000-1999ms: نارنجی
       pingColor = Colors.orange;
       pingText = '${ping}ms';
     } else {
+      // 2000ms+: قرمز
       pingColor = Colors.red;
       pingText = '${ping}ms';
     }
+    
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-      decoration: BoxDecoration(color: pingColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(4)),
-      child: Text(pingText, style: TextStyle(color: pingColor, fontSize: 10, fontWeight: FontWeight.w600)),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: pingColor.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Text(
+        pingText,
+        style: TextStyle(
+          color: pingColor,
+          fontSize: 11,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 
@@ -613,7 +679,10 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
         children: [
           CircularProgressIndicator(color: Color(0xFF10B981)),
           SizedBox(height: 16),
-          Text('Loading servers...', style: TextStyle(color: Colors.white70, fontSize: 14)),
+          Text(
+            'Loading servers...',
+            style: TextStyle(color: Colors.white54, fontSize: 14),
+          ),
         ],
       ),
     );
@@ -624,25 +693,38 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.1), shape: BoxShape.circle),
-            child: Icon(Icons.dns_outlined, size: 64, color: Colors.white.withValues(alpha: 0.5)),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            AppLocalizations.of(context).translate('server_selection.no_servers_available'),
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 16),
+          Icon(
+            Icons.dns_outlined,
+            size: 64,
+            color: Colors.white.withValues(alpha: 0.3),
           ),
           const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: _isRefreshing ? null : _refreshServers,
-            icon: const Icon(Icons.refresh),
-            label: const Text('Refresh'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          Text(
+            AppLocalizations.of(context).translate('server_selection.no_servers_available'),
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.5),
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: _refreshServers,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF10B981), Color(0xFF059669)],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Refresh',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ),
           ),
         ],
@@ -657,7 +739,11 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   }
 
   String _cleanServerName(String remark) {
-    return remark.replaceAll(RegExp(r'^\[([A-Z]{2})\]\s*'), '').trim();
+    // Remove country code patterns: [CC], (CC), CC-
+    String clean = remark;
+    clean = clean.replaceAll(RegExp(r'^[\[\(][A-Z]{2}[\]\)]\s*'), '');
+    clean = clean.replaceAll(RegExp(r'^[A-Z]{2}[-\s]+'), '');
+    return clean.trim().isEmpty ? remark : clean.trim();
   }
 
   Future<void> _testAllServerPings() async {
@@ -680,13 +766,9 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     if (configs.isEmpty) {
       if (mounted) {
         setState(() => _isTesting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).translate('server_selection.no_servers_available')),
-            backgroundColor: Colors.orange,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          ),
+        _showSnackBar(
+          AppLocalizations.of(context).translate('server_selection.no_servers_available'),
+          Colors.orange,
         );
       }
       return;
@@ -694,69 +776,40 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
 
     final Map<String, int> results = {};
     int successCount = 0;
-    int failCount = 0;
     
     try {
       for (int i = 0; i < configs.length; i++) {
         if (!mounted) return;
         final config = configs[i];
         try {
-          debugPrint('🔍 Testing server ${i + 1}/${configs.length}: ${config.remark}');
+          debugPrint('🔍 Testing ${i + 1}/${configs.length}: ${config.remark}');
           final ping = await provider.v2rayService.getServerDelay(config);
           if (!mounted) return;
           final pingValue = ping ?? 99999;
           results[config.id] = pingValue;
-          if (pingValue < 99999) {
-            successCount++;
-          } else {
-            failCount++;
-          }
+          if (pingValue < 99999) successCount++;
           setState(() => _pingResults = Map.from(results));
-          debugPrint('✅ Server ${config.remark}: ${ping ?? "timeout"}ms');
         } catch (e) {
-          debugPrint('❌ Error testing ${config.remark}: $e');
           results[config.id] = 99999;
-          failCount++;
           if (mounted) setState(() => _pingResults = Map.from(results));
         }
       }
 
       if (!mounted) return;
       _sortServersByPing(provider, results);
-      setState(() => _pingResults = results);
 
-      final String message;
-      final Color bgColor;
-      if (successCount == 0) {
-        message = AppLocalizations.of(context).translate('server_selection.all_servers_timeout');
-        bgColor = Colors.orange;
-      } else if (failCount > 0) {
-        message = '${AppLocalizations.of(context).translate('server_selection.servers_updated')} ($successCount/${configs.length})';
-        bgColor = const Color(0xFF10B981);
-      } else {
-        message = AppLocalizations.of(context).translate('server_selection.servers_updated');
-        bgColor = const Color(0xFF10B981);
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(message),
-          backgroundColor: bgColor,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
+      _showSnackBar(
+        '${AppLocalizations.of(context).translate('server_selection.servers_updated')} ($successCount/${configs.length})',
+        const Color(0xFF10B981),
       );
     } catch (e) {
-      debugPrint('❌ Error testing server pings: $e');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(AppLocalizations.of(context).translate('server_selection.error_updating')),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+      debugPrint('❌ Error testing pings: $e');
+      if (mounted) {
+        _showSnackBar(
+          AppLocalizations.of(context).translate('server_selection.error_updating'),
+          Colors.red,
+        );
+      }
     } finally {
       if (mounted) setState(() => _isTesting = false);
     }
@@ -770,8 +823,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       final pingB = pingResults[b.id] ?? 99999;
       return pingA.compareTo(pingB);
     });
-    final sortedList = [smartConnect, ...serverConfigs];
-    setState(() => _sortedConfigs = sortedList);
-    debugPrint('🔄 Sorted ${serverConfigs.length} servers by ping speed');
+    setState(() => _sortedConfigs = [smartConnect, ...serverConfigs]);
   }
 }
