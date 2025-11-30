@@ -84,7 +84,7 @@ flutter build appbundle --release
 ## Configuration
 
 ### Server Configuration
-Servers are loaded from: `https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub.txt`
+Servers are loaded from: `https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt`
 
 You can modify the server URL in `lib/services/server_service.dart`
 

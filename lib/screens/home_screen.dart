@@ -58,9 +58,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     final provider = Provider.of<V2RayProvider>(context, listen: false);
     // Load servers if not already loaded
     if (provider.serverConfigs.isEmpty) {
-      await provider.fetchServers(
-        customUrl: 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt',
-      );
+      await provider.fetchServers();
       debugPrint('✅ Servers loaded in home screen');
     }
   }
@@ -776,10 +774,21 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   Widget _buildConnectionButton(V2RayProvider provider) {
     final isConnected = provider.activeConfig != null;
     
+    // Colors: Beautiful Red when disconnected, Green when connected
+    final buttonColor = isConnected 
+        ? const Color(0xFF10B981) // Green
+        : const Color(0xFFE53935); // Beautiful Red
+    final buttonColorDark = isConnected 
+        ? const Color(0xFF059669) 
+        : const Color(0xFFC62828);
+    final buttonColorDarker = isConnected 
+        ? const Color(0xFF047857) 
+        : const Color(0xFFB71C1C);
+    
     return Stack(
       alignment: Alignment.center,
       children: [
-        // Pulse Animation Rings
+        // Pulse Animation Rings - ONLY when connected
         if (isConnected)
           ...List.generate(2, (index) {
             return _PulseRing(
@@ -787,111 +796,45 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               size: 200.0,
               color: const Color(0xFF10B981),
             );
-          })
-        else
-          // Subtle glow ring for disconnected state
-          _PulseRing(
-            delay: 0,
-            size: 180.0,
-            color: const Color(0xFF6366F1),
-          ),
+          }),
         
-        // Main Circle Button
+        // Main Circle Button - Simple and clean
         GestureDetector(
           onTap: _isConnecting ? null : () => _handleConnectionToggle(),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 500),
+            duration: const Duration(milliseconds: 400),
             width: 150,
             height: 150,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: RadialGradient(
-                colors: isConnected
-                    ? [
-                        const Color(0xFF10B981).withValues(alpha: 0.9),
-                        const Color(0xFF059669),
-                        const Color(0xFF047857),
-                      ]
-                    : [
-                        const Color(0xFF6366F1).withValues(alpha: 0.8),
-                        const Color(0xFF4F46E5),
-                        const Color(0xFF4338CA),
-                      ],
+                colors: [
+                  buttonColor.withValues(alpha: 0.95),
+                  buttonColorDark,
+                  buttonColorDarker,
+                ],
                 stops: const [0.0, 0.6, 1.0],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: isConnected
-                      ? const Color(0xFF10B981).withValues(alpha: 0.5)
-                      : const Color(0xFF6366F1).withValues(alpha: 0.4),
-                  blurRadius: 35,
-                  spreadRadius: 3,
+                  color: buttonColor.withValues(alpha: 0.5),
+                  blurRadius: 30,
+                  spreadRadius: 2,
                 ),
-                if (!isConnected)
-                  BoxShadow(
-                    color: const Color(0xFF8B5CF6).withValues(alpha: 0.2),
-                    blurRadius: 60,
-                    spreadRadius: 10,
-                  ),
               ],
             ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Animated Border Gradient
-                if (isConnected)
-                  TweenAnimationBuilder<double>(
-                    tween: Tween<double>(begin: 0, end: 1),
-                    duration: const Duration(seconds: 2),
-                    curve: Curves.linear,
-                    builder: (context, value, child) {
-                      return Transform.rotate(
-                        angle: value * 2 * 3.14159,
-                        child: Container(
-                          width: 145,
-                          height: 145,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: SweepGradient(
-                              colors: [
-                                Colors.transparent,
-                                Colors.white.withValues(alpha: 0.3),
-                                Colors.transparent,
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                    onEnd: () {
-                      // Animation loop handled by TweenAnimationBuilder
-                    },
-                  ),
-                
-                // Center Icon with Animation
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 600),
-                  transitionBuilder: (Widget child, Animation<double> animation) {
-                    return ScaleTransition(
-                      scale: animation,
-                      child: FadeTransition(
-                        opacity: animation,
-                        child: child,
+            child: Center(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                child: _isConnecting
+                    ? _buildSmartConnectAnimation(provider.wasUsingSmartConnect)
+                    : Icon(
+                        isConnected ? Icons.stop_rounded : Icons.power_settings_new,
+                        key: ValueKey(isConnected ? 'stop' : 'power'),
+                        size: 60,
+                        color: Colors.white,
                       ),
-                    );
-                  },
-                  child: _isConnecting
-                      ? _buildSmartConnectAnimation(provider.wasUsingSmartConnect)
-                      : Icon(
-                          isConnected 
-                              ? Icons.vpn_key
-                              : Icons.power_settings_new,
-                          key: ValueKey(isConnected ? 'vpn_key' : 'power'),
-                          size: 60,
-                          color: Colors.white,
-                        ),
-                ),
-              ],
+              ),
             ),
           ),
         ),
@@ -899,53 +842,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     );
   }
 
-  // Smart Connect animation widget
+  // Simple loading animation for both Smart Connect and normal connect
   Widget _buildSmartConnectAnimation(bool isSmartConnect) {
-    if (isSmartConnect) {
-      // Smart Connect: radar-like scanning animation
-      return SizedBox(
-        key: const ValueKey('smart_connect_anim'),
-        width: 70,
-        height: 70,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Rotating radar sweep
-            TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.0),
-              duration: const Duration(milliseconds: 1500),
-              builder: (context, value, child) {
-                return Transform.rotate(
-                  angle: value * 2 * 3.14159,
-                  child: CustomPaint(
-                    size: const Size(60, 60),
-                    painter: _RadarSweepPainter(progress: value),
-                  ),
-                );
-              },
-              onEnd: () {},
-            ),
-            // Center flash icon
-            const Icon(
-              Icons.flash_on,
-              color: Colors.white,
-              size: 28,
-            ),
-          ],
-        ),
-      );
-    } else {
-      // Normal connect: simple loading
-      return const SizedBox(
-        key: ValueKey('loading'),
-        width: 40,
-        height: 40,
-        child: CircularProgressIndicator(
-          color: Colors.white,
-          strokeWidth: 3,
-        ),
-      );
-    }
+    return const SizedBox(
+      key: ValueKey('loading'),
+      width: 45,
+      height: 45,
+      child: CircularProgressIndicator(
+        color: Colors.white,
+        strokeWidth: 3,
+      ),
+    );
   }
 
   // Helper to clean server name (remove country code prefix like [DE], [US], etc.)
@@ -1082,15 +989,13 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   child: CachedNetworkImage(
                     imageUrl: 'https://flagcdn.com/w160/${countryCode.toLowerCase()}.png',
                     fit: BoxFit.cover,
+                    memCacheWidth: 160,
+                    memCacheHeight: 120,
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
+                    placeholderFadeInDuration: Duration.zero,
                     placeholder: (context, url) => Container(
                       color: Colors.white.withValues(alpha: 0.1),
-                      child: const Center(
-                        child: SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
-                        ),
-                      ),
                     ),
                     errorWidget: (context, url, error) => Container(
                       color: const Color(0xFF6366F1).withValues(alpha: 0.2),
@@ -1179,11 +1084,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           return Container(
             padding: const EdgeInsets.all(16),
             decoration: _statsDecoration ??= BoxDecoration(
-              // Glass effect matching background
-              color: const Color(0xFF0A0E1A).withValues(alpha: 0.6),
+              // Transparent to match app background
+              color: Colors.white.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.08),
+                color: Colors.white.withValues(alpha: 0.1),
                 width: 1,
               ),
             ),
@@ -1199,7 +1104,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                           icon: Icons.timer,
                           label: tr.translate('home.duration'),
                           value: v2rayService.getFormattedConnectedTime(),
-                          color: const Color(0xFF10B981),
+                          color: const Color(0xFFFFAA66), // Orange/Warning
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -1208,7 +1113,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                           icon: Icons.upload,
                           label: tr.translate('home.upload'),
                           value: v2rayService.getFormattedUpload(),
-                          color: const Color(0xFF10B981),
+                          color: const Color(0xFF72D9FF), // Blue for upload
                         ),
                       ),
                     ],
@@ -1221,7 +1126,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                           icon: Icons.download,
                           label: tr.translate('home.download'),
                           value: v2rayService.getFormattedDownload(),
-                          color: const Color(0xFF10B981),
+                          color: const Color(0xFF76F959), // Green for download
                         ),
                       ),
                       const SizedBox(width: 10),
@@ -1230,7 +1135,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                           icon: Icons.public,
                           label: tr.translate('home.ip_address'),
                           value: v2rayService.ipInfo?.ip ?? '...',
-                          color: const Color(0xFF10B981),
+                          color: const Color(0xFF8B5CF6), // Purple for IP
                         ),
                       ),
                     ],
@@ -1388,45 +1293,4 @@ class _PulseRingState extends State<_PulseRing>
   }
 }
 
-// Radar sweep painter for Smart Connect animation
-class _RadarSweepPainter extends CustomPainter {
-  final double progress;
 
-  _RadarSweepPainter({required this.progress});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.width / 2;
-
-    // Draw radar circles
-    final circlePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.2)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    canvas.drawCircle(center, radius * 0.4, circlePaint);
-    canvas.drawCircle(center, radius * 0.7, circlePaint);
-    canvas.drawCircle(center, radius, circlePaint);
-
-    // Draw sweep gradient
-    final sweepPaint = Paint()
-      ..shader = SweepGradient(
-        startAngle: 0,
-        endAngle: 3.14159 / 2,
-        colors: [
-          Colors.white.withValues(alpha: 0.0),
-          Colors.white.withValues(alpha: 0.4),
-          const Color(0xFF10B981).withValues(alpha: 0.6),
-        ],
-        transform: GradientRotation(progress * 2 * 3.14159),
-      ).createShader(Rect.fromCircle(center: center, radius: radius));
-
-    canvas.drawCircle(center, radius, sweepPaint);
-  }
-
-  @override
-  bool shouldRepaint(_RadarSweepPainter oldDelegate) {
-    return oldDelegate.progress != progress;
-  }
-}

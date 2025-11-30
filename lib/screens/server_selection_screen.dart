@@ -47,9 +47,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     
     try {
       final provider = Provider.of<V2RayProvider>(context, listen: false);
-      await provider.fetchServers(
-        customUrl: 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt',
-      );
+      await provider.fetchServers();
       
       if (mounted) {
         setState(() {
@@ -621,15 +619,13 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
         child: CachedNetworkImage(
           imageUrl: 'https://flagcdn.com/w80/${countryCode.toLowerCase()}.png',
           fit: BoxFit.cover,
+          memCacheWidth: 80,
+          memCacheHeight: 60,
+          fadeInDuration: Duration.zero,
+          fadeOutDuration: Duration.zero,
+          placeholderFadeInDuration: Duration.zero,
           placeholder: (context, url) => Container(
             color: Colors.white.withValues(alpha: 0.1),
-            child: const Center(
-              child: SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white54),
-              ),
-            ),
           ),
           errorWidget: (context, url, error) => Container(
             color: Colors.white.withValues(alpha: 0.1),

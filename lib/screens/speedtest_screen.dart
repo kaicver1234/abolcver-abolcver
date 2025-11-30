@@ -294,16 +294,16 @@ class _SpeedTestScreenState extends State<SpeedTestScreen>
                         color: Colors.white,
                       ),
                     ),
-                    // Mouse cursor icon
+                    // Mouse cursor icon - positioned at center-left where lines are
                     Positioned(
-                      right: 18,
-                      bottom: 18,
+                      left: 12,
+                      top: 20,
                       child: Transform.rotate(
-                        angle: 0.4,
+                        angle: -0.5,
                         child: const Icon(
-                          Icons.near_me_outlined,
+                          Icons.near_me,
                           color: Colors.white,
-                          size: 22,
+                          size: 24,
                         ),
                       ),
                     ),

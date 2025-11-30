@@ -30,84 +30,91 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   // Getter for wasUsingSmartConnect
   bool get wasUsingSmartConnect => _wasUsingSmartConnect;
   
-  // Smart Connect: Find and connect to fastest server (tests first 7 servers)
+  // Smart Connect: Find and connect to fastest server (tests first 5 servers)
   Future<void> smartConnect() async {
-    debugPrint('⚡ Smart Connect: Finding fastest server...');
-    _isConnecting = true;
+    debugPrint('⚡ Smart Connect: Starting...');
     _errorMessage = '';
     _wasUsingSmartConnect = true;
     notifyListeners();
     
     try {
-      // Get server configs (excluding smart connect itself)
+      // Get server configs
       var servers = serverConfigs;
       
       // If no servers, try to load them first
       if (servers.isEmpty) {
         debugPrint('⚠️ No servers loaded, fetching...');
-        await fetchServers(
-          customUrl: 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt',
-        );
+        await fetchServers();
         servers = serverConfigs;
       }
       
       if (servers.isEmpty) {
-        _setError('No servers available for Smart Connect');
-        _isConnecting = false;
-        notifyListeners();
+        _setError('No servers available');
         return;
       }
       
-      // Test only first 7 servers for speed
-      final serversToTest = servers.take(7).toList();
-      V2RayConfig? fastestServer;
-      int lowestPing = 999999;
+      debugPrint('⚡ Found ${servers.length} servers, testing first 5...');
       
-      debugPrint('⚡ Testing ${serversToTest.length} servers...');
+      // Test first 5 servers in parallel for speed
+      final serversToTest = servers.take(5).toList();
+      final Map<V2RayConfig, int> pingResults = {};
       
-      // Test servers in parallel for faster results
-      final results = await Future.wait(
-        serversToTest.map((server) async {
-          try {
-            final ping = await _v2rayService.getServerDelay(server)
-                .timeout(const Duration(seconds: 5), onTimeout: () => null);
-            if (ping != null && ping > 0 && ping < 10000) {
-              debugPrint('   ✓ ${server.remark}: ${ping}ms');
-              return {'server': server, 'ping': ping};
-            }
-          } catch (e) {
-            debugPrint('   ✗ ${server.remark}: failed');
+      // Test all 5 servers in parallel
+      final futures = serversToTest.map((server) async {
+        try {
+          debugPrint('   Testing ${server.remark}...');
+          final ping = await _v2rayService.getServerDelay(server)
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
+          if (ping != null && ping > 0 && ping < 10000) {
+            debugPrint('   ✓ ${server.remark}: ${ping}ms');
+            return MapEntry(server, ping);
+          } else {
+            debugPrint('   ✗ ${server.remark}: timeout/no response');
           }
-          return null;
-        }),
-      );
+        } catch (e) {
+          debugPrint('   ✗ ${server.remark}: error - $e');
+        }
+        return null;
+      }).toList();
       
-      // Find fastest from results
+      final results = await Future.wait(futures);
+      
+      // Collect successful results
       for (final result in results) {
         if (result != null) {
-          final ping = result['ping'] as int;
-          if (ping < lowestPing) {
-            lowestPing = ping;
-            fastestServer = result['server'] as V2RayConfig;
-          }
+          pingResults[result.key] = result.value;
         }
       }
       
-      // Connect to fastest or fallback to first
+      // Find fastest server
+      V2RayConfig? fastestServer;
+      int lowestPing = 999999;
+      
+      pingResults.forEach((server, ping) {
+        if (ping < lowestPing) {
+          lowestPing = ping;
+          fastestServer = server;
+        }
+      });
+      
+      // Use fastest server or fallback to first
       final serverToConnect = fastestServer ?? servers.first;
-      debugPrint('⚡ Connecting to: ${serverToConnect.remark} ${fastestServer != null ? "(${lowestPing}ms)" : "(fallback)"}');
+      
+      if (fastestServer != null) {
+        debugPrint('⚡ Fastest server: ${serverToConnect.remark} (${lowestPing}ms)');
+      } else {
+        debugPrint('⚡ No ping response, using first server: ${serverToConnect.remark}');
+      }
       
       _selectedConfig = serverToConnect;
       notifyListeners();
       
-      // Actually connect
+      // Connect to the selected server
       await connectToServer(serverToConnect);
+      
     } catch (e) {
       debugPrint('❌ Smart Connect error: $e');
-      _setError('Smart Connect failed: $e');
-    } finally {
-      _isConnecting = false;
-      notifyListeners();
+      _setError('Connection failed: $e');
     }
   }
   
@@ -321,20 +328,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         _handleNotificationDisconnect();
       });
 
-      // STEP 4: Load configurations (can be slower)
-      await loadConfigs();
-      debugPrint('✅ Configs loaded: ${_configs.length} servers');
-
-      // STEP 5: Load subscriptions
-      await loadSubscriptions();
-      debugPrint('✅ Subscriptions loaded: ${_subscriptions.length} subscriptions');
-
-      // STEP 6: Update subscriptions in background (don't block UI)
-      updateAllSubscriptions().then((_) {
-        debugPrint('✅ Subscriptions updated in background');
-      }).catchError((e) {
-        debugPrint('⚠️ Background subscription update failed: $e');
-      });
+      // STEP 4: Fetch servers from main URL (replaces all old servers)
+      await fetchServers();
+      debugPrint('✅ Servers loaded: ${_configs.length} servers');
       
       // STEP 7: Final sync to ensure everything is correct
       await _enhancedSyncWithVpnServiceState();
@@ -543,35 +539,34 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
-  Future<void> fetchServers({required String customUrl}) async {
+  // Single server URL - ONLY source of servers
+  static const String _serverUrl = 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt';
+
+  Future<void> fetchServers({String? customUrl}) async {
     _isLoadingServers = true;
     _errorMessage = '';
     notifyListeners();
 
     try {
-      // Fetch servers from service using the provided custom URL
-      final servers = await _serverService.fetchServers(customUrl: customUrl);
+      // Always use the main server URL
+      final url = customUrl ?? _serverUrl;
+      final servers = await _serverService.fetchServers(customUrl: url);
 
       if (servers.isNotEmpty) {
-        // Clear all ping cache
         _v2rayService.clearPingCache();
         
-        // Replace all configs with new servers (no duplicates)
+        // COMPLETELY REPLACE all configs - no merging, no duplicates
         _configs = servers;
-
-        // Save configs
         await _v2rayService.saveConfigs(_configs);
-
-        debugPrint('✅ Loaded ${_configs.length} servers');
+        debugPrint('✅ Loaded ${_configs.length} servers from $url');
       } else {
-        // If no servers found online, try to load from local storage
+        // Fallback to cache only if online fetch returns empty
         _configs = await _v2rayService.loadConfigs();
         debugPrint('📂 Loaded ${_configs.length} servers from cache');
       }
     } catch (e) {
       debugPrint('❌ Failed to fetch servers: $e');
       _setError('Failed to fetch servers: $e');
-      // Try to load from local storage as fallback
       _configs = await _v2rayService.loadConfigs();
     } finally {
       _isLoadingServers = false;
@@ -580,63 +575,18 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   }
 
   Future<void> loadSubscriptions() async {
-    _setLoading(true);
-    try {
-      _subscriptions = await _v2rayService.loadSubscriptions();
-
-      // Create default subscription if no subscriptions exist
-      if (_subscriptions.isEmpty) {
-        final defaultSubscription = Subscription(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
-          name: 'Default Subscription',
-          url:
-              'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub.txt',
-          lastUpdated: DateTime.now(),
-          configIds: [],
-        );
-        _subscriptions.add(defaultSubscription);
-        await _v2rayService.saveSubscriptions(_subscriptions);
-      }
-
-      // Ensure configs are loaded and match subscription config IDs
-      if (_configs.isEmpty) {
-        _configs = await _v2rayService.loadConfigs();
-      }
-
-      // Verify that all subscription config IDs exist in the configs list
-      // If not, it means the configs weren't properly saved or loaded
-      for (var subscription in _subscriptions) {
-        final configIds = subscription.configIds;
-        final existingConfigIds = _configs.map((c) => c.id).toSet();
-
-        // Check if any config IDs in the subscription are missing from the configs list
-        final missingConfigIds = configIds
-            .where((id) => !existingConfigIds.contains(id))
-            .toList();
-
-        if (missingConfigIds.isNotEmpty) {
-          // Warning: Found missing configs for subscription
-          // Update the subscription to remove missing config IDs
-          final updatedConfigIds = configIds
-              .where((id) => existingConfigIds.contains(id))
-              .toList();
-          final index = _subscriptions.indexWhere(
-            (s) => s.id == subscription.id,
-          );
-          if (index != -1) {
-            _subscriptions[index] = subscription.copyWith(
-              configIds: updatedConfigIds,
-            );
-          }
-        }
-      }
-
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to load subscriptions: $e');
-    } finally {
-      _setLoading(false);
-    }
+    // Simplified - just ensure we have the default subscription
+    _subscriptions = [
+      Subscription(
+        id: 'default',
+        name: 'Default Subscription',
+        url: _serverUrl,
+        lastUpdated: DateTime.now(),
+        configIds: [],
+      ),
+    ];
+    await _v2rayService.saveSubscriptions(_subscriptions);
+    notifyListeners();
   }
 
   Future<void> addConfig(V2RayConfig config) async {
@@ -888,88 +838,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
-  // Update all subscriptions
+  // Update all subscriptions - simplified to just fetch from main URL
   Future<void> updateAllSubscriptions() async {
-    _setLoading(true);
-    _errorMessage = '';
-    _isLoadingServers = true;
-    notifyListeners();
-
-    // Clear all ping cache before updating subscriptions
-    _v2rayService.clearPingCache();
-
-    try {
-      // Make a copy to avoid modification during iteration
-      final subscriptionsCopy = List<Subscription>.from(_subscriptions);
-      bool anyUpdated = false;
-      List<String> failedSubscriptions = [];
-
-      for (final subscription in subscriptionsCopy) {
-        try {
-          // Skip empty or invalid subscriptions
-          if (subscription.url.isEmpty) continue;
-
-          final configs = await _v2rayService.parseSubscriptionUrl(
-            subscription.url,
-          );
-
-          // Remove old configs for this subscription
-          _configs.removeWhere((c) => subscription.configIds.contains(c.id));
-
-          // Add new configs (avoid duplicates by checking ID)
-          for (var config in configs) {
-            if (!_configs.any((c) => c.id == config.id)) {
-              _configs.add(config);
-            }
-          }
-
-          final newConfigIds = configs.map((c) => c.id).toList();
-
-          // Update subscription
-          final index = _subscriptions.indexWhere(
-            (s) => s.id == subscription.id,
-          );
-          if (index != -1) {
-            _subscriptions[index] = subscription.copyWith(
-              lastUpdated: DateTime.now(),
-              configIds: newConfigIds,
-            );
-            anyUpdated = true;
-          }
-        } catch (e) {
-          // Record failed subscription
-          failedSubscriptions.add(subscription.name);
-          // Error updating subscription
-        }
-      }
-
-      // Save all changes at once to reduce disk operations
-      if (anyUpdated) {
-        await _v2rayService.saveConfigs(_configs);
-        await _v2rayService.saveSubscriptions(_subscriptions);
-      }
-
-      // Set error message if any subscriptions failed
-      if (failedSubscriptions.isNotEmpty) {
-        if (failedSubscriptions.length == _subscriptions.length) {
-          // All subscriptions failed - likely a network issue
-          _setError(
-            'Failed to update subscriptions: Network error or invalid URLs',
-          );
-        } else {
-          // Some subscriptions failed
-          _setError('Failed to update: ${failedSubscriptions.join(', ')}');
-        }
-      }
-
-      _isLoadingServers = false;
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to update all subscriptions: $e');
-    } finally {
-      _setLoading(false);
-      _isLoadingServers = false;
-    }
+    // Simply fetch servers from the main URL
+    await fetchServers();
   }
 
   Future<void> removeSubscription(Subscription subscription) async {
