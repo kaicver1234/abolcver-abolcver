@@ -16,15 +16,35 @@ class SpeedTestProvider with ChangeNotifier {
   final List<double> _downloadSpeeds = [];
   final List<double> _uploadSpeeds = [];
 
-  static const String _downloadUrl = 'https://speed.cloudflare.com/__down';
-  static const String _uploadUrl = 'https://speed.cloudflare.com/__up';
+  static const String _baseUrl = 'https://speed.cloudflare.com';
+  static const String _downloadUrl = '$_baseUrl/__down';
+  static const String _uploadUrl = '$_baseUrl/__up';
+
+  // Measurement configuration like defyxVPN
+  static const List<Map<String, dynamic>> _measurements = [
+    {'type': 'latency', 'numPackets': 1},
+    {'type': 'download', 'bytes': 100000, 'count': 1},
+    {'type': 'latency', 'numPackets': 20},
+    {'type': 'download', 'bytes': 100000, 'count': 9},
+    {'type': 'download', 'bytes': 1000000, 'count': 8},
+    {'type': 'upload', 'bytes': 100000, 'count': 8},
+    {'type': 'upload', 'bytes': 1000000, 'count': 6},
+    {'type': 'download', 'bytes': 10000000, 'count': 6},
+  ];
+
+  String _measurementId = '';
 
   SpeedTestProvider() {
     _dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 15),
+      connectTimeout: const Duration(seconds: 30),
       receiveTimeout: const Duration(seconds: 60),
       sendTimeout: const Duration(seconds: 60),
+      headers: {'User-Agent': 'Tiksar VPN Speed Test'},
     ));
+  }
+
+  String _generateMeasurementId() {
+    return (Random().nextDouble() * 1e16).round().toString();
   }
 
   void stopTest() {
@@ -36,6 +56,7 @@ class SpeedTestProvider with ChangeNotifier {
     _uploadSpeeds.clear();
     _state = const SpeedTestState();
     notifyListeners();
+    debugPrint('🛑 Speed test stopped and reset');
   }
 
   Future<void> startTest() async {
@@ -46,201 +67,328 @@ class SpeedTestProvider with ChangeNotifier {
 
     _isCanceled = false;
     _cancelToken = CancelToken();
+    _measurementId = _generateMeasurementId();
     _latencies.clear();
     _downloadSpeeds.clear();
     _uploadSpeeds.clear();
 
-    _state = const SpeedTestState(step: SpeedTestStep.loading);
+    _state = const SpeedTestState(
+      step: SpeedTestStep.loading,
+      currentPhase: 'Initializing...',
+    );
     notifyListeners();
 
+    debugPrint('🚀 Cloudflare Speed Test Started');
+
     try {
-      // Test latency
-      final latencyOk = await _testLatency();
-      if (_isCanceled) return;
-      
-      if (!latencyOk) {
-        _setError('connection_failed');
+      await _runMeasurementSequence();
+
+      if (_isCanceled) {
+        debugPrint('🛑 Speed test was canceled');
         return;
       }
 
-      // Test download
-      await _testDownload();
-      if (_isCanceled) return;
-
-      // Test upload
-      await _testUpload();
-      if (_isCanceled) return;
-
-      _finishTest();
+      _calculateFinalResults();
+      debugPrint('🏁 Speed test completed successfully');
     } catch (e) {
-      debugPrint('Speed test error: $e');
+      debugPrint('❌ Speed test error: $e');
       if (!_isCanceled) {
-        _setError('test_failed');
+        _state = _state.copyWith(
+          step: SpeedTestStep.ready,
+          errorMessage: 'test_failed',
+          hadError: true,
+          currentSpeed: 0,
+        );
+        notifyListeners();
       }
     }
   }
 
-  void _setError(String errorKey) {
-    _state = _state.copyWith(
-      step: SpeedTestStep.ready,
-      errorMessage: errorKey, // Will be translated in UI
-      hadError: true,
-    );
-    notifyListeners();
+  Future<void> _runMeasurementSequence() async {
+    String currentPhase = '';
+    int totalMeasurements = _measurements.length;
+
+    for (int i = 0; i < totalMeasurements; i++) {
+      if (_isCanceled) {
+        debugPrint('🛑 Measurement sequence canceled');
+        return;
+      }
+
+      final measurement = _measurements[i];
+      final progress = (i + 1) / totalMeasurements;
+      final type = measurement['type'] as String;
+
+      bool needsPhaseChange = false;
+      SpeedTestStep? nextStep;
+
+      if (type == 'latency' && currentPhase != 'loading') {
+        needsPhaseChange = true;
+        nextStep = SpeedTestStep.loading;
+        currentPhase = 'loading';
+      } else if (type == 'download' && currentPhase != 'download') {
+        needsPhaseChange = true;
+        nextStep = SpeedTestStep.download;
+        currentPhase = 'download';
+      } else if (type == 'upload' && currentPhase != 'upload') {
+        needsPhaseChange = true;
+        nextStep = SpeedTestStep.upload;
+        currentPhase = 'upload';
+      }
+
+      // Reset progress when changing phase
+      if (needsPhaseChange && i > 0 && _state.progress > 0) {
+        _state = _state.copyWith(progress: 0.0);
+        notifyListeners();
+        await Future.delayed(const Duration(milliseconds: 1200));
+
+        if (_isCanceled) return;
+      }
+
+      if (needsPhaseChange && nextStep != null) {
+        _state = _state.copyWith(step: nextStep);
+        notifyListeners();
+      }
+
+      debugPrint('📊 Running measurement ${i + 1}/$totalMeasurements: $type');
+
+      switch (type) {
+        case 'latency':
+          await _runLatencyMeasurement(measurement);
+          break;
+        case 'download':
+          await _runDownloadMeasurement(measurement, progress);
+          break;
+        case 'upload':
+          await _runUploadMeasurement(measurement, progress);
+          break;
+      }
+
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
   }
 
-  Future<bool> _testLatency() async {
-    debugPrint('Testing latency...');
+  Future<void> _runLatencyMeasurement(Map<String, dynamic> config) async {
+    final numPackets = config['numPackets'] as int;
+    int consecutiveFailures = 0;
 
-    // Warmup
-    try {
-      await _dio.head('$_downloadUrl?bytes=0').timeout(const Duration(seconds: 5));
-    } catch (_) {}
+    _state = _state.copyWith(
+      step: SpeedTestStep.loading,
+      currentPhase: 'Measuring latency... ($numPackets packets)',
+    );
+    notifyListeners();
 
-    for (int i = 0; i < 8; i++) {
-      if (_isCanceled) return false;
+    for (int i = 0; i < numPackets; i++) {
+      if (_isCanceled) return;
 
       try {
         final sw = Stopwatch()..start();
-        await _dio.head(
-          '$_downloadUrl?bytes=0',
+        await _dio.get(
+          '$_downloadUrl?bytes=0&measId=$_measurementId',
           cancelToken: _cancelToken,
-        ).timeout(const Duration(seconds: 5));
+        );
         sw.stop();
 
         final latency = sw.elapsedMilliseconds;
         if (latency > 0 && latency < 5000) {
           _latencies.add(latency);
-        }
+          consecutiveFailures = 0;
 
-        _state = _state.copyWith(
-          progress: (i + 1) / 8,
-          result: _state.result.copyWith(
-            ping: _latencies.isNotEmpty ? _latencies.reduce(min) : 0,
-            jitter: _calcJitter(),
-          ),
-        );
-        notifyListeners();
+          final avgLatency = _latencies.isNotEmpty
+              ? (_latencies.reduce((a, b) => a + b) / _latencies.length).round()
+              : 0;
+
+          int jitter = 0;
+          if (_latencies.length >= 2) {
+            int jitterSum = 0;
+            for (int j = 1; j < _latencies.length; j++) {
+              jitterSum += (_latencies[j] - _latencies[j - 1]).abs();
+            }
+            jitter = (jitterSum / (_latencies.length - 1)).round();
+          }
+
+          _state = _state.copyWith(
+            result: _state.result.copyWith(
+              ping: latency,
+              latency: avgLatency,
+              jitter: jitter,
+            ),
+          );
+          notifyListeners();
+
+          debugPrint('   📡 Latency ${i + 1}/$numPackets: ${latency}ms');
+        }
       } catch (e) {
-        debugPrint('Ping $i failed: $e');
+        consecutiveFailures++;
+        debugPrint('   ❌ Latency measurement ${i + 1} failed: $e');
+
+        if (consecutiveFailures >= 3) {
+          throw Exception('Network connection failed');
+        }
       }
 
-      await Future.delayed(const Duration(milliseconds: 80));
+      await Future.delayed(const Duration(milliseconds: 10));
     }
 
-    return _latencies.isNotEmpty;
+    if (_latencies.isEmpty) {
+      throw Exception('Failed to measure latency');
+    }
   }
 
-  Future<void> _testDownload() async {
-    debugPrint('Testing download...');
+  Future<void> _runDownloadMeasurement(Map<String, dynamic> config, double progress) async {
+    final bytes = config['bytes'] as int;
+    final count = config['count'] as int;
+    final sizeLabel = _formatBytes(bytes);
+    int consecutiveFailures = 0;
 
     _state = _state.copyWith(
       step: SpeedTestStep.download,
-      progress: 0,
-      currentSpeed: 0,
+      currentPhase: 'Download test: $sizeLabel',
+      progress: progress,
     );
     notifyListeners();
 
-    final testSizes = [500000, 2000000, 5000000, 10000000];
-
-    for (int i = 0; i < testSizes.length; i++) {
+    for (int i = 0; i < count; i++) {
       if (_isCanceled) return;
 
-      final bytes = testSizes[i];
-      final speed = await _measureDownload(bytes);
+      try {
+        final speed = await _measureDownloadSpeed(bytes);
+        if (speed > 0) {
+          _downloadSpeeds.add(speed);
+          consecutiveFailures = 0;
 
-      if (speed > 0) {
-        _downloadSpeeds.add(speed);
-        final avgSpeed = _calcAverage(_downloadSpeeds);
+          final percentileSpeed = _calculatePercentile(_downloadSpeeds, 0.9);
+          final avgSpeed = _downloadSpeeds.reduce((a, b) => a + b) / _downloadSpeeds.length;
 
-        _state = _state.copyWith(
-          progress: (i + 1) / testSizes.length,
-          currentSpeed: avgSpeed,
-          result: _state.result.copyWith(downloadSpeed: avgSpeed),
-        );
-        notifyListeners();
+          _state = _state.copyWith(
+            currentSpeed: avgSpeed,
+            result: _state.result.copyWith(
+              downloadSpeed: percentileSpeed,
+              ping: _latencies.isNotEmpty ? _latencies.last : 0,
+            ),
+          );
+          notifyListeners();
 
-        debugPrint('Download ${bytes ~/ 1000}KB: ${speed.toStringAsFixed(1)} Mbps');
+          debugPrint('   📥 Download ${i + 1}/$count ($sizeLabel): ${speed.toStringAsFixed(2)} Mbps');
+        }
+      } catch (e) {
+        consecutiveFailures++;
+        debugPrint('   ❌ Download measurement ${i + 1} failed: $e');
+
+        if (consecutiveFailures >= 3) {
+          throw Exception('Network connection lost during download test');
+        }
       }
 
-      await Future.delayed(const Duration(milliseconds: 150));
+      await Future.delayed(const Duration(milliseconds: 50));
     }
   }
 
-  Future<double> _measureDownload(int bytes) async {
+  Future<double> _measureDownloadSpeed(int bytes) async {
+    if (_isCanceled) return 0.0;
+
     final sw = Stopwatch()..start();
-    int received = 0;
+    DateTime? lastUpdateTime;
 
     try {
-      await _dio.get<List<int>>(
-        '$_downloadUrl?bytes=$bytes',
+      final response = await _dio.get<List<int>>(
+        '$_downloadUrl?bytes=$bytes&measId=$_measurementId&during=download',
         options: Options(
           responseType: ResponseType.bytes,
           headers: {'Cache-Control': 'no-cache, no-store'},
         ),
         cancelToken: _cancelToken,
-        onReceiveProgress: (recv, total) {
+        onReceiveProgress: (received, total) {
           if (_isCanceled) return;
-          received = recv;
+
+          final now = DateTime.now();
           final elapsed = sw.elapsedMilliseconds / 1000.0;
-          if (elapsed > 0.15) {
-            final speed = (recv * 8) / elapsed / 1000000;
-            _state = _state.copyWith(currentSpeed: speed);
+
+          if (elapsed > 0.05 &&
+              (lastUpdateTime == null || now.difference(lastUpdateTime!).inMilliseconds > 100)) {
+            final currentSpeedMbps = (received * 8) / elapsed / 1000000;
+            final roundedSpeed = _roundSpeed(currentSpeedMbps);
+            _state = _state.copyWith(currentSpeed: roundedSpeed);
             notifyListeners();
+            lastUpdateTime = now;
           }
         },
       );
 
+      if (_isCanceled) return 0.0;
+
       sw.stop();
-      final seconds = sw.elapsedMilliseconds / 1000.0;
-      if (seconds < 0.05 || received == 0) return 0;
-      return (received * 8) / seconds / 1000000;
+      final durationSeconds = sw.elapsedMilliseconds / 1000.0;
+      if (durationSeconds < 0.01) return 0.0;
+
+      final actualBytes = response.data?.length ?? 0;
+      return (actualBytes * 8) / durationSeconds / 1000000;
     } catch (e) {
-      sw.stop();
-      if (received > 0 && sw.elapsedMilliseconds > 100) {
-        return (received * 8) / (sw.elapsedMilliseconds / 1000.0) / 1000000;
-      }
-      return 0;
+      debugPrint('   ❌ Download measurement error: $e');
+      throw Exception('Download failed: $e');
     }
   }
 
-  Future<void> _testUpload() async {
-    debugPrint('Testing upload...');
+  Future<void> _runUploadMeasurement(Map<String, dynamic> config, double progress) async {
+    final bytes = config['bytes'] as int;
+    final count = config['count'] as int;
+    final sizeLabel = _formatBytes(bytes);
+    int consecutiveFailures = 0;
 
     _state = _state.copyWith(
       step: SpeedTestStep.upload,
-      progress: 0,
-      currentSpeed: 0,
+      currentPhase: 'Upload test: $sizeLabel',
+      progress: progress,
     );
     notifyListeners();
 
-    final testSizes = [250000, 500000, 1000000, 2000000];
-
-    for (int i = 0; i < testSizes.length; i++) {
+    for (int i = 0; i < count; i++) {
       if (_isCanceled) return;
 
-      final bytes = testSizes[i];
-      final speed = await _measureUpload(bytes);
+      try {
+        final speed = await _measureUploadSpeed(bytes);
+        if (speed > 0) {
+          _uploadSpeeds.add(speed);
+          consecutiveFailures = 0;
 
-      if (speed > 0) {
-        _uploadSpeeds.add(speed);
-        final avgSpeed = _calcAverage(_uploadSpeeds);
+          final percentileSpeed = _calculatePercentile(_uploadSpeeds, 0.9);
+          final avgSpeed = _uploadSpeeds.reduce((a, b) => a + b) / _uploadSpeeds.length;
 
-        _state = _state.copyWith(
-          progress: (i + 1) / testSizes.length,
-          currentSpeed: avgSpeed,
-          result: _state.result.copyWith(uploadSpeed: avgSpeed),
-        );
-        notifyListeners();
+          int jitter = 0;
+          if (_latencies.length >= 2) {
+            int jitterSum = 0;
+            for (int j = 1; j < _latencies.length; j++) {
+              jitterSum += (_latencies[j] - _latencies[j - 1]).abs();
+            }
+            jitter = (jitterSum / (_latencies.length - 1)).round();
+          }
 
-        debugPrint('Upload ${bytes ~/ 1000}KB: ${speed.toStringAsFixed(1)} Mbps');
+          _state = _state.copyWith(
+            currentSpeed: avgSpeed,
+            result: _state.result.copyWith(
+              uploadSpeed: percentileSpeed,
+              jitter: jitter,
+            ),
+          );
+          notifyListeners();
+
+          debugPrint('   📤 Upload ${i + 1}/$count ($sizeLabel): ${speed.toStringAsFixed(2)} Mbps');
+        }
+      } catch (e) {
+        consecutiveFailures++;
+        debugPrint('   ❌ Upload measurement ${i + 1} failed: $e');
+
+        if (consecutiveFailures >= 3) {
+          throw Exception('Network connection lost during upload test');
+        }
       }
 
-      await Future.delayed(const Duration(milliseconds: 150));
+      await Future.delayed(const Duration(milliseconds: 50));
     }
   }
 
-  Future<double> _measureUpload(int bytes) async {
+  Future<double> _measureUploadSpeed(int bytes) async {
+    if (_isCanceled) return 0.0;
+
     final data = Uint8List(bytes);
     final random = Random();
     for (int i = 0; i < min(2048, bytes); i++) {
@@ -248,45 +396,66 @@ class SpeedTestProvider with ChangeNotifier {
     }
 
     final sw = Stopwatch()..start();
-    int sent = 0;
+    DateTime? lastUpdateTime;
 
     try {
       await _dio.post(
-        _uploadUrl,
+        '$_uploadUrl?measId=$_measurementId&during=upload',
         data: data,
         options: Options(
           headers: {'Content-Type': 'application/octet-stream'},
         ),
         cancelToken: _cancelToken,
-        onSendProgress: (s, total) {
+        onSendProgress: (sent, total) {
           if (_isCanceled) return;
-          sent = s;
+
+          final now = DateTime.now();
           final elapsed = sw.elapsedMilliseconds / 1000.0;
-          if (elapsed > 0.15) {
-            final speed = (s * 8) / elapsed / 1000000;
-            _state = _state.copyWith(currentSpeed: speed);
+
+          if (elapsed > 0.05 &&
+              (lastUpdateTime == null || now.difference(lastUpdateTime!).inMilliseconds > 100)) {
+            final currentSpeedMbps = (sent * 8) / elapsed / 1000000;
+            final roundedSpeed = _roundSpeed(currentSpeedMbps);
+            _state = _state.copyWith(currentSpeed: roundedSpeed);
             notifyListeners();
+            lastUpdateTime = now;
           }
         },
       );
 
+      if (_isCanceled) return 0.0;
+
       sw.stop();
-      final seconds = sw.elapsedMilliseconds / 1000.0;
-      if (seconds < 0.05) return 0;
-      return (bytes * 8) / seconds / 1000000;
+      final durationSeconds = sw.elapsedMilliseconds / 1000.0;
+      if (durationSeconds < 0.05) return 0.0;
+
+      return (bytes * 8) / durationSeconds / 1000000;
     } catch (e) {
-      sw.stop();
-      if (sent > 0 && sw.elapsedMilliseconds > 100) {
-        return (sent * 8) / (sw.elapsedMilliseconds / 1000.0) / 1000000;
-      }
-      return 0;
+      debugPrint('   ❌ Upload measurement error: $e');
+      throw Exception('Upload failed: $e');
     }
   }
 
-  void _finishTest() {
-    final download = _downloadSpeeds.isEmpty ? 0.0 : _calcAverage(_downloadSpeeds);
-    final upload = _uploadSpeeds.isEmpty ? 0.0 : _calcAverage(_uploadSpeeds);
+  void _calculateFinalResults() {
+    final downloadSpeed = _downloadSpeeds.isEmpty
+        ? 0.0
+        : _calculatePercentile(_downloadSpeeds, 0.9);
+    final uploadSpeed = _uploadSpeeds.isEmpty
+        ? 0.0
+        : _calculatePercentile(_uploadSpeeds, 0.9);
     final ping = _latencies.isEmpty ? 0 : _latencies.reduce(min);
+    final latency = _latencies.isEmpty
+        ? 0
+        : (_latencies.reduce((a, b) => a + b) / _latencies.length).round();
+
+    int jitter = 0;
+    if (_latencies.length >= 2) {
+      int jitterSum = 0;
+      for (int i = 1; i < _latencies.length; i++) {
+        jitterSum += (_latencies[i] - _latencies[i - 1]).abs();
+      }
+      jitter = (jitterSum / (_latencies.length - 1)).round();
+    }
 
     _state = _state.copyWith(
       step: SpeedTestStep.ready,
@@ -294,33 +463,43 @@ class SpeedTestProvider with ChangeNotifier {
       currentSpeed: 0,
       testCompleted: true,
       hadError: false,
+      clearErrorMessage: true,
       result: SpeedTestResult(
-        downloadSpeed: download,
-        uploadSpeed: upload,
+        downloadSpeed: downloadSpeed,
+        uploadSpeed: uploadSpeed,
         ping: ping,
-        latency: _latencies.isEmpty ? 0 : (_latencies.reduce((a, b) => a + b) ~/ _latencies.length),
-        jitter: _calcJitter(),
+        latency: latency,
+        jitter: jitter,
         packetLoss: 0,
       ),
     );
     notifyListeners();
 
-    debugPrint('Complete: ↓${download.toStringAsFixed(1)} ↑${upload.toStringAsFixed(1)} Mbps, ${ping}ms');
+    debugPrint('Complete: ↓${downloadSpeed.toStringAsFixed(1)} ↑${uploadSpeed.toStringAsFixed(1)} Mbps, ${ping}ms');
   }
 
-  double _calcAverage(List<double> values) {
-    if (values.isEmpty) return 0;
-    if (values.length == 1) return values.first;
-    return values.reduce((a, b) => a + b) / values.length;
+  double _calculatePercentile(List<double> values, double percentile) {
+    if (values.isEmpty) return 0.0;
+    final sorted = List<double>.from(values)..sort();
+    final index = (percentile * (sorted.length - 1)).round();
+    return sorted[index.clamp(0, sorted.length - 1)];
   }
 
-  int _calcJitter() {
-    if (_latencies.length < 2) return 0;
-    int sum = 0;
-    for (int i = 1; i < _latencies.length; i++) {
-      sum += (_latencies[i] - _latencies[i - 1]).abs();
+  double _roundSpeed(double speed) {
+    if (speed < 10) {
+      return (speed / 0.1).round() * 0.1;
+    } else if (speed < 50) {
+      return (speed / 0.25).round() * 0.25;
+    } else {
+      return (speed / 0.5).round() * 0.5;
     }
-    return sum ~/ (_latencies.length - 1);
+  }
+
+  String _formatBytes(int bytes) {
+    if (bytes < 1000) return '${bytes}B';
+    if (bytes < 1000000) return '${(bytes / 1000).toStringAsFixed(0)}KB';
+    if (bytes < 1000000000) return '${(bytes / 1000000).toStringAsFixed(0)}MB';
+    return '${(bytes / 1000000000).toStringAsFixed(0)}GB';
   }
 
   void resetTest() => stopTest();
