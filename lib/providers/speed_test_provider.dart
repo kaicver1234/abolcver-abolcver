@@ -1,10 +1,10 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../models/speed_test_state.dart';
 
-/// Speed Test Provider - Based on Cloudflare Speed Test
 class SpeedTestProvider with ChangeNotifier {
   SpeedTestState _state = const SpeedTestState();
   SpeedTestState get state => _state;
@@ -17,68 +17,56 @@ class SpeedTestProvider with ChangeNotifier {
   final List<double> _downloadSpeeds = [];
   final List<double> _uploadSpeeds = [];
 
-  // Measurement configuration (like defyxVPN)
-  static const List<Map<String, dynamic>> _measurements = [
-    {'type': 'latency', 'numPackets': 1},
-    {'type': 'download', 'bytes': 100000, 'count': 1},
-    {'type': 'latency', 'numPackets': 20},
-    {'type': 'download', 'bytes': 100000, 'count': 9},
-    {'type': 'download', 'bytes': 1000000, 'count': 8},
-    {'type': 'upload', 'bytes': 100000, 'count': 8},
-    {'type': 'upload', 'bytes': 1000000, 'count': 6},
-    {'type': 'download', 'bytes': 10000000, 'count': 6},
-  ];
+  static const String _downloadUrl = 'https://speed.cloudflare.com/__down';
+  static const String _uploadUrl = 'https://speed.cloudflare.com/__up';
 
   SpeedTestProvider() {
-    _dio = Dio()
-      ..options.connectTimeout = const Duration(seconds: 30)
-      ..options.receiveTimeout = const Duration(seconds: 60)
-      ..options.sendTimeout = const Duration(seconds: 60)
-      ..options.headers['User-Agent'] = 'Tiksar VPN Speed Test';
+    _dio = Dio(BaseOptions(
+      connectTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(seconds: 120),
+      sendTimeout: const Duration(seconds: 120),
+    ));
   }
 
   void stopTest() {
     _isCanceled = true;
-    _cancelToken?.cancel('User stopped');
+    _cancelToken?.cancel('User canceled');
     _cancelToken = null;
-    _reset();
-    _state = const SpeedTestState();
-    notifyListeners();
-  }
-
-  void _reset() {
     _latencies.clear();
     _downloadSpeeds.clear();
     _uploadSpeeds.clear();
+    _state = const SpeedTestState();
+    notifyListeners();
   }
 
   Future<void> startTest() async {
     if (_state.step != SpeedTestStep.ready) {
       stopTest();
-      await Future.delayed(const Duration(milliseconds: 200));
+      await Future.delayed(const Duration(milliseconds: 300));
     }
 
     _isCanceled = false;
     _cancelToken = CancelToken();
-    _reset();
+    _latencies.clear();
+    _downloadSpeeds.clear();
+    _uploadSpeeds.clear();
 
-    _state = _state.copyWith(
-      step: SpeedTestStep.loading,
-      progress: 0.0,
-      result: const SpeedTestResult(),
-      currentSpeed: 0.0,
-      errorMessage: null,
-      hadError: false,
-      testCompleted: false,
-    );
+    _state = const SpeedTestState(step: SpeedTestStep.loading);
     notifyListeners();
 
     try {
-      await _runMeasurementSequence();
+      await _testLatency();
       if (_isCanceled) return;
-      _calculateFinalResults();
+
+      await _testDownload();
+      if (_isCanceled) return;
+
+      await _testUpload();
+      if (_isCanceled) return;
+
+      _finishTest();
     } catch (e) {
-      debugPrint('❌ Speed test error: $e');
+      debugPrint('Speed test error: $e');
       if (!_isCanceled) {
         _state = _state.copyWith(
           step: SpeedTestStep.ready,
@@ -90,297 +78,241 @@ class SpeedTestProvider with ChangeNotifier {
     }
   }
 
-  Future<void> _runMeasurementSequence() async {
-    String currentPhase = '';
-    int measurementIndex = 0;
 
-    for (final measurement in _measurements) {
-      if (_isCanceled) return;
+  Future<void> _testLatency() async {
+    debugPrint('Testing latency...');
 
-      final type = measurement['type'] as String;
-      measurementIndex++;
-      final progress = measurementIndex / _measurements.length;
+    try {
+      await _dio.head('$_downloadUrl?bytes=0');
+    } catch (_) {}
 
-      // Phase change
-      SpeedTestStep? nextStep;
-      if (type == 'latency' && currentPhase != 'loading') {
-        nextStep = SpeedTestStep.loading;
-        currentPhase = 'loading';
-      } else if (type == 'download' && currentPhase != 'download') {
-        nextStep = SpeedTestStep.download;
-        currentPhase = 'download';
-        // Reset progress when changing phase
-        if (measurementIndex > 1) {
-          _state = _state.copyWith(progress: 0.0);
-          notifyListeners();
-          await Future.delayed(const Duration(milliseconds: 800));
-        }
-      } else if (type == 'upload' && currentPhase != 'upload') {
-        nextStep = SpeedTestStep.upload;
-        currentPhase = 'upload';
-        _state = _state.copyWith(progress: 0.0);
-        notifyListeners();
-        await Future.delayed(const Duration(milliseconds: 800));
-      }
+    await Future.delayed(const Duration(milliseconds: 200));
 
-      if (nextStep != null) {
-        _state = _state.copyWith(step: nextStep);
-        notifyListeners();
-      }
-
-      switch (type) {
-        case 'latency':
-          await _runLatencyMeasurement(measurement);
-          break;
-        case 'download':
-          await _runDownloadMeasurement(measurement, progress);
-          break;
-        case 'upload':
-          await _runUploadMeasurement(measurement, progress);
-          break;
-      }
-
-      await Future.delayed(const Duration(milliseconds: 50));
-    }
-  }
-
-  Future<void> _runLatencyMeasurement(Map<String, dynamic> config) async {
-    final numPackets = config['numPackets'] as int;
-
-    for (int i = 0; i < numPackets; i++) {
+    for (int i = 0; i < 10; i++) {
       if (_isCanceled) return;
 
       try {
-        final stopwatch = Stopwatch()..start();
-        await _dio.get(
-          'https://speed.cloudflare.com/__down?bytes=0',
-          cancelToken: _cancelToken,
-        );
-        stopwatch.stop();
+        final sw = Stopwatch()..start();
+        await _dio.head('$_downloadUrl?bytes=0', cancelToken: _cancelToken);
+        sw.stop();
 
-        final latency = stopwatch.elapsedMilliseconds;
-        _latencies.add(latency);
-
-        final avgLatency = (_latencies.reduce((a, b) => a + b) / _latencies.length).round();
-        final jitter = _calculateJitter();
+        final latency = sw.elapsedMilliseconds;
+        if (latency > 0 && latency < 5000) {
+          _latencies.add(latency);
+        }
 
         _state = _state.copyWith(
+          progress: (i + 1) / 10,
           result: _state.result.copyWith(
-            ping: _latencies.reduce(min),
-            latency: avgLatency,
-            jitter: jitter,
+            ping: _latencies.isNotEmpty ? _latencies.reduce(min) : 0,
+            jitter: _calcJitter(),
           ),
         );
         notifyListeners();
-
-        debugPrint('📡 Latency ${i + 1}/$numPackets: ${latency}ms');
       } catch (e) {
-        debugPrint('❌ Latency failed: $e');
+        debugPrint('Ping failed: $e');
       }
 
-      await Future.delayed(const Duration(milliseconds: 10));
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
+    if (_latencies.isEmpty) {
+      throw Exception('Latency test failed');
     }
   }
 
-  Future<void> _runDownloadMeasurement(Map<String, dynamic> config, double overallProgress) async {
-    final bytes = config['bytes'] as int;
-    final count = config['count'] as int;
+  Future<void> _testDownload() async {
+    debugPrint('Testing download...');
 
-    for (int i = 0; i < count; i++) {
+    _state = _state.copyWith(
+      step: SpeedTestStep.download,
+      progress: 0,
+      currentSpeed: 0,
+    );
+    notifyListeners();
+
+    final testSizes = [100000, 1000000, 5000000, 10000000, 25000000];
+
+    for (int i = 0; i < testSizes.length; i++) {
       if (_isCanceled) return;
 
-      try {
-        final speed = await _measureDownload(bytes);
-        if (speed > 0) {
-          _downloadSpeeds.add(speed);
+      final bytes = testSizes[i];
+      final speed = await _measureDownload(bytes);
 
-          final percentileSpeed = _calculatePercentile(_downloadSpeeds, 0.9);
-          final avgSpeed = _downloadSpeeds.reduce((a, b) => a + b) / _downloadSpeeds.length;
+      if (speed > 0) {
+        _downloadSpeeds.add(speed);
+        final avgSpeed = _calcAverage(_downloadSpeeds);
 
-          _state = _state.copyWith(
-            progress: overallProgress,
-            currentSpeed: _roundSpeed(avgSpeed),
-            result: _state.result.copyWith(downloadSpeed: percentileSpeed),
-          );
-          notifyListeners();
+        _state = _state.copyWith(
+          progress: (i + 1) / testSizes.length,
+          currentSpeed: avgSpeed,
+          result: _state.result.copyWith(downloadSpeed: avgSpeed),
+        );
+        notifyListeners();
 
-          debugPrint('📥 Download ${i + 1}/$count (${_formatBytes(bytes)}): ${speed.toStringAsFixed(2)} Mbps');
-        }
-      } catch (e) {
-        debugPrint('❌ Download failed: $e');
+        if (avgSpeed < 1 && i >= 2) break;
       }
 
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future.delayed(const Duration(milliseconds: 200));
     }
   }
 
   Future<double> _measureDownload(int bytes) async {
-    final stopwatch = Stopwatch()..start();
-    int receivedBytes = 0;
+    final sw = Stopwatch()..start();
+    int received = 0;
 
     try {
-      final response = await _dio.get<List<int>>(
-        'https://speed.cloudflare.com/__down?bytes=$bytes',
-        options: Options(responseType: ResponseType.bytes),
+      await _dio.get<List<int>>(
+        '$_downloadUrl?bytes=$bytes',
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {'Cache-Control': 'no-cache, no-store'},
+        ),
         cancelToken: _cancelToken,
-        onReceiveProgress: (received, total) {
-          receivedBytes = received;
-          final elapsed = stopwatch.elapsedMilliseconds / 1000.0;
-          if (elapsed > 0.1 && !_isCanceled) {
-            final speedMbps = (received * 8) / elapsed / 1000000;
-            _state = _state.copyWith(currentSpeed: _roundSpeed(speedMbps));
+        onReceiveProgress: (recv, total) {
+          if (_isCanceled) return;
+          received = recv;
+          final elapsed = sw.elapsedMilliseconds / 1000.0;
+          if (elapsed > 0.2) {
+            final speed = (recv * 8) / elapsed / 1000000;
+            _state = _state.copyWith(currentSpeed: speed);
             notifyListeners();
           }
         },
       );
 
-      stopwatch.stop();
-      final actualBytes = response.data?.length ?? receivedBytes;
-      final durationSec = stopwatch.elapsedMilliseconds / 1000.0;
-
-      if (durationSec < 0.01) return 0;
-      return (actualBytes * 8) / durationSec / 1000000;
+      sw.stop();
+      final seconds = sw.elapsedMilliseconds / 1000.0;
+      if (seconds < 0.05) return 0;
+      return (received * 8) / seconds / 1000000;
     } catch (e) {
-      stopwatch.stop();
-      if (receivedBytes > 0 && stopwatch.elapsedMilliseconds > 100) {
-        return (receivedBytes * 8) / (stopwatch.elapsedMilliseconds / 1000.0) / 1000000;
+      sw.stop();
+      if (received > 0 && sw.elapsedMilliseconds > 100) {
+        return (received * 8) / (sw.elapsedMilliseconds / 1000.0) / 1000000;
       }
       return 0;
     }
   }
 
-  Future<void> _runUploadMeasurement(Map<String, dynamic> config, double overallProgress) async {
-    final bytes = config['bytes'] as int;
-    final count = config['count'] as int;
 
-    for (int i = 0; i < count; i++) {
+  Future<void> _testUpload() async {
+    debugPrint('Testing upload...');
+
+    _state = _state.copyWith(
+      step: SpeedTestStep.upload,
+      progress: 0,
+      currentSpeed: 0,
+    );
+    notifyListeners();
+
+    final testSizes = [100000, 500000, 1000000, 2000000, 5000000];
+
+    for (int i = 0; i < testSizes.length; i++) {
       if (_isCanceled) return;
 
-      try {
-        final speed = await _measureUpload(bytes);
-        if (speed > 0) {
-          _uploadSpeeds.add(speed);
+      final bytes = testSizes[i];
+      final speed = await _measureUpload(bytes);
 
-          final percentileSpeed = _calculatePercentile(_uploadSpeeds, 0.9);
-          final avgSpeed = _uploadSpeeds.reduce((a, b) => a + b) / _uploadSpeeds.length;
+      if (speed > 0) {
+        _uploadSpeeds.add(speed);
+        final avgSpeed = _calcAverage(_uploadSpeeds);
 
-          _state = _state.copyWith(
-            progress: overallProgress,
-            currentSpeed: _roundSpeed(avgSpeed),
-            result: _state.result.copyWith(uploadSpeed: percentileSpeed),
-          );
-          notifyListeners();
+        _state = _state.copyWith(
+          progress: (i + 1) / testSizes.length,
+          currentSpeed: avgSpeed,
+          result: _state.result.copyWith(uploadSpeed: avgSpeed),
+        );
+        notifyListeners();
 
-          debugPrint('📤 Upload ${i + 1}/$count (${_formatBytes(bytes)}): ${speed.toStringAsFixed(2)} Mbps');
-        }
-      } catch (e) {
-        debugPrint('❌ Upload failed: $e');
+        if (avgSpeed < 0.5 && i >= 2) break;
       }
 
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future.delayed(const Duration(milliseconds: 200));
     }
   }
 
   Future<double> _measureUpload(int bytes) async {
     final data = Uint8List(bytes);
-    final rng = Random();
-    for (int i = 0; i < min(1000, bytes); i++) {
-      data[i] = rng.nextInt(256);
+    final random = Random();
+    for (int i = 0; i < min(4096, bytes); i++) {
+      data[i] = random.nextInt(256);
     }
 
-    final stopwatch = Stopwatch()..start();
-    int sentBytes = 0;
+    final sw = Stopwatch()..start();
+    int sent = 0;
 
     try {
       await _dio.post(
-        'https://speed.cloudflare.com/__up',
+        _uploadUrl,
         data: data,
+        options: Options(
+          headers: {'Content-Type': 'application/octet-stream'},
+        ),
         cancelToken: _cancelToken,
-        options: Options(headers: {'Content-Type': 'application/octet-stream'}),
-        onSendProgress: (sent, total) {
-          sentBytes = sent;
-          final elapsed = stopwatch.elapsedMilliseconds / 1000.0;
-          if (elapsed > 0.1 && !_isCanceled) {
-            final speedMbps = (sent * 8) / elapsed / 1000000;
-            _state = _state.copyWith(currentSpeed: _roundSpeed(speedMbps));
+        onSendProgress: (s, total) {
+          if (_isCanceled) return;
+          sent = s;
+          final elapsed = sw.elapsedMilliseconds / 1000.0;
+          if (elapsed > 0.2) {
+            final speed = (s * 8) / elapsed / 1000000;
+            _state = _state.copyWith(currentSpeed: speed);
             notifyListeners();
           }
         },
       );
 
-      stopwatch.stop();
-      final durationSec = stopwatch.elapsedMilliseconds / 1000.0;
-
-      if (durationSec < 0.01) return 0;
-      return (sentBytes * 8) / durationSec / 1000000;
+      sw.stop();
+      final seconds = sw.elapsedMilliseconds / 1000.0;
+      if (seconds < 0.05) return 0;
+      return (bytes * 8) / seconds / 1000000;
     } catch (e) {
-      stopwatch.stop();
-      if (sentBytes > 0 && stopwatch.elapsedMilliseconds > 100) {
-        return (sentBytes * 8) / (stopwatch.elapsedMilliseconds / 1000.0) / 1000000;
+      sw.stop();
+      if (sent > 0 && sw.elapsedMilliseconds > 100) {
+        return (sent * 8) / (sw.elapsedMilliseconds / 1000.0) / 1000000;
       }
       return 0;
     }
   }
 
-  void _calculateFinalResults() {
-    final downloadSpeed = _downloadSpeeds.isNotEmpty
-        ? _calculatePercentile(_downloadSpeeds, 0.9)
-        : 0.0;
-    final uploadSpeed = _uploadSpeeds.isNotEmpty
-        ? _calculatePercentile(_uploadSpeeds, 0.9)
-        : 0.0;
-    final ping = _latencies.isNotEmpty ? _latencies.reduce(min) : 0;
-    final latency = _latencies.isNotEmpty
-        ? (_latencies.reduce((a, b) => a + b) / _latencies.length).round()
-        : 0;
-    final jitter = _calculateJitter();
+  void _finishTest() {
+    final download = _downloadSpeeds.isEmpty ? 0.0 : _calcAverage(_downloadSpeeds);
+    final upload = _uploadSpeeds.isEmpty ? 0.0 : _calcAverage(_uploadSpeeds);
+    final ping = _latencies.isEmpty ? 0 : _latencies.reduce(min);
 
     _state = _state.copyWith(
       step: SpeedTestStep.ready,
       progress: 1.0,
-      currentSpeed: 0.0,
+      currentSpeed: 0,
       testCompleted: true,
       hadError: false,
       result: SpeedTestResult(
-        downloadSpeed: downloadSpeed,
-        uploadSpeed: uploadSpeed,
+        downloadSpeed: download,
+        uploadSpeed: upload,
         ping: ping,
-        latency: latency,
-        jitter: jitter,
-        packetLoss: 0.0,
+        latency: _latencies.isEmpty ? 0 : (_latencies.reduce((a, b) => a + b) ~/ _latencies.length),
+        jitter: _calcJitter(),
+        packetLoss: 0,
       ),
     );
     notifyListeners();
 
-    debugPrint('✅ Complete: ↓${downloadSpeed.toStringAsFixed(1)} ↑${uploadSpeed.toStringAsFixed(1)} Mbps, ${ping}ms');
+    debugPrint('Test Complete: Download=${download.toStringAsFixed(1)}Mbps, Upload=${upload.toStringAsFixed(1)}Mbps, Ping=${ping}ms');
   }
 
-  int _calculateJitter() {
+  double _calcAverage(List<double> values) {
+    if (values.isEmpty) return 0;
+    if (values.length == 1) return values.first;
+    final relevant = values.length > 1 ? values.sublist(1) : values;
+    return relevant.reduce((a, b) => a + b) / relevant.length;
+  }
+
+  int _calcJitter() {
     if (_latencies.length < 2) return 0;
     int sum = 0;
     for (int i = 1; i < _latencies.length; i++) {
       sum += (_latencies[i] - _latencies[i - 1]).abs();
     }
     return sum ~/ (_latencies.length - 1);
-  }
-
-  double _calculatePercentile(List<double> values, double percentile) {
-    if (values.isEmpty) return 0.0;
-    final sorted = List<double>.from(values)..sort();
-    final index = (percentile * (sorted.length - 1)).round().clamp(0, sorted.length - 1);
-    return sorted[index];
-  }
-
-  double _roundSpeed(double speed) {
-    if (speed < 10) return (speed / 0.1).round() * 0.1;
-    if (speed < 50) return (speed / 0.25).round() * 0.25;
-    return (speed / 0.5).round() * 0.5;
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1000) return '${bytes}B';
-    if (bytes < 1000000) return '${(bytes / 1000).round()}KB';
-    return '${(bytes / 1000000).round()}MB';
   }
 
   void resetTest() => stopTest();
