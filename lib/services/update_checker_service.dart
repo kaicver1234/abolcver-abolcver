@@ -1,44 +1,48 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import '../models/app_update_info.dart';
 
 class UpdateCheckerService {
-  // Add timestamp to bypass cache
-  static String get _updateUrl => 
-      'https://gist.githubusercontent.com/cverhud/41d9dbbc00a9320853b2d880c9184e5f/raw/tiksar-vpn.json?t=${DateTime.now().millisecondsSinceEpoch}';
+  static const String _baseUrl = 
+      'https://gist.githubusercontent.com/cverhud/41d9dbbc00a9320853b2d880c9184e5f/raw/tiksar-vpn.json';
 
-  // Check for updates - called every time app opens
   static Future<AppUpdateInfo?> checkForUpdate() async {
     try {
-      // Get current app version
       final PackageInfo packageInfo = await PackageInfo.fromPlatform();
       final String currentVersion = packageInfo.version;
 
-      // Fetch update info from GitHub Gist (with no-cache headers and timestamp)
+      // چک آپدیت در background با compute
+      final result = await compute(_fetchUpdateInfo, _baseUrl);
+      
+      if (result != null && result.isNewerThan(currentVersion)) {
+        return result;
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  // این تابع در isolate جداگانه اجرا میشه
+  static Future<AppUpdateInfo?> _fetchUpdateInfo(String baseUrl) async {
+    try {
+      final url = '$baseUrl?t=${DateTime.now().millisecondsSinceEpoch}';
+      
       final response = await http.get(
-        Uri.parse(_updateUrl),
+        Uri.parse(url),
         headers: {
-          'Cache-Control': 'no-cache',
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
+          'Expires': '0',
         },
-      ).timeout(
-        const Duration(seconds: 10),
-      );
+      ).timeout(const Duration(seconds: 8));
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> json = jsonDecode(response.body);
-        final AppUpdateInfo updateInfo = AppUpdateInfo.fromJson(json);
-
-        // Check if update is newer than current version
-        if (updateInfo.isNewerThan(currentVersion)) {
-          // Always show update if version is newer, regardless of dismiss status
-          return updateInfo;
-        }
+        return AppUpdateInfo.fromJson(json);
       }
-    } catch (e) {
-      // Error checking for update
-    }
+    } catch (_) {}
 
     return null;
   }

@@ -9,7 +9,6 @@ import 'screens/main_navigation_screen.dart';
 import 'screens/privacy_welcome_screen.dart';
 import 'screens/language_selection_screen.dart';
 import 'screens/splash_loading_screen.dart';
-import 'screens/update_check_wrapper.dart';
 import 'services/notification_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
@@ -141,9 +140,7 @@ class MyApp extends StatelessWidget {
               Locale('en'),
               Locale('fa'),
             ],
-            builder: (context, child) {
-              return UpdateCheckWrapper(child: child ?? homeScreen);
-            },
+
             home: homeScreen,
           );
         },
