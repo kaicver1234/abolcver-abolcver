@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:async';
 import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
-import '../widgets/vpn_gradient_background.dart';
+import '../widgets/cyber_glow_background.dart';
 import '../utils/app_localizations.dart';
 
 class HostCheckerScreen extends StatefulWidget {
@@ -161,8 +161,7 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
       builder: (context, languageProvider, child) {
         return Directionality(
           textDirection: languageProvider.textDirection,
-          child: VPNGradientBackground(
-            status: VPNBackgroundStatus.disconnected,
+          child: CyberGlowBackground(
             child: SafeArea(
               child: Column(
                 children: [

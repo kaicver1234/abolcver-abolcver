@@ -63,36 +63,38 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         return;
       }
       
+      // Clear ping cache to get fresh results
+      _v2rayService.clearPingCache();
+      
       debugPrint('⚡ Found ${servers.length} servers, testing first 7...');
       
-      // Test first 7 servers in parallel for speed
+      // Test first 7 servers
       final serversToTest = servers.take(7).toList();
       final Map<V2RayConfig, int> pingResults = {};
       
-      // Test all 7 servers in parallel with 6 second timeout
-      final futures = serversToTest.map((server) async {
+      // Test servers one by one using V2Ray core
+      for (int i = 0; i < serversToTest.length; i++) {
+        final server = serversToTest[i];
+        debugPrint('   [${i + 1}/7] Testing ${server.remark}...');
+        
         try {
-          debugPrint('   Testing ${server.remark}...');
-          final ping = await _v2rayService.getServerDelay(server)
-              .timeout(const Duration(seconds: 6), onTimeout: () => null);
+          // Use V2Ray core ping directly (no cache)
+          final ping = await _v2rayService.getServerDelayDirect(server);
+          
           if (ping != null && ping > 0 && ping < 10000) {
             debugPrint('   ✓ ${server.remark}: ${ping}ms');
-            return MapEntry(server, ping);
+            pingResults[server] = ping;
+            
+            // If we found a very fast server (< 150ms), we can stop early
+            if (ping < 150 && pingResults.length >= 2) {
+              debugPrint('   ⚡ Found fast server, stopping early');
+              break;
+            }
           } else {
-            debugPrint('   ✗ ${server.remark}: timeout/no response');
+            debugPrint('   ✗ ${server.remark}: no response');
           }
         } catch (e) {
           debugPrint('   ✗ ${server.remark}: error - $e');
-        }
-        return null;
-      }).toList();
-      
-      final results = await Future.wait(futures);
-      
-      // Collect successful results
-      for (final result in results) {
-        if (result != null) {
-          pingResults[result.key] = result.value;
         }
       }
       
@@ -1322,49 +1324,52 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       // STEP 1: Re-initialize service to restore saved state
       await _v2rayService.initialize();
       
-      // STEP 2: Check actual VPN connection status using V2Ray delay check
+      // STEP 2: Wait a bit for V2Ray status callback to fire
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      // STEP 3: Check actual VPN connection status using V2Ray delay check
       // This is more reliable than just checking if VPN is running
       bool isOurVpnConnected = false;
       
-      try {
-        // Try to get delay from connected server - this only works if OUR V2Ray is running
-        final activeConfig = _v2rayService.activeConfig;
-        
-        // If we have an active config AND V2Ray reports it's running, verify it's ours
-        if (activeConfig != null) {
-          // Try to ping through our V2Ray connection
-          // If another VPN is active, this will fail or timeout
-          final testDelay = await _v2rayService.getServerDelay(activeConfig)
+      // First, check if we have a saved active config
+      final savedConfig = _v2rayService.activeConfig;
+      debugPrint('🔎 Saved active config: ${savedConfig?.remark ?? "none"}');
+      
+      if (savedConfig != null) {
+        // We have a saved config, verify it's actually connected
+        try {
+          // Try to get delay from connected server - this only works if OUR V2Ray is running
+          final testDelay = await _v2rayService.getServerDelay(savedConfig)
               .timeout(const Duration(seconds: 3), onTimeout: () => null);
           
           if (testDelay != null && testDelay > 0 && testDelay < 10000) {
             isOurVpnConnected = true;
             debugPrint('✅ Our V2Ray VPN is active (delay: ${testDelay}ms)');
           } else {
-            debugPrint('⚠️ V2Ray delay check failed - another VPN may be active');
+            debugPrint('⚠️ V2Ray delay check failed - checking alternative methods');
+            
+            // Alternative: Check V2Ray status directly
+            final status = _v2rayService.currentStatus;
+            final stateString = status?.state.toLowerCase() ?? '';
+            
+            if (stateString.contains('connect') || stateString == 'connected' || stateString == 'running') {
+              isOurVpnConnected = true;
+              debugPrint('✅ V2Ray status reports connected');
+            }
           }
+        } catch (e) {
+          debugPrint('⚠️ Error checking V2Ray status: $e');
         }
-      } catch (e) {
-        debugPrint('⚠️ Error checking V2Ray status: $e');
       }
       
       // Fallback: Check if V2Ray service thinks it's connected
-      if (!isOurVpnConnected) {
+      if (!isOurVpnConnected && savedConfig != null) {
         final isActuallyConnected = await _v2rayService.isActuallyConnected()
             .timeout(const Duration(seconds: 2), onTimeout: () => false);
         
-        if (isActuallyConnected && _v2rayService.activeConfig != null) {
-          // Double check by verifying the connection is responsive
-          try {
-            final status = _v2rayService.currentStatus;
-            // If we have traffic data, it's likely our VPN
-            if (status != null && (status.upload > 0 || status.download > 0)) {
-              isOurVpnConnected = true;
-              debugPrint('✅ V2Ray has traffic data - connection is ours');
-            }
-          } catch (e) {
-            debugPrint('⚠️ Could not verify traffic: $e');
-          }
+        if (isActuallyConnected) {
+          isOurVpnConnected = true;
+          debugPrint('✅ isActuallyConnected returned true');
         }
       }
       
@@ -1373,40 +1378,35 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       
       bool stateChanged = false;
       
-      if (isOurVpnConnected) {
+      if (isOurVpnConnected && savedConfig != null) {
         debugPrint('✅ Our VPN is connected! Syncing UI...');
         
-        // Get active config from service
-        final activeConfig = _v2rayService.activeConfig;
-        
-        if (activeConfig != null) {
-          // Find matching config in our list and mark as connected
-          bool foundMatch = false;
-          for (var config in _configs) {
-            final shouldBeConnected = 
-                config.id == activeConfig.id ||
-                config.fullConfig == activeConfig.fullConfig ||
-                (config.address == activeConfig.address && config.port == activeConfig.port);
-            
-            if (config.isConnected != shouldBeConnected) {
-              config.isConnected = shouldBeConnected;
-              stateChanged = true;
-            }
-            
-            if (shouldBeConnected) {
-              foundMatch = true;
-              _selectedConfig = config;
-            }
+        // Find matching config in our list and mark as connected
+        bool foundMatch = false;
+        for (var config in _configs) {
+          final shouldBeConnected = 
+              config.id == savedConfig.id ||
+              config.fullConfig == savedConfig.fullConfig ||
+              (config.address == savedConfig.address && config.port == savedConfig.port);
+          
+          if (config.isConnected != shouldBeConnected) {
+            config.isConnected = shouldBeConnected;
+            stateChanged = true;
           }
           
-          // If no match found, add active config to list
-          if (!foundMatch && !_configs.any((c) => c.id == activeConfig.id)) {
-            activeConfig.isConnected = true;
-            _configs.insert(0, activeConfig);
-            _selectedConfig = activeConfig;
-            stateChanged = true;
-            debugPrint('➕ Added active config to list: ${activeConfig.remark}');
+          if (shouldBeConnected) {
+            foundMatch = true;
+            _selectedConfig = config;
           }
+        }
+        
+        // If no match found, add active config to list
+        if (!foundMatch && !_configs.any((c) => c.id == savedConfig.id)) {
+          savedConfig.isConnected = true;
+          _configs.insert(0, savedConfig);
+          _selectedConfig = savedConfig;
+          stateChanged = true;
+          debugPrint('➕ Added active config to list: ${savedConfig.remark}');
         }
         
         // Ensure monitoring is active
@@ -1420,13 +1420,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
             config.isConnected = false;
             stateChanged = true;
           }
-        }
-        
-        // Also clear active config in service if another VPN took over
-        if (_v2rayService.activeConfig != null) {
-          debugPrint('🧹 Clearing stale active config from service');
-          // Don't call disconnect() as that might interfere with the other VPN
-          // Just clear our internal state
         }
       }
       

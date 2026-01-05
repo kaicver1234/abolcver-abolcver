@@ -3,7 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/language_provider.dart';
-import '../widgets/vpn_gradient_background.dart';
+import '../widgets/cyber_glow_background.dart';
 import '../models/app_language.dart';
 import 'privacy_welcome_screen.dart';
 
@@ -114,8 +114,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
 
   @override
   Widget build(BuildContext context) {
-    return VPNGradientBackground(
-      status: VPNBackgroundStatus.disconnected,
+    return CyberGlowBackground(
       child: Stack(
         children: [
           // Floating Orbs (kept for visual effect)

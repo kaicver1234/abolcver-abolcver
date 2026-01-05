@@ -5,6 +5,7 @@ import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
 import '../models/v2ray_config.dart';
 import '../utils/app_localizations.dart';
+import '../widgets/cyber_glow_background.dart';
 
 class ServerSelectionScreen extends StatefulWidget {
   const ServerSelectionScreen({super.key});
@@ -97,36 +98,26 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     
     return Directionality(
       textDirection: languageProvider.textDirection,
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0A0E1A),
-        body: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFF0F1629), Color(0xFF0A0E1A)],
-            ),
-          ),
-          child: SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(context),
-                _buildTabButtons(),
-                if (_currentTab == 0) _buildActionButtons(),
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    onPageChanged: (index) {
-                      setState(() => _currentTab = index);
-                    },
-                    children: [
-                      _buildFreeServersTab(),
-                      _buildPremiumTab(),
-                    ],
-                  ),
+      child: CyberGlowBackground(
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(context),
+              _buildTabButtons(),
+              if (_currentTab == 0) _buildActionButtons(),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() => _currentTab = index);
+                  },
+                  children: [
+                    _buildFreeServersTab(),
+                    _buildPremiumTab(),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

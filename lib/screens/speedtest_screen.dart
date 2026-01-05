@@ -3,11 +3,14 @@ import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/speed_test_provider.dart';
 import '../models/speed_test_state.dart';
-import '../widgets/vpn_gradient_background.dart';
+import '../widgets/cyber_glow_background.dart';
 import '../widgets/speed_test/speed_test_progress_indicator.dart';
 import '../widgets/speed_test/speed_test_start_button.dart';
 import '../utils/app_localizations.dart';
-import '../utils/app_colors.dart';
+
+// Colors for speed test
+const Color _downloadColor = Color(0xFF76F959);
+const Color _uploadColor = Color(0xFF72D9FF);
 
 class SpeedTestScreen extends StatelessWidget {
   const SpeedTestScreen({super.key});
@@ -18,21 +21,19 @@ class SpeedTestScreen extends StatelessWidget {
 
     return Directionality(
       textDirection: languageProvider.textDirection,
-      child: Scaffold(
-        body: VPNGradientBackground(
-          child: SafeArea(
-            child: Consumer<SpeedTestProvider>(
-              builder: (context, provider, child) {
-                return Column(
-                  children: [
-                    _buildHeader(context, provider.state),
-                    Expanded(
-                      child: _buildContent(context, provider),
-                    ),
-                  ],
-                );
-              },
-            ),
+      child: CyberGlowBackground(
+        child: SafeArea(
+          child: Consumer<SpeedTestProvider>(
+            builder: (context, provider, child) {
+              return Column(
+                children: [
+                  _buildHeader(context, provider.state),
+                  Expanded(
+                    child: _buildContent(context, provider),
+                  ),
+                ],
+              );
+            },
           ),
         ),
       ),
@@ -138,7 +139,7 @@ class SpeedTestScreen extends StatelessWidget {
         const SizedBox(height: 30),
         SpeedTestProgressIndicator(
           progress: 0.0,
-          color: AppColors.downloadColor,
+          color: _downloadColor,
           showButton: true,
           result: state.result,
           currentStep: SpeedTestStep.ready,
@@ -215,7 +216,7 @@ class SpeedTestScreen extends StatelessWidget {
           onTap: () => provider.stopTest(),
           child: SpeedTestProgressIndicator(
             progress: combinedProgress,
-            color: AppColors.downloadColor,
+            color: _downloadColor,
             showButton: false,
             centerValue: displaySpeed,
             centerUnit: 'Mbps',
@@ -243,7 +244,7 @@ class SpeedTestScreen extends StatelessWidget {
           onTap: () => provider.stopTest(),
           child: SpeedTestProgressIndicator(
             progress: combinedProgress,
-            color: AppColors.uploadColor,
+            color: _uploadColor,
             showButton: false,
             centerValue: displaySpeed,
             centerUnit: 'Mbps',
@@ -303,7 +304,7 @@ class SpeedTestScreen extends StatelessWidget {
             label: tr.translate('speed_test.download'),
             value: state.result.downloadSpeed.toStringAsFixed(1),
             unit: tr.translate('speed_test.mbps'),
-            color: AppColors.downloadColor,
+            color: _downloadColor,
           ),
           _buildDivider(),
           _ResultItem(
@@ -311,7 +312,7 @@ class SpeedTestScreen extends StatelessWidget {
             label: tr.translate('speed_test.upload'),
             value: state.result.uploadSpeed.toStringAsFixed(1),
             unit: tr.translate('speed_test.mbps'),
-            color: AppColors.uploadColor,
+            color: _uploadColor,
           ),
           _buildDivider(),
           _ResultItem(

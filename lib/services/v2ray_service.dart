@@ -201,6 +201,10 @@ class V2RayService extends ChangeNotifier {
 
       // Try to restore active config if VPN is still running
       await _tryRestoreActiveConfig();
+    } else {
+      // Already initialized, but still try to restore config on re-entry
+      // This helps when app is reopened after being in background
+      await _tryRestoreActiveConfig();
     }
   }
 
@@ -581,6 +585,45 @@ class V2RayService extends ChangeNotifier {
       // Ensure cleanup even in unexpected errors
       _pingInProgress[hostKey] = false;
       _pingInProgress[configId] = false;
+      return null;
+    }
+  }
+
+  // Direct ping using V2Ray core - NO CACHE, for Smart Connect
+  Future<int?> getServerDelayDirect(V2RayConfig config) async {
+    try {
+      await initialize();
+
+      // Safely parse the config
+      V2RayURL parser;
+      try {
+        parser = FlutterV2ray.parseFromURL(config.fullConfig);
+      } catch (parseError) {
+        debugPrint('❌ Failed to parse config ${config.remark}: $parseError');
+        return null;
+      }
+
+      debugPrint('🔍 V2Ray core ping: ${config.remark}...');
+      
+      final delay = await _flutterV2ray
+          .getServerDelay(config: parser.getFullConfiguration())
+          .timeout(
+            const Duration(seconds: 5),
+            onTimeout: () {
+              debugPrint('⚠️ V2Ray ping timeout for ${config.remark}');
+              return -1;
+            },
+          );
+
+      if (delay >= 0 && delay < 10000) {
+        debugPrint('✓ V2Ray ping ${config.remark}: ${delay}ms');
+        return delay;
+      } else {
+        debugPrint('✗ V2Ray ping ${config.remark}: invalid ($delay)');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ V2Ray ping error ${config.remark}: $e');
       return null;
     }
   }

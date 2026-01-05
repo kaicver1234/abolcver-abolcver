@@ -14,6 +14,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'firebase_options.dart';
 import 'theme/app_theme.dart';
+import 'services/remote_config_service.dart';
 
 
 void main() async {
@@ -60,6 +61,13 @@ void _initializeServices() {
     FirebaseAnalytics.instance.logAppOpen();
   } catch (e) {
     debugPrint('⚠️ Analytics skipped: $e');
+  }
+  
+  // Remote Config
+  try {
+    RemoteConfigService().initialize();
+  } catch (e) {
+    debugPrint('⚠️ Remote Config skipped: $e');
   }
   
   // Notifications

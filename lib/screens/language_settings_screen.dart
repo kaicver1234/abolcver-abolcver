@@ -5,7 +5,7 @@ import '../theme/app_theme.dart';
 import '../models/app_language.dart';
 import '../providers/language_provider.dart';
 import '../widgets/error_snackbar.dart';
-import '../widgets/vpn_gradient_background.dart';
+import '../widgets/cyber_glow_background.dart';
 
 class LanguageSettingsScreen extends StatefulWidget {
   const LanguageSettingsScreen({super.key});
@@ -74,8 +74,7 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen>
 
         return Directionality(
           textDirection: languageProvider.textDirection,
-          child: VPNGradientBackground(
-            status: VPNBackgroundStatus.disconnected,
+          child: CyberGlowBackground(
             child: SafeArea(
               child: Column(
                 children: [
