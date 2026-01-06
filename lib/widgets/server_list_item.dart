@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/v2ray_config.dart';
 import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
@@ -83,10 +84,23 @@ class _ServerListItemState extends State<ServerListItem> {
                           ),
                         ],
                       ),
-                      child: Center(
-                        child: Text(
-                          widget.config.countryFlag,
-                          style: const TextStyle(fontSize: 28),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(5),
+                        child: CachedNetworkImage(
+                          imageUrl: 'https://flagcdn.com/w80/${widget.config.countryCode!.toLowerCase()}.png',
+                          fit: BoxFit.cover,
+                          memCacheWidth: 80,
+                          memCacheHeight: 60,
+                          maxWidthDiskCache: 80,
+                          maxHeightDiskCache: 60,
+                          placeholder: (context, url) => Container(
+                            color: Colors.grey.withValues(alpha: 0.2),
+                          ),
+                          errorWidget: (context, url, error) => const Icon(
+                            Icons.public,
+                            color: Colors.grey,
+                            size: 24,
+                          ),
                         ),
                       ),
                     ),

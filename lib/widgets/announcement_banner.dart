@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/remote_config_service.dart';
@@ -10,16 +11,18 @@ class AnnouncementBannerWidget extends StatefulWidget {
 }
 
 class _AnnouncementBannerWidgetState extends State<AnnouncementBannerWidget>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   AnnouncementBanner? _banner;
   bool _isDismissed = false;
   late AnimationController _controller;
   late Animation<Offset> _slideAnimation;
   late Animation<double> _fadeAnimation;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 400),
@@ -31,18 +34,74 @@ class _AnnouncementBannerWidgetState extends State<AnnouncementBannerWidget>
     _fadeAnimation = Tween<double>(begin: 0, end: 1).animate(_controller);
     
     _loadBanner();
+    _startTimer();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Only run timer when app is in foreground
+    if (state == AppLifecycleState.resumed) {
+      _refreshBanner();
+      _startTimer();
+    } else if (state == AppLifecycleState.paused) {
+      _refreshTimer?.cancel();
+    }
+  }
+
+  void _startTimer() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      _refreshBanner();
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
   void _loadBanner() {
     final banner = RemoteConfigService().getAnnouncementBanner();
     if (banner.enabled && banner.message.isNotEmpty) {
-      setState(() => _banner = banner);
+      setState(() {
+        _banner = banner;
+        _isDismissed = false;
+      });
+      _controller.forward();
+    }
+  }
+
+  Future<void> _refreshBanner() async {
+    // Refresh remote config
+    await RemoteConfigService().refresh();
+    
+    final banner = RemoteConfigService().getAnnouncementBanner();
+    
+    if (!mounted) return;
+    
+    // If banner is disabled, hide it
+    if (!banner.enabled || banner.message.isEmpty) {
+      if (_banner != null && !_isDismissed) {
+        _controller.reverse().then((_) {
+          if (mounted) {
+            setState(() {
+              _banner = null;
+            });
+          }
+        });
+      }
+      return;
+    }
+    
+    // If banner content changed, update it
+    if (_banner == null || _banner!.message != banner.message) {
+      setState(() {
+        _banner = banner;
+        _isDismissed = false;
+      });
       _controller.forward();
     }
   }
@@ -125,7 +184,7 @@ class _AnnouncementBannerWidgetState extends State<AnnouncementBannerWidget>
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Icon با گرادیانت
+                // Icon
                 Container(
                   width: 44,
                   height: 44,

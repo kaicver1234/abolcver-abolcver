@@ -18,8 +18,12 @@
         "host_checker_desc": "Check status, response time and details of any web host",
         "speed_test_desc": "Test your internet connection speed"
     },
+    "settings": {
+        "title": "Settings"
+    },
     "language_settings": {
         "title": "Language Settings",
+        "language": "Language",
         "current_language": "Current Language",
         "language_changed": "Language changed successfully",
         "restart_required": "Please restart the app to apply language changes",
@@ -84,6 +88,7 @@
         "enter_host_to_check": "Enter a website or use quick buttons"
     },
     "about": {
+        "title": "About",
         "app_name": "Tiksar VPN",
         "about_description": "Tiksar VPN is a powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access to the global web with complete privacy and security.",
         "copyright": "© 2026 TiksarVPN",

@@ -54,6 +54,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = 8
         versionName = "1.1.1"
+        
+        // Reduce Play Protect warnings
+        multiDexEnabled = true
     }
 
     signingConfigs {
@@ -78,9 +81,13 @@ android {
                 signingConfigs.getByName("debug")
             }
 
-            // Disable minify for VPN apps to avoid compatibility issues
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // Minify enabled but no obfuscation to avoid VPN issues
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android.txt"),
+                "proguard-rules.pro"
+            )
         }
         
         debug {
@@ -122,5 +129,6 @@ flutter {
 
 dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
+    implementation("androidx.multidex:multidex:2.0.1")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.0.4")
 }

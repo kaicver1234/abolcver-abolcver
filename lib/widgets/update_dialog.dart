@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:google_fonts/google_fonts.dart';
 import '../models/app_update_info.dart';
 
 class UpdateDialog extends StatefulWidget {
@@ -14,21 +15,26 @@ class UpdateDialog extends StatefulWidget {
 class _UpdateDialogState extends State<UpdateDialog>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
-  late final Animation<double> _animation;
+  late final Animation<double> _scaleAnimation;
+  late final Animation<double> _fadeAnimation;
 
-  static const _bgColor = Color(0xFF1C1C1E);
-  static const _cardColor = Color(0xFF2C2C2E);
-  static const _primaryColor = Color(0xFF5E5CE6);
-  static const _secondaryColor = Color(0xFF8B5CF6);
+  static const _primaryColor = Color(0xFF10b981);
+  static const _secondaryColor = Color(0xFF06b6d4);
+  static const _accentColor = Color(0xFFa78bfa);
 
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 200),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
-    _animation = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutBack),
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
     _controller.forward();
   }
 
@@ -46,14 +52,32 @@ class _UpdateDialogState extends State<UpdateDialog>
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.all(24),
         child: ScaleTransition(
-          scale: _animation,
+          scale: _scaleAnimation,
           child: FadeTransition(
-            opacity: _animation,
+            opacity: _fadeAnimation,
             child: Container(
               constraints: const BoxConstraints(maxWidth: 340),
               decoration: BoxDecoration(
-                color: _bgColor,
-                borderRadius: BorderRadius.circular(24),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    const Color(0xFF1a1a2e),
+                    const Color(0xFF16213e),
+                  ],
+                ),
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: _primaryColor.withOpacity(0.2),
+                  width: 1.5,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: _primaryColor.withOpacity(0.15),
+                    blurRadius: 30,
+                    spreadRadius: 5,
+                  ),
+                ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -72,51 +96,94 @@ class _UpdateDialogState extends State<UpdateDialog>
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 12),
+      padding: const EdgeInsets.fromLTRB(24, 28, 24, 16),
       child: Column(
         children: [
-          // Icon
+          // Animated Icon
           Container(
-            width: 64,
-            height: 64,
+            width: 80,
+            height: 80,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [_primaryColor, _secondaryColor],
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  _primaryColor.withOpacity(0.2),
+                  _secondaryColor.withOpacity(0.1),
+                ],
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: _primaryColor.withOpacity(0.3),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: _primaryColor.withOpacity(0.2),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
             child: const Icon(
-              Icons.system_update_rounded,
-              size: 32,
-              color: Colors.white,
+              Icons.rocket_launch_rounded,
+              size: 40,
+              color: _primaryColor,
             ),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 20),
           // Title
           Text(
             widget.updateInfo.title,
-            style: const TextStyle(
+            style: GoogleFonts.poppins(
               color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
             ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
-          // Version
+          const SizedBox(height: 12),
+          // Version Badge
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             decoration: BoxDecoration(
-              color: _primaryColor.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              'نسخه ${widget.updateInfo.version}',
-              style: const TextStyle(
-                color: _primaryColor,
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
+              gradient: LinearGradient(
+                colors: [
+                  _primaryColor.withOpacity(0.15),
+                  _secondaryColor.withOpacity(0.1),
+                ],
               ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _primaryColor.withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: _primaryColor,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(
+                        color: _primaryColor.withOpacity(0.5),
+                        blurRadius: 6,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'نسخه ${widget.updateInfo.version}',
+                  style: TextStyle(
+                    color: _primaryColor,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -126,13 +193,16 @@ class _UpdateDialogState extends State<UpdateDialog>
 
   Widget _buildContent() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: _cardColor,
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.white.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white.withOpacity(0.06),
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -141,27 +211,27 @@ class _UpdateDialogState extends State<UpdateDialog>
               children: [
                 Icon(
                   Icons.auto_awesome_rounded,
-                  color: Colors.white.withValues(alpha: 0.4),
-                  size: 14,
+                  color: _accentColor,
+                  size: 16,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 Text(
                   'تغییرات جدید',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.4),
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+                    color: _accentColor,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             Text(
               widget.updateInfo.message,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 13,
-                height: 1.5,
+                color: Colors.white.withOpacity(0.8),
+                fontSize: 14,
+                height: 1.6,
               ),
               textAlign: TextAlign.right,
               textDirection: TextDirection.rtl,
@@ -176,59 +246,101 @@ class _UpdateDialogState extends State<UpdateDialog>
     final isForced = widget.updateInfo.isForced;
 
     return Padding(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           // Download button
-          _ActionButton(
+          GestureDetector(
             onTap: _handleUpdate,
-            gradient: const LinearGradient(colors: [_primaryColor, _secondaryColor]),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.download_rounded, color: Colors.white, size: 18),
-                const SizedBox(width: 6),
-                Text(
-                  isForced ? 'آپدیت اجباری' : 'دانلود آپدیت',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w600,
-                  ),
+            child: Container(
+              width: double.infinity,
+              height: 52,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [_primaryColor, _secondaryColor],
                 ),
-              ],
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: _primaryColor.withOpacity(0.4),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.download_rounded, color: Colors.white, size: 20),
+                  const SizedBox(width: 8),
+                  Text(
+                    isForced ? 'آپدیت اجباری' : 'دانلود آپدیت',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           // Later button
           if (!isForced) ...[
-            const SizedBox(height: 8),
-            _ActionButton(
+            const SizedBox(height: 12),
+            GestureDetector(
               onTap: () => Navigator.of(context).pop(),
-              color: _cardColor,
-              child: Text(
-                'بعداً',
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.6),
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
+              child: Container(
+                width: double.infinity,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.05),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.white.withOpacity(0.1),
+                  ),
+                ),
+                child: Center(
+                  child: Text(
+                    'بعداً یادآوری کن',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.6),
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
                 ),
               ),
             ),
           ],
-          // Warning
+          // Warning for forced update
           if (isForced) ...[
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.info_outline_rounded, color: Colors.orange.shade300, size: 14),
-                const SizedBox(width: 6),
-                Text(
-                  'برای ادامه باید آپدیت کنید',
-                  style: TextStyle(color: Colors.orange.shade300, fontSize: 11),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.orange.withOpacity(0.2),
                 ),
-              ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade400, size: 16),
+                  const SizedBox(width: 8),
+                  Text(
+                    'برای ادامه باید آپدیت کنید',
+                    style: TextStyle(
+                      color: Colors.orange.shade400,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ],
@@ -246,36 +358,5 @@ class _UpdateDialogState extends State<UpdateDialog>
         Navigator.of(context).pop();
       }
     } catch (_) {}
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  final VoidCallback onTap;
-  final Widget child;
-  final Gradient? gradient;
-  final Color? color;
-
-  const _ActionButton({
-    required this.onTap,
-    required this.child,
-    this.gradient,
-    this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        height: 46,
-        decoration: BoxDecoration(
-          gradient: gradient,
-          color: color,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(child: child),
-      ),
-    );
   }
 }

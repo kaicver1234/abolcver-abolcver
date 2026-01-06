@@ -636,6 +636,8 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           fit: BoxFit.cover,
           memCacheWidth: 80,
           memCacheHeight: 60,
+          maxWidthDiskCache: 80,
+          maxHeightDiskCache: 60,
           fadeInDuration: Duration.zero,
           fadeOutDuration: Duration.zero,
           placeholderFadeInDuration: Duration.zero,

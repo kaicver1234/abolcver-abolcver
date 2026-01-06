@@ -1,7 +1,9 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
 import '../widgets/cyber_glow_background.dart';
@@ -11,7 +13,6 @@ import '../screens/server_selection_screen.dart';
 import '../screens/ip_info_screen.dart';
 import '../screens/speedtest_screen.dart';
 import '../screens/host_checker_screen.dart';
-import '../screens/about_screen.dart';
 import '../widgets/announcement_banner.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -25,6 +26,21 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   bool _isConnecting = false;
   late PageController _pageController;
   int _currentPage = 0;
+  Color _timerColor = const Color(0xFF10b981);
+  
+  // Single colors for timer (no pink)
+  static const List<Color> _timerColorOptions = [
+    Color(0xFF10b981), // Green
+    Color(0xFF06b6d4), // Cyan
+    Color(0xFF3b82f6), // Blue
+    Color(0xFF8b5cf6), // Purple
+    Color(0xFFf59e0b), // Amber
+    Color(0xFF14b8a6), // Teal
+    Color(0xFF22c55e), // Emerald
+    Color(0xFF6366f1), // Indigo
+    Color(0xFFef4444), // Red
+    Color(0xFFFFFFFF), // White
+  ];
   
   @override
   bool get wantKeepAlive => true;
@@ -89,6 +105,9 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       if (provider.activeConfig != null) {
         await provider.disconnect();
       } else {
+        // Change timer color on new connection
+        _changeTimerColor();
+        
         if (provider.wasUsingSmartConnect) {
           await provider.smartConnect();
         } else {
@@ -118,6 +137,13 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     }
   }
 
+  void _changeTimerColor() {
+    final random = Random();
+    setState(() {
+      _timerColor = _timerColorOptions[random.nextInt(_timerColorOptions.length)];
+    });
+  }
+
   void _showSnackBar(String message, Color color) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -127,17 +153,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         margin: const EdgeInsets.all(16),
-      ),
-    );
-  }
-
-  void _showSettingsModal(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => _SettingsModal(
-        onLanguageChanged: () => setState(() {}),
       ),
     );
   }
@@ -165,6 +180,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       children: [
                         _buildVPNTab(v2rayProvider),
                         _buildToolsTab(context),
+                        _buildAboutTab(context),
                       ],
                     ),
                   ),
@@ -194,9 +210,9 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               ],
             ),
           ),
-          // Settings Button
+          // Language Button
           GestureDetector(
-            onTap: () => _showSettingsModal(context),
+            onTap: () => _showLanguageModal(context),
             child: Container(
               width: 42,
               height: 42,
@@ -205,10 +221,115 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 border: Border.all(color: Colors.white.withOpacity(0.08)),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(Icons.settings, color: Colors.white.withOpacity(0.5), size: 20),
+              child: Icon(Icons.language, color: Colors.white.withOpacity(0.5), size: 20),
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showLanguageModal(BuildContext context) {
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final languages = [
+      {'name': 'فارسی', 'code': 'fa', 'flag': '🦁'},
+      {'name': 'English', 'code': 'en', 'flag': '🇬🇧'},
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        margin: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: const Color(0xFF14141a),
+          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    AppLocalizations.of(context).translate('language_settings.language'),
+                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.pop(context),
+                    child: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(Icons.close, color: Colors.white.withOpacity(0.6), size: 18),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...languages.map((lang) {
+              final isSelected = languageProvider.currentLanguage.code == lang['code'];
+              return GestureDetector(
+                onTap: () async {
+                  final newLanguage = AppLanguage(
+                    name: lang['name']!,
+                    code: lang['code']!,
+                    flag: lang['flag']!,
+                    direction: lang['code'] == 'fa' ? 'rtl' : 'ltr',
+                  );
+                  await languageProvider.changeLanguage(newLanguage);
+                  if (mounted) {
+                    Navigator.pop(context);
+                    setState(() {});
+                  }
+                },
+                child: Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  decoration: BoxDecoration(
+                    color: isSelected ? const Color(0xFF10b981).withOpacity(0.12) : Colors.white.withOpacity(0.03),
+                    border: Border.all(
+                      color: isSelected ? const Color(0xFF10b981).withOpacity(0.3) : Colors.white.withOpacity(0.05),
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(lang['flag']!, style: const TextStyle(fontSize: 24)),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Text(
+                          lang['name']!,
+                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                        ),
+                      ),
+                      Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: isSelected ? const Color(0xFF10b981) : Colors.transparent,
+                          border: Border.all(
+                            color: isSelected ? const Color(0xFF10b981) : Colors.white.withOpacity(0.2),
+                            width: 2,
+                          ),
+                        ),
+                        child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 14) : null,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+            const SizedBox(height: 16),
+          ],
+        ),
       ),
     );
   }
@@ -392,15 +513,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           ),
         ),
         if (isConnected) ...[
-          const SizedBox(height: 12),
-          // Server location
-          Text(
-            provider.activeConfig?.remark ?? '',
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.5),
-              fontSize: 14,
-            ),
-          ),
           const SizedBox(height: 8),
           // Timer
           StreamBuilder(
@@ -411,10 +523,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 style: GoogleFonts.poppins(
                   fontSize: 34,
                   fontWeight: FontWeight.w700,
-                  foreground: Paint()
-                    ..shader = const LinearGradient(
-                      colors: [Color(0xFF10b981), Color(0xFF06b6d4)],
-                    ).createShader(const Rect.fromLTWH(0, 0, 150, 40)),
+                  color: _timerColor,
                 ),
               );
             },
@@ -434,13 +543,13 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     
     if (provider.activeConfig != null) {
       serverName = _cleanServerName(provider.activeConfig!.remark);
-      countryCode = provider.activeConfig!.countryCode;
+      countryCode = provider.activeConfig!.countryCode ?? _extractCountryCode(provider.activeConfig!.remark);
     } else if (isSmartConnect) {
       serverName = AppLocalizations.of(context).translate('server_selection.smart_connect');
       subtitle = AppLocalizations.of(context).translate('server_selection.smart_connect_description');
     } else if (selectedConfig != null) {
       serverName = _cleanServerName(selectedConfig.remark);
-      countryCode = selectedConfig.countryCode;
+      countryCode = selectedConfig.countryCode ?? _extractCountryCode(selectedConfig.remark);
     } else {
       serverName = AppLocalizations.of(context).translate('server_selection.select_server');
     }
@@ -508,6 +617,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           child: CachedNetworkImage(
             imageUrl: 'https://flagcdn.com/w160/${countryCode.toLowerCase()}.png',
             fit: BoxFit.cover,
+            memCacheWidth: 160,
+            memCacheHeight: 120,
+            maxWidthDiskCache: 160,
+            maxHeightDiskCache: 120,
             placeholder: (context, url) => Container(color: Colors.white.withOpacity(0.1)),
             errorWidget: (context, url, error) => Container(
               color: const Color(0xFF6366F1).withOpacity(0.2),
@@ -580,6 +693,15 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     return name.replaceAll(RegExp(r'^\[[A-Z]{2}\]\s*'), '').trim();
   }
 
+  String? _extractCountryCode(String remark) {
+    // Try to extract country code from remark: [CC], (CC), CC-, -CC-
+    final match = RegExp(r'[\[\(]([A-Z]{2})[\]\)]|^([A-Z]{2})[-\s]', caseSensitive: false).firstMatch(remark.toUpperCase());
+    if (match != null) {
+      return match.group(1) ?? match.group(2);
+    }
+    return null;
+  }
+
 
   Widget _buildStatsCard(V2RayProvider provider) {
     final v2rayService = provider.v2rayService;
@@ -612,9 +734,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               _buildStatDivider(),
               _buildStatItem(
                 label: 'IP',
-                value: v2rayService.ipInfo?.ip?.split('.').take(2).join('.') ?? '...',
+                value: v2rayService.ipInfo?.ip ?? '...',
                 color: const Color(0xFFa78bfa),
                 icon: '●',
+                smallFont: true,
               ),
             ],
           ),
@@ -628,6 +751,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     required String value,
     required Color color,
     required String icon,
+    bool smallFont = false,
   }) {
     return Expanded(
       child: Column(
@@ -637,23 +761,28 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             crossAxisAlignment: CrossAxisAlignment.baseline,
             textBaseline: TextBaseline.alphabetic,
             children: [
-              Text(
-                value.split(' ').first,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
+              Flexible(
+                child: Text(
+                  smallFont ? value : value.split(' ').first,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: smallFont ? 12 : 18,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-              const SizedBox(width: 2),
-              Text(
-                value.contains(' ') ? value.split(' ').last : '',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.4),
-                  fontSize: 11,
-                  fontWeight: FontWeight.w500,
+              if (!smallFont && value.contains(' ')) ...[
+                const SizedBox(width: 2),
+                Text(
+                  value.split(' ').last,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.4),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
           const SizedBox(height: 4),
@@ -805,6 +934,193 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     );
   }
 
+  Widget _buildAboutTab(BuildContext context) {
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          const SizedBox(height: 20),
+          // Logo
+          Container(
+            width: 90,
+            height: 90,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF10b981).withOpacity(0.3),
+                  blurRadius: 25,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(22),
+              child: Image.asset('assets/images/apk.png', fit: BoxFit.cover),
+            ),
+          ),
+          const SizedBox(height: 18),
+          // App Name
+          RichText(
+            text: TextSpan(
+              style: GoogleFonts.poppins(fontSize: 26, fontWeight: FontWeight.w700),
+              children: const [
+                TextSpan(text: 'Tiksar', style: TextStyle(color: Colors.white)),
+                TextSpan(text: 'VPN', style: TextStyle(color: Color(0xFFa78bfa))),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          // Version
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+            decoration: BoxDecoration(
+              color: const Color(0xFF10b981).withOpacity(0.15),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFF10b981).withOpacity(0.3)),
+            ),
+            child: Text(
+              'v1.1.1',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.white.withOpacity(0.7),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(height: 28),
+          // Description
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.04),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withOpacity(0.08)),
+            ),
+            child: Text(
+              AppLocalizations.of(context).translate('about.about_description'),
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.7),
+                fontSize: 13,
+                height: 1.6,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Developer
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  const Color(0xFFf472b6).withOpacity(0.1),
+                  const Color(0xFFa78bfa).withOpacity(0.05),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFf472b6).withOpacity(0.2)),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  AppLocalizations.of(context).translate('about.developed_with'),
+                  style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 13),
+                ),
+                const SizedBox(width: 6),
+                const Icon(Icons.favorite, color: Color(0xFFf472b6), size: 16),
+                const SizedBox(width: 6),
+                Text(
+                  AppLocalizations.of(context).translate('about.developer'),
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          // Social Links
+          _buildSocialLink(
+            icon: Icons.send_rounded,
+            title: AppLocalizations.of(context).translate('about.telegram'),
+            subtitle: '@tiksar_vpn',
+            color: const Color(0xFF0088CC),
+            url: 'https://t.me/tiksar_vpn',
+          ),
+          const SizedBox(height: 10),
+          _buildSocialLink(
+            icon: Icons.camera_alt_rounded,
+            title: AppLocalizations.of(context).translate('about.instagram'),
+            subtitle: '@aboljahany',
+            color: const Color(0xFFE1306C),
+            url: 'https://instagram.com/aboljahany',
+          ),
+          const SizedBox(height: 28),
+          // Copyright
+          Text(
+            AppLocalizations.of(context).translate('about.copyright'),
+            style: TextStyle(color: Colors.white.withOpacity(0.3), fontSize: 11),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSocialLink({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required String url,
+  }) {
+    return GestureDetector(
+      onTap: () async {
+        final uri = Uri.parse(url);
+        try {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } catch (_) {}
+      },
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.03),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withOpacity(0.06)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(11),
+              ),
+              child: Icon(icon, color: color, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12)),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: Colors.white.withOpacity(0.3), size: 14),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildBottomNav() {
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
@@ -818,6 +1134,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         children: [
           _buildNavItem(0, 'VPN'),
           _buildNavItem(1, AppLocalizations.of(context).translate('navigation.tools')),
+          _buildNavItem(2, AppLocalizations.of(context).translate('about.title')),
         ],
       ),
     );
@@ -854,189 +1171,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-// Settings Modal
-class _SettingsModal extends StatefulWidget {
-  final VoidCallback onLanguageChanged;
-  
-  const _SettingsModal({required this.onLanguageChanged});
-
-  @override
-  State<_SettingsModal> createState() => _SettingsModalState();
-}
-
-class _SettingsModalState extends State<_SettingsModal> {
-  bool _showLanguages = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFF14141a),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
-        borderRadius: BorderRadius.circular(24),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  AppLocalizations.of(context).translate('settings.title'),
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
-                ),
-                GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      border: Border.all(color: Colors.white.withOpacity(0.08)),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(Icons.close, color: Colors.white.withOpacity(0.6), size: 18),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          // Language Setting
-          _buildSettingItem(
-            icon: Icons.language,
-            label: AppLocalizations.of(context).translate('language_settings.language'),
-            subtitle: Provider.of<LanguageProvider>(context).currentLanguage.name,
-            onTap: () => setState(() => _showLanguages = !_showLanguages),
-          ),
-          if (_showLanguages) _buildLanguageOptions(),
-          // About Setting
-          _buildSettingItem(
-            icon: Icons.info_outline,
-            label: AppLocalizations.of(context).translate('about.title'),
-            subtitle: 'v1.0.0',
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(context, MaterialPageRoute(builder: (_) => const AboutScreen()));
-            },
-          ),
-          const SizedBox(height: 16),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSettingItem({
-    required IconData icon,
-    required String label,
-    required String subtitle,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.03),
-          border: Border.all(color: Colors.white.withOpacity(0.05)),
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [const Color(0xFF6366f1).withOpacity(0.15), const Color(0xFF8b5cf6).withOpacity(0.08)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: const Color(0xFFa78bfa), size: 22),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(label, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
-                  const SizedBox(height: 2),
-                  Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12)),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_left, color: Colors.white.withOpacity(0.2), size: 18),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLanguageOptions() {
-    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
-    final languages = [
-      {'name': 'فارسی', 'code': 'fa', 'flag': '🦁'},
-      {'name': 'English', 'code': 'en', 'flag': '🇬🇧'},
-    ];
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: Colors.white.withOpacity(0.06))),
-      ),
-      child: Column(
-        children: languages.map((lang) {
-          final isSelected = languageProvider.currentLanguage.code == lang['code'];
-          return GestureDetector(
-            onTap: () async {
-              final newLanguage = AppLanguage(
-                name: lang['name']!,
-                code: lang['code']!,
-                flag: lang['flag']!,
-                direction: lang['code'] == 'fa' ? 'rtl' : 'ltr',
-              );
-              await languageProvider.changeLanguage(newLanguage);
-              widget.onLanguageChanged();
-              if (mounted) setState(() => _showLanguages = false);
-            },
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: isSelected ? const Color(0xFF10b981).withOpacity(0.12) : Colors.transparent,
-                border: isSelected ? Border.all(color: const Color(0xFF10b981).withOpacity(0.3)) : null,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                children: [
-                  Text(lang['flag']!, style: const TextStyle(fontSize: 22)),
-                  const SizedBox(width: 12),
-                  Expanded(child: Text(lang['name']!, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500))),
-                  Container(
-                    width: 20,
-                    height: 20,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected ? const Color(0xFF10b981) : Colors.transparent,
-                      border: Border.all(color: isSelected ? const Color(0xFF10b981) : Colors.white.withOpacity(0.2), width: 2),
-                    ),
-                    child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 12) : null,
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList(),
       ),
     );
   }

@@ -1,71 +1,63 @@
-# Flutter Wrapper
+# Flutter wrapper
 -keep class io.flutter.app.** { *; }
 -keep class io.flutter.plugin.**  { *; }
 -keep class io.flutter.util.**  { *; }
 -keep class io.flutter.view.**  { *; }
 -keep class io.flutter.**  { *; }
 -keep class io.flutter.plugins.**  { *; }
--keep class io.flutter.embedding.** { *; }
--keep class io.flutter.embedding.engine.** { *; }
 
-# Google Play Core (for Flutter)
--keep class com.google.android.play.core.** { *; }
--keep class com.google.android.play.core.splitcompat.** { *; }
--keep class com.google.android.play.core.splitinstall.** { *; }
--keep class com.google.android.play.core.tasks.** { *; }
--dontwarn com.google.android.play.core.**
-
-# V2Ray
+# Keep V2Ray related classes
 -keep class com.v2ray.** { *; }
 -keep class libv2ray.** { *; }
+-keep class go.** { *; }
 
-# Firebase
+# Keep Firebase
 -keep class com.google.firebase.** { *; }
 -keep class com.google.android.gms.** { *; }
--dontwarn com.google.firebase.**
--dontwarn com.google.android.gms.**
-
-# Gson
--keepattributes Signature
--keepattributes *Annotation*
--keepattributes EnclosingMethod
--keepattributes InnerClasses
--dontwarn sun.misc.**
--keep class com.google.gson.** { *; }
--keep class * implements com.google.gson.TypeAdapter
--keep class * implements com.google.gson.TypeAdapterFactory
--keep class * implements com.google.gson.JsonSerializer
--keep class * implements com.google.gson.JsonDeserializer
 
 # Keep native methods
 -keepclasseswithmembernames class * {
     native <methods>;
 }
 
-# Keep custom model classes
--keep class com.tiksarvpn.app.models.** { *; }
+# Keep Parcelables
+-keepclassmembers class * implements android.os.Parcelable {
+    static ** CREATOR;
+}
+
+# Keep Serializable
+-keepclassmembers class * implements java.io.Serializable {
+    static final long serialVersionUID;
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
+    private void writeObject(java.io.ObjectOutputStream);
+    private void readObject(java.io.ObjectInputStream);
+    java.lang.Object writeReplace();
+    java.lang.Object readResolve();
+}
+
+# Keep R classes
+-keepclassmembers class **.R$* {
+    public static <fields>;
+}
 
 # Kotlin
 -keep class kotlin.** { *; }
--keep class kotlin.Metadata { *; }
+-keep class kotlinx.** { *; }
 -dontwarn kotlin.**
--keepclassmembers class **$WhenMappings {
-    <fields>;
-}
--keepclassmembers class kotlin.Metadata {
-    public <methods>;
-}
+-dontwarn kotlinx.**
 
-# Coroutines
--keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
--keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
--keepclassmembernames class kotlinx.** {
-    volatile <fields>;
-}
+# OkHttp
+-dontwarn okhttp3.**
+-dontwarn okio.**
+-keep class okhttp3.** { *; }
+-keep class okio.** { *; }
 
-# Remove logging in release
--assumenosideeffects class android.util.Log {
-    public static *** d(...);
-    public static *** v(...);
-    public static *** i(...);
-}
+# Gson
+-keep class com.google.gson.** { *; }
+-keepattributes Signature
+-keepattributes *Annotation*
+
+# General
+-keepattributes SourceFile,LineNumberTable
+-renamesourcefileattribute SourceFile
+-dontobfuscate
