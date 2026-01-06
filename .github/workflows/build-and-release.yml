@@ -32,14 +32,28 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
+      - name: Clear Gradle caches
+        run: |
+          rm -rf ~/.gradle/caches/
+          rm -rf android/.gradle/
+        shell: bash
+
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.32.8'
           channel: 'stable'
+          cache: false
 
       - name: Get dependencies
         run: flutter pub get
+
+      - name: Clean Gradle cache
+        run: |
+          cd android
+          ./gradlew clean --no-daemon
+          cd ..
+        shell: bash
 
       - name: Setup Keystore (if available)
         env:
