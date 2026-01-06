@@ -1,5 +1,4 @@
 import 'dart:math';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 
 class SplashLoadingScreen extends StatefulWidget {
@@ -177,6 +176,10 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
   }
 
   void _navigateToNext() {
+    // Stop all animations before navigating to prevent lag
+    _glowController.stop();
+    _shineController.stop();
+    
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
@@ -184,7 +187,7 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
           return FadeTransition(opacity: animation, child: child);
         },
-        transitionDuration: const Duration(milliseconds: 300),
+        transitionDuration: const Duration(milliseconds: 400),
       ),
     );
   }
@@ -224,8 +227,10 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
           ),
           child: Stack(
             children: [
-              // Particles
-              const _ParticlesWidget(),
+              // Particles - isolated repaint boundary
+              const RepaintBoundary(
+                child: _ParticlesWidget(),
+              ),
               
               // Main content with zoom/fade
               Center(
@@ -281,31 +286,28 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
           alignment: Alignment.center,
           clipBehavior: Clip.none,
           children: [
-            // Glow behind logo (280x150px, blur 20px)
+            // Glow behind logo - simple gradient without ImageFilter (much lighter)
             Positioned(
               child: AnimatedBuilder(
                 animation: _glowController,
                 builder: (context, _) {
-                  // glowPulse: opacity 0.6 -> 1, scale 1 -> 1.1
                   final opacity = 0.6 + (_glowAnim.value * 0.4);
                   final scale = 1.0 + (_glowAnim.value * 0.1);
                   
                   return Transform.scale(
                     scale: scale,
-                    child: ImageFiltered(
-                      imageFilter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                      child: Container(
-                        width: 280,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          gradient: RadialGradient(
-                            colors: [
-                              gold.withValues(alpha: 0.25 * opacity),
-                              gold.withValues(alpha: 0.1 * opacity),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.0, 0.4, 0.7],
-                          ),
+                    child: Container(
+                      width: 280,
+                      height: 150,
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          colors: [
+                            gold.withValues(alpha: 0.3 * opacity),
+                            gold.withValues(alpha: 0.15 * opacity),
+                            gold.withValues(alpha: 0.05 * opacity),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.3, 0.6, 1.0],
                         ),
                       ),
                     ),
@@ -584,6 +586,7 @@ class _ParticlesWidgetState extends State<_ParticlesWidget>
   late AnimationController _controller;
   final List<_Particle> _particles = [];
   final Random _random = Random();
+  late double _startTime;
 
   // Colors from HTML: #fbbf24, #f59e0b, #fff
   static const colors = [
@@ -595,19 +598,18 @@ class _ParticlesWidgetState extends State<_ParticlesWidget>
   @override
   void initState() {
     super.initState();
+    _startTime = DateTime.now().millisecondsSinceEpoch / 1000.0;
+    
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 16), // ~60fps
+      duration: const Duration(seconds: 4), // Longer duration, smoother
     )..repeat();
 
-    // Create 30 particles
-    // HTML: left: 10% + random*80%, bottom: 20% + random*20%
-    // duration: 2.5s + random*1.5s, delay: random*3s
-    // size: 3px + random*4px
-    for (int i = 0; i < 30; i++) {
+    // Create 20 particles (reduced from 30)
+    for (int i = 0; i < 20; i++) {
       _particles.add(_Particle(
         x: 0.1 + _random.nextDouble() * 0.8,
-        startY: 0.8 - _random.nextDouble() * 0.2, // bottom 20-40% means y 60-80%
+        startY: 0.8 - _random.nextDouble() * 0.2,
         delay: _random.nextDouble() * 3.0,
         duration: 2.5 + _random.nextDouble() * 1.5,
         size: 3 + _random.nextDouble() * 4,
@@ -627,11 +629,12 @@ class _ParticlesWidgetState extends State<_ParticlesWidget>
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, _) {
+        final elapsed = _controller.value * 4.0; // 4 seconds cycle
         return CustomPaint(
           size: Size.infinite,
           painter: _ParticlesPainter(
             particles: _particles,
-            time: DateTime.now().millisecondsSinceEpoch / 1000.0,
+            time: _startTime + elapsed,
             colors: colors,
           ),
         );

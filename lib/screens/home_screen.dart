@@ -14,6 +14,7 @@ import '../screens/ip_info_screen.dart';
 import '../screens/speedtest_screen.dart';
 import '../screens/host_checker_screen.dart';
 import '../widgets/announcement_banner.dart';
+import '../services/remote_config_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -1030,7 +1031,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 13),
                 ),
                 const SizedBox(width: 6),
-                const Icon(Icons.favorite, color: Color(0xFFf472b6), size: 16),
+                const _BeatingHeart(),
                 const SizedBox(width: 6),
                 Text(
                   AppLocalizations.of(context).translate('about.developer'),
@@ -1044,21 +1045,38 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             ),
           ),
           const SizedBox(height: 24),
-          // Social Links
-          _buildSocialLink(
-            icon: Icons.send_rounded,
-            title: AppLocalizations.of(context).translate('about.telegram'),
-            subtitle: '@tiksar_vpn',
-            color: const Color(0xFF0088CC),
-            url: 'https://t.me/tiksar_vpn',
-          ),
-          const SizedBox(height: 10),
-          _buildSocialLink(
-            icon: Icons.camera_alt_rounded,
-            title: AppLocalizations.of(context).translate('about.instagram'),
-            subtitle: '@aboljahany',
-            color: const Color(0xFFE1306C),
-            url: 'https://instagram.com/aboljahany',
+          // Social Links (from Remote Config)
+          Builder(
+            builder: (context) {
+              final remoteConfig = RemoteConfigService();
+              return Column(
+                children: [
+                  _buildSocialLink(
+                    icon: Icons.send_rounded,
+                    title: AppLocalizations.of(context).translate('about.telegram'),
+                    subtitle: remoteConfig.telegramId,
+                    color: const Color(0xFF0088CC),
+                    url: remoteConfig.telegramUrl,
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSocialLink(
+                    icon: Icons.camera_alt_rounded,
+                    title: AppLocalizations.of(context).translate('about.instagram'),
+                    subtitle: remoteConfig.instagramId,
+                    color: const Color(0xFFE1306C),
+                    url: remoteConfig.instagramUrl,
+                  ),
+                  const SizedBox(height: 10),
+                  _buildSocialLink(
+                    icon: Icons.public,
+                    title: AppLocalizations.of(context).translate('about.tiksar_village_page'),
+                    subtitle: remoteConfig.tiksarPageId,
+                    color: const Color(0xFF10b981),
+                    url: remoteConfig.tiksarPageUrl,
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 28),
           // Copyright
@@ -1172,6 +1190,57 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           ),
         ),
       ),
+    );
+  }
+}
+
+
+// Beating heart widget
+class _BeatingHeart extends StatefulWidget {
+  const _BeatingHeart();
+
+  @override
+  State<_BeatingHeart> createState() => _BeatingHeartState();
+}
+
+class _BeatingHeartState extends State<_BeatingHeart>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    )..repeat(reverse: true);
+    
+    _animation = Tween<double>(begin: 1.0, end: 1.25).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _animation.value,
+          child: const Icon(
+            Icons.favorite,
+            color: Color(0xFFf472b6),
+            size: 16,
+          ),
+        );
+      },
     );
   }
 }
