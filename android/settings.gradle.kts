@@ -23,16 +23,3 @@ plugins {
 }
 
 include(":app")
-
-// Force all subprojects to use consistent Kotlin version
-subprojects {
-    afterEvaluate {
-        configurations.all {
-            resolutionStrategy {
-                force("org.jetbrains.kotlin:kotlin-stdlib:1.9.22")
-                force("org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.9.22")
-                force("org.jetbrains.kotlin:kotlin-reflect:1.9.22")
-            }
-        }
-    }
-}
