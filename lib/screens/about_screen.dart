@@ -24,7 +24,7 @@ class _AboutScreenState extends State<AboutScreen> with TickerProviderStateMixin
     super.initState();
     _heartController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
 
     _logoController = AnimationController(
@@ -32,7 +32,7 @@ class _AboutScreenState extends State<AboutScreen> with TickerProviderStateMixin
       duration: const Duration(milliseconds: 800),
     )..forward();
 
-    _heartAnimation = Tween<double>(begin: 1.0, end: 1.2).animate(
+    _heartAnimation = Tween<double>(begin: 0.9, end: 1.3).animate(
       CurvedAnimation(parent: _heartController, curve: Curves.easeInOut),
     );
 

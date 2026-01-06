@@ -628,6 +628,20 @@ class V2RayService extends ChangeNotifier {
     }
   }
 
+  // Get delay of currently connected server - for checking if VPN is actually running
+  Future<int> getConnectedServerDelayDirect() async {
+    try {
+      await initialize();
+      final delay = await _flutterV2ray.getConnectedServerDelay()
+          .timeout(const Duration(seconds: 3));
+      debugPrint('🔍 Connected server delay: ${delay}ms');
+      return delay;
+    } catch (e) {
+      debugPrint('❌ getConnectedServerDelay error: $e');
+      return -1;
+    }
+  }
+
   Future<List<V2RayConfig>> parseSubscriptionUrl(String url) async {
     try {
       final response = await http
@@ -897,35 +911,45 @@ class V2RayService extends ChangeNotifier {
 
   // Public method to force check connection status
   // Works WITHOUT internet - checks VPN service state directly
-  // IMPROVED: Better detection when another VPN app takes over
+  // IMPROVED: Better detection - prioritize delay check over status string
+  // Status string can be stale after app restart, but delay check is real-time
   Future<bool> isActuallyConnected() async {
     try {
       debugPrint('🔎 Checking if VPN is actually connected...');
       
-      // Priority 1: Check V2Ray core status FIRST
-      // This is more reliable than just checking activeConfig
+      // PRIORITY 1: Try delay check FIRST - this is the most reliable method
+      // It actually tests if V2Ray core is running and can reach the server
+      try {
+        final delay = await _flutterV2ray.getConnectedServerDelay()
+            .timeout(const Duration(seconds: 3));
+        
+        if (delay >= 0 && delay < 10000) {
+          debugPrint('✅ VPN connected (delay check: ${delay}ms)');
+          
+          // Restore active config if needed
+          if (_activeConfig == null) {
+            final savedConfig = await _loadActiveConfig();
+            if (savedConfig != null) {
+              _activeConfig = savedConfig;
+              await _restoreConnectionTime();
+              _startUsageMonitoring();
+              notifyListeners();
+              debugPrint('✅ Restored activeConfig from saved');
+            }
+          }
+          return true;
+        }
+        debugPrint('🔎 Delay check returned invalid: $delay');
+      } catch (e) {
+        debugPrint('🔎 Delay check failed: $e');
+        // Continue to other checks
+      }
+      
+      // PRIORITY 2: Check V2Ray status string
       final currentState = _currentStatus?.state.toLowerCase() ?? '';
       debugPrint('🔎 Current V2Ray state: "$currentState"');
       
-      // If V2Ray explicitly says disconnected, trust it
-      if (currentState.contains('disconnect') || 
-          currentState.contains('stop') || 
-          currentState.contains('idle') ||
-          currentState == 'disconnected' ||
-          currentState.isEmpty) {
-        debugPrint('❌ V2Ray reports disconnected state');
-        
-        // Clear active config if V2Ray says disconnected
-        if (_activeConfig != null) {
-          debugPrint('🧹 Clearing stale activeConfig');
-          _activeConfig = null;
-          await _clearActiveConfig();
-          notifyListeners();
-        }
-        return false;
-      }
-      
-      // Priority 2: If V2Ray says connected, verify we have active config
+      // If V2Ray says connected, trust it
       if (currentState.contains('connect') || 
           currentState == 'connected' ||
           currentState == 'running') {
@@ -945,55 +969,22 @@ class V2RayService extends ChangeNotifier {
           debugPrint('✅ VPN connected (restored from saved config)');
           return true;
         }
-        
-        // V2Ray says connected but we have no config - might be another VPN
-        debugPrint('⚠️ V2Ray reports connected but no config found - possibly another VPN');
-        return false;
       }
       
-      // Priority 3: Check if we have active config in memory
+      // PRIORITY 3: Check if we have active config in memory
       if (_activeConfig != null) {
-        // We have config but V2Ray state is unclear - verify with delay check
-        try {
-          final delay = await _flutterV2ray.getConnectedServerDelay()
-              .timeout(const Duration(seconds: 2));
-          
-          if (delay >= 0 && delay < 10000) {
-            debugPrint('✅ VPN connected (verified with delay: ${delay}ms)');
-            return true;
-          }
-        } catch (e) {
-          debugPrint('⚠️ Delay check failed: $e');
-        }
-        
-        // Delay check failed - connection might be dead or another VPN took over
-        debugPrint('⚠️ activeConfig exists but connection unverified');
+        debugPrint('⚠️ activeConfig exists but delay check failed - assuming disconnected');
+        // Don't clear immediately - let the caller decide
         return false;
       }
       
-      // Priority 4: Check saved config (VPN might be running but app was killed)
+      // PRIORITY 4: Check saved config (VPN might be running but app was killed)
       final savedConfig = await _loadActiveConfig();
       if (savedConfig != null) {
-        // Verify the saved config is actually connected
-        try {
-          final delay = await _flutterV2ray.getConnectedServerDelay()
-              .timeout(const Duration(seconds: 2));
-          
-          if (delay >= 0 && delay < 10000) {
-            _activeConfig = savedConfig;
-            await _restoreConnectionTime();
-            _startUsageMonitoring();
-            notifyListeners();
-            debugPrint('✅ VPN connected (restored and verified)');
-            return true;
-          }
-        } catch (e) {
-          debugPrint('⚠️ Could not verify saved config: $e');
-        }
-        
-        // Saved config exists but can't verify - clear it
-        debugPrint('🧹 Clearing unverifiable saved config');
-        await _clearActiveConfig();
+        debugPrint('🔎 Found saved config but delay check failed');
+        // Don't clear saved config here - it might be a temporary network issue
+        // Let the UI show disconnected but keep the config for reconnection
+        return false;
       }
       
       debugPrint('❌ VPN disconnected (no active config)');
