@@ -1,8 +1,10 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// Cyber Glow Background - New UI Design
-/// Static gradient with subtle glow effects
+/// Cyber Glow Background - V7 Final Mix Style
+/// Matches the HTML background-v7-final-mix.html exactly
+/// Three layers: center dark, top aurora, bottom seamless glow
 class CyberGlowBackground extends StatelessWidget {
   final Widget child;
   final bool showBottomGlow;
@@ -24,105 +26,143 @@ class CyberGlowBackground extends StatelessWidget {
         backgroundColor: const Color(0xFF0a0a0a),
         body: Stack(
           children: [
-            // Base gradient background
+            // Layer 1: Base dark background
+            Container(
+              width: double.infinity,
+              height: double.infinity,
+              color: const Color(0xFF0a0a0a),
+            ),
+            
+            // Layer 2: Center dark radial gradient
+            // CSS: radial-gradient(ellipse at 50% 40%, #0c0c12 0%, #0a0a0a 70%)
             Positioned.fill(
               child: Container(
                 decoration: const BoxDecoration(
                   gradient: RadialGradient(
-                    center: Alignment(0, 0),
-                    radius: 1.2,
+                    center: Alignment(0.0, -0.2), // 50% 40%
+                    radius: 1.5,
                     colors: [
-                      Color(0xFF12121a), // Subtle purple tint in center
-                      Color(0xFF0a0a0a), // Dark edges
+                      Color(0xFF0c0c12),
+                      Color(0xFF0a0a0a),
                     ],
+                    stops: [0.0, 0.7],
                   ),
                 ),
               ),
             ),
             
-            // Top-center purple glow
+            // Layer 3: Top Aurora effect with blur
+            // CSS: radial-gradient(ellipse 80% 50% at 50% 30%, rgba(99, 102, 241, 0.08) 0%, transparent 60%)
+            // with filter: blur(30px)
             Positioned(
-              top: -100,
+              top: -150,
               left: 0,
               right: 0,
-              child: Container(
-                height: 300,
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment.center,
-                    radius: 0.8,
-                    colors: [
-                      const Color(0xFF6366f1).withValues(alpha: 0.08),
-                      Colors.transparent,
-                    ],
-                  ),
-                ),
-              ),
+              child: _buildTopAurora(),
             ),
             
-            // Bottom-left green glow
-            if (showBottomGlow)
-              Positioned(
-                bottom: -50,
-                left: -100,
-                child: Container(
-                  width: 300,
-                  height: 300,
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [
-                        const Color(0xFF10b981).withValues(alpha: 0.15),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            
-            // Bottom-right cyan glow
-            if (showBottomGlow)
-              Positioned(
-                bottom: -50,
-                right: -100,
-                child: Container(
-                  width: 300,
-                  height: 300,
-                  decoration: BoxDecoration(
-                    gradient: RadialGradient(
-                      colors: [
-                        const Color(0xFF06b6d4).withValues(alpha: 0.15),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            
-            // Bottom gradient overlay
+            // Layer 4: Bottom glow - seamless blend (three sub-layers)
             if (showBottomGlow)
               Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
-                height: 250,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [
-                        const Color(0xFF10b981).withValues(alpha: 0.06),
-                        Colors.transparent,
-                      ],
-                    ),
-                  ),
-                ),
+                child: _buildBottomGlow(context),
               ),
             
             // Content
             Positioned.fill(child: child),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildTopAurora() {
+    // Matches HTML: height: 450px, radial-gradient with blur(30px)
+    return Container(
+      height: 450,
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(0.0, -0.4), // at 50% 30%
+          radius: 0.9,
+          colors: [
+            const Color(0xFF6366F1).withValues(alpha: 0.08), // rgba(99, 102, 241, 0.08)
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.6],
+        ),
+      ),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
+        child: Container(color: Colors.transparent),
+      ),
+    );
+  }
+
+  Widget _buildBottomGlow(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final bottomHeight = screenHeight * 0.45; // 45% of screen height
+    
+    return SizedBox(
+      height: bottomHeight,
+      child: Stack(
+        children: [
+          // Sub-layer 1: Linear gradient fade
+          // CSS: linear-gradient(180deg, transparent 0%, rgba(16, 185, 129, 0.03) 60%, rgba(16, 185, 129, 0.06) 100%)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    const Color(0xFF10B981).withValues(alpha: 0.03),
+                    const Color(0xFF10B981).withValues(alpha: 0.06),
+                  ],
+                  stops: const [0.0, 0.6, 1.0],
+                ),
+              ),
+            ),
+          ),
+          
+          // Sub-layer 2: Left radial glow (green)
+          // CSS: radial-gradient(ellipse at 30% 100%, rgba(16, 185, 129, 0.08) 0%, transparent 45%)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(-0.4, 1.0), // at 30% 100%
+                  radius: 0.7,
+                  colors: [
+                    const Color(0xFF10B981).withValues(alpha: 0.08),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.45],
+                ),
+              ),
+            ),
+          ),
+          
+          // Sub-layer 3: Right radial glow (cyan)
+          // CSS: radial-gradient(ellipse at 70% 100%, rgba(6, 182, 212, 0.06) 0%, transparent 45%)
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0.4, 1.0), // at 70% 100%
+                  radius: 0.7,
+                  colors: [
+                    const Color(0xFF06B6D4).withValues(alpha: 0.06),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.45],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -66,16 +66,17 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       // Clear ping cache to get fresh results
       _v2rayService.clearPingCache();
       
-      debugPrint('⚡ Found ${servers.length} servers, testing first 7...');
+      debugPrint('⚡ Found ${servers.length} servers, testing first 7 in parallel...');
       
       // Test first 7 servers
       final serversToTest = servers.take(7).toList();
       final Map<V2RayConfig, int> pingResults = {};
       
-      // Test ALL 7 servers - don't stop early, inactive servers will timeout gracefully
-      for (int i = 0; i < serversToTest.length; i++) {
-        final server = serversToTest[i];
-        debugPrint('   [${i + 1}/${serversToTest.length}] Testing ${server.remark}...');
+      // Test ALL 7 servers in PARALLEL for faster results
+      final futures = serversToTest.asMap().entries.map((entry) async {
+        final index = entry.key;
+        final server = entry.value;
+        debugPrint('   [${index + 1}/${serversToTest.length}] Testing ${server.remark}...');
         
         try {
           // Use V2Ray core ping directly (no cache)
@@ -84,13 +85,36 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           
           if (ping != null && ping > 0 && ping < 10000) {
             debugPrint('   ✓ ${server.remark}: ${ping}ms');
-            pingResults[server] = ping;
+            return MapEntry(server, ping);
           } else {
             debugPrint('   ✗ ${server.remark}: no response or timeout');
+            return null;
           }
         } catch (e) {
           debugPrint('   ✗ ${server.remark}: error - $e');
-          // Continue to next server on error
+          return null;
+        }
+      }).toList();
+      
+      // Wait for all pings to complete with overall timeout
+      List<MapEntry<V2RayConfig, int>?> results;
+      try {
+        results = await Future.wait(futures).timeout(
+          const Duration(seconds: 8),
+          onTimeout: () {
+            debugPrint('⚠️ Overall ping timeout, using partial results');
+            return List.filled(futures.length, null);
+          },
+        );
+      } catch (e) {
+        debugPrint('⚠️ Future.wait error: $e');
+        results = [];
+      }
+      
+      // Collect successful results
+      for (final result in results) {
+        if (result != null) {
+          pingResults[result.key] = result.value;
         }
       }
       

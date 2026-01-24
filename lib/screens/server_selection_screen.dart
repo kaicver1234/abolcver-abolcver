@@ -829,38 +829,66 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
 
     final Map<String, int> results = {};
     int successCount = 0;
+    int completedCount = 0;
     
     try {
-      for (int i = 0; i < configs.length; i++) {
+      debugPrint('🚀 Starting parallel ping test for ${configs.length} servers...');
+      
+      // Test all servers in parallel with batches to avoid overwhelming the system
+      const batchSize = 10; // Test 10 servers at a time
+      
+      for (int batchStart = 0; batchStart < configs.length; batchStart += batchSize) {
         if (!mounted) return;
-        final config = configs[i];
-        try {
-          debugPrint('🔍 Testing ${i + 1}/${configs.length}: ${config.remark}');
-          final ping = await provider.v2rayService.getServerDelay(config);
-          if (!mounted) return;
-          final pingValue = ping ?? 99999;
-          results[config.id] = pingValue;
-          if (pingValue < 99999) successCount++;
-          
-          // Update ping results and sort in real-time
-          setState(() {
-            _pingResults = Map.from(results);
-          });
-          
-          // Sort servers by ping in real-time as results come in
-          _sortServersByPing(provider, results);
-          
-        } catch (e) {
-          results[config.id] = 99999;
-          if (mounted) {
-            setState(() => _pingResults = Map.from(results));
+        
+        final batchEnd = (batchStart + batchSize).clamp(0, configs.length);
+        final batch = configs.sublist(batchStart, batchEnd);
+        
+        debugPrint('📦 Testing batch ${batchStart ~/ batchSize + 1}: servers ${batchStart + 1}-$batchEnd');
+        
+        // Test all servers in this batch simultaneously
+        final futures = batch.map((config) async {
+          try {
+            final ping = await provider!.v2rayService.getServerDelay(config);
+            final pingValue = ping ?? 99999;
+            
+            if (!mounted) return;
+            
+            // Update results immediately as each ping completes
+            results[config.id] = pingValue;
+            if (pingValue < 99999) successCount++;
+            completedCount++;
+            
+            // Update UI in real-time
+            setState(() {
+              _pingResults = Map.from(results);
+            });
+            
+            // Sort servers by ping in real-time
             _sortServersByPing(provider, results);
+            
+            debugPrint('✓ ${config.remark}: ${pingValue}ms ($completedCount/${configs.length})');
+          } catch (e) {
+            if (!mounted) return;
+            results[config.id] = 99999;
+            completedCount++;
+            setState(() => _pingResults = Map.from(results));
+            _sortServersByPing(provider!, results);
+            debugPrint('✗ ${config.remark}: timeout ($completedCount/${configs.length})');
           }
+        }).toList();
+        
+        // Wait for all pings in this batch to complete
+        await Future.wait(futures);
+        
+        // Small delay between batches to prevent overwhelming
+        if (batchEnd < configs.length) {
+          await Future.delayed(const Duration(milliseconds: 100));
         }
       }
 
       if (!mounted) return;
 
+      debugPrint('✅ Ping test completed: $successCount/$completedCount successful');
       _showSnackBar(
         '${AppLocalizations.of(context).translate('server_selection.servers_updated')} ($successCount/${configs.length})',
         const Color(0xFF10B981),

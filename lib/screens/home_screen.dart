@@ -1093,7 +1093,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   ),
                   const SizedBox(height: 10),
                   _buildSocialLink(
-                    icon: Icons.photo_camera_back_outlined,
+                    icon: Icons.photo_library_outlined,
                     title: AppLocalizations.of(context).translate('about.tiksar_village_page'),
                     subtitle: remoteConfig.tiksarPageId,
                     color: const Color(0xFFC13584),
