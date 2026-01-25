@@ -1017,22 +1017,30 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           ),
           const SizedBox(height: 28),
           // Description
-          Container(
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.04),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-            ),
-            child: Text(
-              AppLocalizations.of(context).translate('about.about_description'),
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
-                fontSize: 13,
-                height: 1.6,
-              ),
-            ),
+          Builder(
+            builder: (context) {
+              final remoteConfig = RemoteConfigService();
+              final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+              final description = remoteConfig.getAboutDescription(languageProvider.currentLanguage.code);
+              
+              return Container(
+                padding: const EdgeInsets.all(18),
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                ),
+                child: Text(
+                  description,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.7),
+                    fontSize: 13,
+                    height: 1.6,
+                  ),
+                ),
+              );
+            },
           ),
           const SizedBox(height: 16),
           // Developer

@@ -38,6 +38,9 @@ class RemoteConfigService {
     'announcement_type': 'info',
     'maintenance_mode': false,
     'maintenance_message': 'سرویس در حال بروزرسانی است',
+    // About description
+    'about_description_en': 'Tiksar VPN is a powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access to the global web with complete privacy and security.',
+    'about_description_fa': 'تیکسر وی پی ان ابزاری قدرتمند برای دسترسی به اینترنت آزاد است. محدودیت‌ها را بشکنید و با حفظ کامل حریم خصوصی و امنیت، از دسترسی نامحدود به وب جهانی لذت ببرید.',
     // Social links
     'telegram_id': '@tiksar_vpn',
     'telegram_url': 'https://t.me/tiksar_vpn',
@@ -157,5 +160,26 @@ class RemoteConfigService {
     if (!_isSupported || _remoteConfig == null) return 'https://instagram.com/tiksaar_leyl_gilan';
     final url = _remoteConfig!.getString('tiksar_page_url');
     return url.isNotEmpty ? url : 'https://instagram.com/tiksaar_leyl_gilan';
+  }
+
+  /// Get about description based on language
+  String getAboutDescription(String languageCode) {
+    if (!_isSupported || _remoteConfig == null) {
+      return languageCode == 'fa'
+          ? 'تیکسر وی پی ان ابزاری قدرتمند برای دسترسی به اینترنت آزاد است. محدودیت‌ها را بشکنید و با حفظ کامل حریم خصوصی و امنیت، از دسترسی نامحدود به وب جهانی لذت ببرید.'
+          : 'Tiksar VPN is a powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access to the global web with complete privacy and security.';
+    }
+    
+    final key = 'about_description_$languageCode';
+    final description = _remoteConfig!.getString(key);
+    
+    if (description.isNotEmpty) {
+      return description;
+    }
+    
+    // Fallback to default
+    return languageCode == 'fa'
+        ? 'تیکسر وی پی ان ابزاری قدرتمند برای دسترسی به اینترنت آزاد است. محدودیت‌ها را بشکنید و با حفظ کامل حریم خصوصی و امنیت، از دسترسی نامحدود به وب جهانی لذت ببرید.'
+        : 'Tiksar VPN is a powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access to the global web with complete privacy and security.';
   }
 }

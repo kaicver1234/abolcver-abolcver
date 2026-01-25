@@ -103,7 +103,7 @@ class NotificationService {
       importance: Importance.max,
       priority: Priority.high,
       showWhen: true,
-      icon: '@drawable/ic_firebase_notification',
+      icon: '@drawable/ic_notification', // Same icon as VPN notification
     );
     
     const DarwinNotificationDetails iOSPlatformChannelSpecifics =

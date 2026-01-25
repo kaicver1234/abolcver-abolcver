@@ -219,6 +219,10 @@ class _AboutScreenState extends State<AboutScreen> with TickerProviderStateMixin
   }
 
   Widget _buildDescriptionCard(BuildContext context) {
+    final remoteConfig = RemoteConfigService();
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final description = remoteConfig.getAboutDescription(languageProvider.currentLanguage.code);
+    
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -246,7 +250,7 @@ class _AboutScreenState extends State<AboutScreen> with TickerProviderStateMixin
           ),
           const SizedBox(height: 16),
           Text(
-            AppLocalizations.of(context).translate('about.about_description'),
+            description,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.75),
