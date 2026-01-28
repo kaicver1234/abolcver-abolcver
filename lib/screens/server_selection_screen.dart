@@ -830,28 +830,31 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     final Map<String, int> results = {};
     
     try {
-      debugPrint('🚀 Starting parallel ping test for ${configs.length} servers...');
+      debugPrint('🚀 Starting batch ping test for ${configs.length} servers (10 at a time)...');
       
-      // Test all servers in parallel with batches to avoid overwhelming the system
-      const batchSize = 10; // Test 10 servers at a time
+      // Test servers in batches of 10 for optimal performance
+      const batchSize = 10;
+      final totalBatches = (configs.length / batchSize).ceil();
       
-      for (int batchStart = 0; batchStart < configs.length; batchStart += batchSize) {
+      for (int batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
         if (!mounted) return;
         
+        final batchStart = batchIndex * batchSize;
         final batchEnd = (batchStart + batchSize).clamp(0, configs.length);
         final batch = configs.sublist(batchStart, batchEnd);
         
-        debugPrint('📦 Testing batch ${batchStart ~/ batchSize + 1}: servers ${batchStart + 1}-$batchEnd');
+        debugPrint('📦 Batch ${batchIndex + 1}/$totalBatches: Testing servers ${batchStart + 1}-$batchEnd (${batch.length} servers)');
         
-        // Test all servers in this batch simultaneously
+        // Test all 10 servers in this batch simultaneously
         final futures = batch.map((config) async {
           try {
+            // Each server has 11 seconds timeout
             final ping = await provider!.v2rayService.getServerDelay(config);
             final pingValue = ping ?? 99999;
             
             if (!mounted) return;
             
-            // Thread-safe update: use synchronized block
+            // Thread-safe update
             synchronized(() {
               results[config.id] = pingValue;
               
@@ -866,7 +869,11 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
               }
             });
             
-            debugPrint('✓ ${config.remark}: ${pingValue}ms (${results.length}/${configs.length})');
+            if (pingValue < 99999) {
+              debugPrint('  ✓ ${config.remark}: ${pingValue}ms');
+            } else {
+              debugPrint('  ✗ ${config.remark}: timeout');
+            }
           } catch (e) {
             if (!mounted) return;
             
@@ -878,23 +885,36 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
               }
             });
             
-            debugPrint('✗ ${config.remark}: timeout (${results.length}/${configs.length})');
+            debugPrint('  ✗ ${config.remark}: error - $e');
           }
         }).toList();
         
-        // Wait for all pings in this batch to complete
-        await Future.wait(futures);
+        // Wait for all 10 servers in this batch to complete (max 11 seconds per server)
+        try {
+          await Future.wait(futures).timeout(
+            const Duration(seconds: 12), // Slightly more than individual timeout
+            onTimeout: () {
+              debugPrint('⚠️ Batch ${batchIndex + 1} timeout, moving to next batch');
+              return [];
+            },
+          );
+        } catch (e) {
+          debugPrint('⚠️ Batch ${batchIndex + 1} error: $e');
+        }
         
-        // Small delay between batches to prevent overwhelming
+        debugPrint('✅ Batch ${batchIndex + 1}/$totalBatches completed (${results.length}/${configs.length} total)');
+        
+        // Small delay between batches to prevent overwhelming the system
         if (batchEnd < configs.length && mounted) {
-          await Future.delayed(const Duration(milliseconds: 100));
+          await Future.delayed(const Duration(milliseconds: 200));
         }
       }
 
       if (!mounted) return;
 
       final successCount = results.values.where((ping) => ping < 99999).length;
-      debugPrint('✅ Ping test completed: $successCount/${configs.length} successful');
+      final failedCount = configs.length - successCount;
+      debugPrint('🎯 Ping test completed: $successCount successful, $failedCount failed/timeout');
       
       _showSnackBar(
         '${AppLocalizations.of(context).translate('server_selection.servers_updated')} ($successCount/${configs.length})',

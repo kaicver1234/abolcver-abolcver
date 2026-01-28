@@ -100,7 +100,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       List<MapEntry<V2RayConfig, int>?> results;
       try {
         results = await Future.wait(futures).timeout(
-          const Duration(seconds: 8),
+          const Duration(seconds: 20), // 7 servers * ~3s each (with retry)
           onTimeout: () {
             debugPrint('⚠️ Overall ping timeout, using partial results');
             return List.filled(futures.length, null);

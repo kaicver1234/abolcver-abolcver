@@ -490,12 +490,14 @@ class V2RayService extends ChangeNotifier {
         final cached = _pingCache[hostKey];
         final ageSeconds = DateTime.now().difference(cached!.timestamp).inSeconds;
         if (ageSeconds < 30) {
+          debugPrint('📦 Using cached ping for ${config.remark}: ${cached.delay}ms');
           return cached.delay;
         }
       } else if (_pingCache.containsKey(configId)) {
         final cached = _pingCache[configId];
         final ageSeconds = DateTime.now().difference(cached!.timestamp).inSeconds;
         if (ageSeconds < 30) {
+          debugPrint('📦 Using cached ping for ${config.remark}: ${cached.delay}ms');
           return cached.delay;
         }
       }
@@ -503,9 +505,10 @@ class V2RayService extends ChangeNotifier {
       // Check if ping is already in progress for this host or config
       if (_pingInProgress[hostKey] == true ||
           _pingInProgress[configId] == true) {
-        // Wait for the ongoing ping to complete (max 6 seconds)
+        debugPrint('⏳ Ping already in progress for ${config.remark}, waiting...');
+        // Wait for the ongoing ping to complete (max 10 seconds)
         int attempts = 0;
-        while ((_pingInProgress[hostKey] == true || _pingInProgress[configId] == true) && attempts < 60) {
+        while ((_pingInProgress[hostKey] == true || _pingInProgress[configId] == true) && attempts < 100) {
           await Future.delayed(const Duration(milliseconds: 100));
           attempts++;
           
@@ -526,7 +529,7 @@ class V2RayService extends ChangeNotifier {
       _pingInProgress[configId] = true;
 
       try {
-        // Use V2Ray's built-in ping method for better accuracy
+        // Use V2Ray's built-in ping method (same as v2rayNG Real Delay)
         await initialize();
 
         // Safely parse the config
@@ -540,27 +543,57 @@ class V2RayService extends ChangeNotifier {
           return null;
         }
 
-        final delay = await _flutterV2ray
-            .getServerDelay(config: parser.getFullConfiguration())
-            .timeout(
-              const Duration(seconds: 8),
-              onTimeout: () {
-                debugPrint('⚠️ Ping timeout for ${config.remark}');
-                return -1; // Return -1 instead of throwing
-              },
-            );
+        debugPrint('🔍 Testing ping for ${config.remark} using V2Ray core...');
+        
+        // Use same test URLs as v2rayNG
+        final testUrls = [
+          'https://www.gstatic.com/generate_204',  // Primary (same as v2rayNG)
+          'https://www.google.com/generate_204',   // Secondary (same as v2rayNG)
+        ];
+        
+        int? bestDelay;
+        
+        for (final url in testUrls) {
+          try {
+            final delay = await _flutterV2ray
+                .getServerDelay(
+                  config: parser.getFullConfiguration(),
+                  url: url,
+                )
+                .timeout(
+                  const Duration(seconds: 11), // Increased timeout
+                  onTimeout: () {
+                    debugPrint('⚠️ Ping timeout for ${config.remark} with $url');
+                    return -1;
+                  },
+                );
+
+            if (delay > 0 && delay < 10000) {
+              if (bestDelay == null || delay < bestDelay) {
+                bestDelay = delay;
+              }
+              // If we got a good result, no need to try other URLs
+              break;
+            }
+          } catch (e) {
+            debugPrint('⚠️ Error testing ${config.remark} with $url: $e');
+            continue;
+          }
+        }
 
         // Cache the result by both host and config ID with timestamp
-        if (delay >= 0 && delay < 10000) {
+        if (bestDelay != null && bestDelay > 0 && bestDelay < 10000) {
           final now = DateTime.now();
-          _pingCache[hostKey] = (delay: delay, timestamp: now);
-          _pingCache[configId] = (delay: delay, timestamp: now);
+          _pingCache[hostKey] = (delay: bestDelay, timestamp: now);
+          _pingCache[configId] = (delay: bestDelay, timestamp: now);
 
           _pingInProgress[hostKey] = false;
           _pingInProgress[configId] = false;
 
-          return delay;
+          debugPrint('✅ Ping result for ${config.remark}: ${bestDelay}ms');
+          return bestDelay;
         } else {
+          debugPrint('❌ No valid ping result for ${config.remark}');
           _pingInProgress[hostKey] = false;
           _pingInProgress[configId] = false;
           _pingCache.remove(hostKey);
@@ -605,23 +638,39 @@ class V2RayService extends ChangeNotifier {
 
       debugPrint('🔍 V2Ray core ping: ${config.remark}...');
       
-      final delay = await _flutterV2ray
-          .getServerDelay(config: parser.getFullConfiguration())
-          .timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              debugPrint('⚠️ V2Ray ping timeout for ${config.remark}');
-              return -1;
-            },
-          );
+      // Use same test URLs as v2rayNG
+      final testUrls = [
+        'https://www.gstatic.com/generate_204',  // Primary (same as v2rayNG)
+        'https://www.google.com/generate_204',   // Secondary (same as v2rayNG)
+      ];
+      
+      for (final url in testUrls) {
+        try {
+          final delay = await _flutterV2ray
+              .getServerDelay(
+                config: parser.getFullConfiguration(),
+                url: url,
+              )
+              .timeout(
+                const Duration(seconds: 11), // Increased timeout for Smart Connect
+                onTimeout: () {
+                  debugPrint('⚠️ V2Ray ping timeout for ${config.remark} with $url');
+                  return -1;
+                },
+              );
 
-      if (delay >= 0 && delay < 10000) {
-        debugPrint('✓ V2Ray ping ${config.remark}: ${delay}ms');
-        return delay;
-      } else {
-        debugPrint('✗ V2Ray ping ${config.remark}: invalid ($delay)');
-        return null;
+          if (delay > 0 && delay < 10000) {
+            debugPrint('✓ V2Ray ping ${config.remark}: ${delay}ms');
+            return delay;
+          }
+        } catch (e) {
+          debugPrint('⚠️ V2Ray ping error ${config.remark} with $url: $e');
+          continue;
+        }
       }
+      
+      debugPrint('✗ V2Ray ping ${config.remark}: all attempts failed');
+      return null;
     } catch (e) {
       debugPrint('❌ V2Ray ping error ${config.remark}: $e');
       return null;
