@@ -8,6 +8,7 @@ import '../models/subscription.dart';
 import '../services/v2ray_service.dart';
 import '../services/server_service.dart';
 import '../services/analytics_service.dart';
+import '../services/remote_config_service.dart';
 
 class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   final V2RayService _v2rayService = V2RayService();
@@ -66,13 +67,13 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       // Clear ping cache to get fresh results
       _v2rayService.clearPingCache();
       
-      debugPrint('⚡ Found ${servers.length} servers, testing first 8 in parallel...');
+      debugPrint('⚡ Found ${servers.length} servers, testing first 7 in parallel...');
       
-      // Test first 8 servers
-      final serversToTest = servers.take(8).toList();
+      // Test first 7 servers
+      final serversToTest = servers.take(7).toList();
       final Map<V2RayConfig, int> pingResults = {};
       
-      // Test ALL 8 servers in PARALLEL for faster results
+      // Test ALL 7 servers in PARALLEL for faster results
       final futures = serversToTest.asMap().entries.map((entry) async {
         final index = entry.key;
         final server = entry.value;
@@ -80,7 +81,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         
         try {
           // Use V2Ray core ping directly (no cache)
-          // Timeout is handled in getServerDelayDirect (10 seconds)
+          // Timeout is handled in getServerDelayDirect (5 seconds)
           final ping = await _v2rayService.getServerDelayDirect(server);
           
           if (ping != null && ping > 0 && ping < 10000) {
@@ -626,17 +627,17 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
-  // Single server URL - ONLY source of servers
-  static const String _serverUrl = 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt';
-
   Future<void> fetchServers({String? customUrl}) async {
     _isLoadingServers = true;
     _errorMessage = '';
     notifyListeners();
 
     try {
-      // Always use the main server URL
-      final url = customUrl ?? _serverUrl;
+      // Get URL from Remote Config or use custom URL
+      final remoteConfig = RemoteConfigService();
+      final url = customUrl ?? remoteConfig.serverListUrl;
+      
+      debugPrint('📡 Fetching servers from: $url');
       final servers = await _serverService.fetchServers(customUrl: url);
 
       if (servers.isNotEmpty) {
@@ -645,7 +646,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         // COMPLETELY REPLACE all configs - no merging, no duplicates
         _configs = servers;
         await _v2rayService.saveConfigs(_configs);
-        debugPrint('✅ Loaded ${_configs.length} servers from $url');
+        debugPrint('✅ Loaded ${_configs.length} servers from Remote Config');
       } else {
         // Fallback to cache only if online fetch returns empty
         _configs = await _v2rayService.loadConfigs();
@@ -663,11 +664,12 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
 
   Future<void> loadSubscriptions() async {
     // Simplified - just ensure we have the default subscription
+    final remoteConfig = RemoteConfigService();
     _subscriptions = [
       Subscription(
         id: 'default',
         name: 'Default Subscription',
-        url: _serverUrl,
+        url: remoteConfig.serverListUrl,
         lastUpdated: DateTime.now(),
         configIds: [],
       ),

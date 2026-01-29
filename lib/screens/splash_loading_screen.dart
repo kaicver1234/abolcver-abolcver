@@ -166,12 +166,13 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
 
     // ZoomFade at 2800ms
     Future.delayed(const Duration(milliseconds: 2800), () {
-      if (mounted) _zoomFadeController.forward();
-    });
-
-    // Navigate at 3600ms (2800 + 800)
-    Future.delayed(const Duration(milliseconds: 3600), () {
-      if (mounted) _navigateToNext();
+      if (mounted) {
+        _zoomFadeController.forward();
+        // Start navigation earlier (during fade out) to mask loading
+        Future.delayed(const Duration(milliseconds: 400), () {
+          if (mounted) _navigateToNext();
+        });
+      }
     });
   }
 
@@ -180,14 +181,19 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
     _glowController.stop();
     _shineController.stop();
     
+    // Pre-warm the next screen to reduce lag
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
         pageBuilder: (context, animation, secondaryAnimation) => widget.nextScreen,
         transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(opacity: animation, child: child);
+          // Fade transition for smoother experience
+          return FadeTransition(
+            opacity: animation,
+            child: child,
+          );
         },
-        transitionDuration: const Duration(milliseconds: 400),
+        transitionDuration: const Duration(milliseconds: 600), // Longer transition to mask loading
       ),
     );
   }
@@ -235,16 +241,17 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
               // Main content with zoom/fade
               Center(
                 child: AnimatedBuilder(
-                  animation: Listenable.merge([_zoomFadeController, _glowController]),
-                  builder: (context, _) {
+                  animation: _zoomFadeController,
+                  builder: (context, child) {
                     return Opacity(
                       opacity: _fadeAnim.value,
                       child: Transform.scale(
                         scale: _zoomAnim.value,
-                        child: _buildLogoContent(),
+                        child: child,
                       ),
                     );
                   },
+                  child: _buildLogoContent(), // Build once, reuse
                 ),
               ),
               

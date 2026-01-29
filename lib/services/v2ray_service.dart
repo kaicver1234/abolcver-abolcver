@@ -608,7 +608,7 @@ class V2RayService extends ChangeNotifier {
       final delay = await _flutterV2ray
           .getServerDelay(config: parser.getFullConfiguration())
           .timeout(
-            const Duration(seconds: 10), // 10 second timeout for accurate results
+            const Duration(seconds: 5),
             onTimeout: () {
               debugPrint('⚠️ V2Ray ping timeout for ${config.remark}');
               return -1;

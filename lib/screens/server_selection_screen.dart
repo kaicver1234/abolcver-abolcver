@@ -806,7 +806,14 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       _pingResults.clear();
     });
 
-    final provider = Provider.of<V2RayProvider>(context, listen: false);
+    V2RayProvider? provider;
+    try {
+      provider = Provider.of<V2RayProvider>(context, listen: false);
+    } catch (e) {
+      debugPrint('❌ Could not get provider: $e');
+      if (mounted) setState(() => _isTesting = false);
+      return;
+    }
     
     final configs = provider.serverConfigs;
     if (configs.isEmpty) {
@@ -823,10 +830,10 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     final Map<String, int> results = {};
     
     try {
-      debugPrint('🚀 Starting optimized ping test for ${configs.length} servers...');
+      debugPrint('🚀 Starting parallel ping test for ${configs.length} servers...');
       
-      // Test all servers in parallel with larger batches for faster results
-      const batchSize = 20; // Increased from 10 to 20 for faster testing
+      // Test all servers in parallel with batches to avoid overwhelming the system
+      const batchSize = 10; // Test 10 servers at a time
       
       for (int batchStart = 0; batchStart < configs.length; batchStart += batchSize) {
         if (!mounted) return;
@@ -836,39 +843,40 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
         
         debugPrint('📦 Testing batch ${batchStart ~/ batchSize + 1}: servers ${batchStart + 1}-$batchEnd');
         
-        // Test all servers in this batch simultaneously with timeout
+        // Test all servers in this batch simultaneously
         final futures = batch.map((config) async {
           try {
-            // Add timeout to prevent hanging on slow servers
-            final ping = await provider.v2rayService.getServerDelay(config)
-                .timeout(
-                  const Duration(seconds: 10), // 10 second timeout per server
-                  onTimeout: () => null,
-                );
+            final ping = await provider!.v2rayService.getServerDelay(config);
             final pingValue = ping ?? 99999;
             
             if (!mounted) return;
             
-            results[config.id] = pingValue;
-            
-            // Update UI every 5 servers for better performance
-            if (results.length % 5 == 0 && mounted) {
-              setState(() {
-                _pingResults = Map.from(results);
-              });
-              _sortServersByPing(provider, results);
-            }
+            // Thread-safe update: use synchronized block
+            synchronized(() {
+              results[config.id] = pingValue;
+              
+              // Update UI in real-time
+              if (mounted) {
+                setState(() {
+                  _pingResults = Map.from(results);
+                });
+                
+                // Sort servers by ping in real-time
+                _sortServersByPing(provider!, results);
+              }
+            });
             
             debugPrint('✓ ${config.remark}: ${pingValue}ms (${results.length}/${configs.length})');
           } catch (e) {
             if (!mounted) return;
             
-            results[config.id] = 99999;
-            
-            if (results.length % 5 == 0 && mounted) {
-              setState(() => _pingResults = Map.from(results));
-              _sortServersByPing(provider, results);
-            }
+            synchronized(() {
+              results[config.id] = 99999;
+              if (mounted) {
+                setState(() => _pingResults = Map.from(results));
+                _sortServersByPing(provider!, results);
+              }
+            });
             
             debugPrint('✗ ${config.remark}: timeout (${results.length}/${configs.length})');
           }
@@ -877,14 +885,13 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
         // Wait for all pings in this batch to complete
         await Future.wait(futures);
         
-        // No delay between batches - removed for faster testing
+        // Small delay between batches to prevent overwhelming
+        if (batchEnd < configs.length && mounted) {
+          await Future.delayed(const Duration(milliseconds: 100));
+        }
       }
 
       if (!mounted) return;
-
-      // Final UI update
-      setState(() => _pingResults = Map.from(results));
-      _sortServersByPing(provider, results);
 
       final successCount = results.values.where((ping) => ping < 99999).length;
       debugPrint('✅ Ping test completed: $successCount/${configs.length} successful');
@@ -904,6 +911,13 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     } finally {
       if (mounted) setState(() => _isTesting = false);
     }
+  }
+
+  // Helper method for thread-safe operations
+  void synchronized(Function() action) {
+    // In Dart, single-threaded event loop ensures this is safe
+    // But we wrap it for clarity and future-proofing
+    action();
   }
 
   void _sortServersByPing(V2RayProvider provider, Map<String, int> pingResults) {

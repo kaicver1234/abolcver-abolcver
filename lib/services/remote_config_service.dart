@@ -38,6 +38,8 @@ class RemoteConfigService {
     'announcement_type': 'info',
     'maintenance_mode': false,
     'maintenance_message': 'سرویس در حال بروزرسانی است',
+    // Server URL
+    'server_list_url': 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt',
     // About description
     'about_description_en': 'Tiksar VPN is a powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access to the global web with complete privacy and security.',
     'about_description_fa': 'تیکسر وی پی ان ابزاری قدرتمند برای دسترسی به اینترنت آزاد است. محدودیت‌ها را بشکنید و با حفظ کامل حریم خصوصی و امنیت، از دسترسی نامحدود به وب جهانی لذت ببرید.',
@@ -181,5 +183,15 @@ class RemoteConfigService {
     return languageCode == 'fa'
         ? 'تیکسر وی پی ان ابزاری قدرتمند برای دسترسی به اینترنت آزاد است. محدودیت‌ها را بشکنید و با حفظ کامل حریم خصوصی و امنیت، از دسترسی نامحدود به وب جهانی لذت ببرید.'
         : 'Tiksar VPN is a powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access to the global web with complete privacy and security.';
+  }
+
+  /// Get server list URL
+  String get serverListUrl {
+    if (!_isSupported || _remoteConfig == null) {
+      return 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt';
+    }
+    
+    final url = _remoteConfig!.getString('server_list_url');
+    return url.isNotEmpty ? url : 'https://raw.githubusercontent.com/cverhud/v2ray-sub/refs/heads/main/sub2.txt';
   }
 }
