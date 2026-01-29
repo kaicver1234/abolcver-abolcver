@@ -261,7 +261,7 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
                 left: 0,
                 right: 0,
                 child: Text(
-                  'v1.1.2',
+                  'v1.1.3',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,

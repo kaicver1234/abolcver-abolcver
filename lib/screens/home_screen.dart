@@ -1007,7 +1007,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               border: Border.all(color: const Color(0xFF10b981).withValues(alpha: 0.3)),
             ),
             child: Text(
-              'v1.1.2',
+              'v1.1.3',
               style: TextStyle(
                 fontSize: 12,
                 color: Colors.white.withValues(alpha: 0.7),
