@@ -87,19 +87,18 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           _sortedConfigs = null;
           _pingResults.clear();
         });
-        _showSnackBar(
-          AppLocalizations.of(context).translate('server_selection.servers_updated'),
-          const Color(0xFF10B981),
-        );
+        
+        // Only show success message if no error
+        if (provider.errorMessage.isEmpty) {
+          _showSnackBar(
+            AppLocalizations.of(context).translate('server_selection.servers_updated'),
+            const Color(0xFF10B981),
+          );
+        }
       }
     } catch (e) {
       debugPrint('❌ Error refreshing servers: $e');
-      if (mounted) {
-        _showSnackBar(
-          AppLocalizations.of(context).translate('server_selection.error_updating'),
-          Colors.red,
-        );
-      }
+      // Silently use cache, no error message to user
     } finally {
       if (mounted) {
         _refreshAnimController.stop();
@@ -476,6 +475,8 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
 
   Widget _buildSmartConnectCard(BuildContext context, V2RayProvider provider) {
     final isSelected = provider.wasUsingSmartConnect;
+    final isConnected = provider.activeConfig != null;
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -492,8 +493,12 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            provider.selectConfig(V2RayConfig.smartConnect());
-            Navigator.pop(context);
+            if (isConnected) {
+              _showDisconnectFirstDialog(context);
+            } else {
+              provider.selectConfig(V2RayConfig.smartConnect());
+              Navigator.pop(context);
+            }
           },
           borderRadius: BorderRadius.circular(16),
           child: Padding(
@@ -572,6 +577,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   Widget _buildServerCard(BuildContext context, V2RayProvider provider, V2RayConfig config, bool isSelected) {
     final countryCode = config.countryCode ?? _extractCountryCode(config.remark);
     final ping = _pingResults[config.id];
+    final isConnected = provider.activeConfig != null;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -589,8 +595,12 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
         color: Colors.transparent,
         child: InkWell(
           onTap: () {
-            provider.selectConfig(config);
-            Navigator.pop(context);
+            if (isConnected) {
+              _showDisconnectFirstDialog(context);
+            } else {
+              provider.selectConfig(config);
+              Navigator.pop(context);
+            }
           },
           borderRadius: BorderRadius.circular(14),
           child: Padding(
@@ -918,6 +928,41 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     // In Dart, single-threaded event loop ensures this is safe
     // But we wrap it for clarity and future-proofing
     action();
+  }
+
+  void _showDisconnectFirstDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: const Color(0xFF1a1a1e),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                AppLocalizations.of(context).translate('server_selector.connection_active'),
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          AppLocalizations.of(context).translate('server_selector.disconnect_first'),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(
+              AppLocalizations.of(context).translate('common.ok'),
+              style: const TextStyle(color: Color(0xFF6366F1), fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _sortServersByPing(V2RayProvider provider, Map<String, int> pingResults) {

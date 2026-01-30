@@ -8,7 +8,6 @@ import '../models/subscription.dart';
 import '../services/v2ray_service.dart';
 import '../services/server_service.dart';
 import '../services/analytics_service.dart';
-import '../services/remote_config_service.dart';
 
 class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   final V2RayService _v2rayService = V2RayService();
@@ -627,15 +626,17 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     }
   }
 
+  // Single server URL - ONLY source of servers
+  static const String _serverUrl = 'https://tiksar-sub.pages.dev/sub/sub2.txt';
+
   Future<void> fetchServers({String? customUrl}) async {
     _isLoadingServers = true;
     _errorMessage = '';
     notifyListeners();
 
     try {
-      // Get URL from Remote Config or use custom URL
-      final remoteConfig = RemoteConfigService();
-      final url = customUrl ?? remoteConfig.serverListUrl;
+      // Always use the main server URL
+      final url = customUrl ?? _serverUrl;
       
       debugPrint('📡 Fetching servers from: $url');
       final servers = await _serverService.fetchServers(customUrl: url);
@@ -646,16 +647,30 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         // COMPLETELY REPLACE all configs - no merging, no duplicates
         _configs = servers;
         await _v2rayService.saveConfigs(_configs);
-        debugPrint('✅ Loaded ${_configs.length} servers from Remote Config');
+        debugPrint('✅ Loaded ${_configs.length} servers from online');
       } else {
-        // Fallback to cache only if online fetch returns empty
+        // Fallback to cache if online fetch returns empty
+        debugPrint('⚠️ Online fetch returned empty, loading from cache...');
         _configs = await _v2rayService.loadConfigs();
         debugPrint('📂 Loaded ${_configs.length} servers from cache');
+        
+        if (_configs.isEmpty) {
+          _setError('No servers available');
+        }
       }
     } catch (e) {
       debugPrint('❌ Failed to fetch servers: $e');
-      _setError('Failed to fetch servers: $e');
+      debugPrint('📂 Loading servers from cache...');
+      
+      // Load from cache when network fails
       _configs = await _v2rayService.loadConfigs();
+      
+      if (_configs.isNotEmpty) {
+        debugPrint('✅ Loaded ${_configs.length} servers from cache');
+        // Don't set error if we have cached servers
+      } else {
+        _setError('Failed to load servers. Please check your connection.');
+      }
     } finally {
       _isLoadingServers = false;
       notifyListeners();
@@ -664,12 +679,11 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
 
   Future<void> loadSubscriptions() async {
     // Simplified - just ensure we have the default subscription
-    final remoteConfig = RemoteConfigService();
     _subscriptions = [
       Subscription(
         id: 'default',
         name: 'Default Subscription',
-        url: remoteConfig.serverListUrl,
+        url: _serverUrl,
         lastUpdated: DateTime.now(),
         configIds: [],
       ),

@@ -677,42 +677,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   void _onServerCardTap(V2RayProvider provider) {
-    if (provider.activeConfig != null) {
-      showDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          backgroundColor: const Color(0xFF1a1a1e),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  AppLocalizations.of(context).translate('server_selector.connection_active'),
-                  style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-          content: Text(
-            AppLocalizations.of(context).translate('server_selector.disconnect_first'),
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 15),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(
-                AppLocalizations.of(context).translate('common.ok'),
-                style: const TextStyle(color: Color(0xFF6366F1), fontSize: 16, fontWeight: FontWeight.w600),
-              ),
-            ),
-          ],
-        ),
-      );
-    } else {
-      Navigator.push(context, MaterialPageRoute(builder: (context) => const ServerSelectionScreen()));
-    }
+    // Always allow navigation to server selection screen
+    Navigator.push(context, MaterialPageRoute(builder: (context) => const ServerSelectionScreen()));
   }
 
   String _cleanServerName(String name) {

@@ -50,8 +50,8 @@
         "server_location_label": "موقعیت سرور"
     },
     "server_selector": {
-        "connection_active": "اتصال فعال",
-        "disconnect_first": "لطفاً ابتدا از سرور فعلی قطع شوید و سپس سرور جدید انتخاب کنید."
+        "connection_active": "در حال حاضر متصل هستید",
+        "disconnect_first": "برای تغییر سرور، ابتدا اتصال را قطع کنید و سپس سرور جدید انتخاب کنید."
     },
     "server_selection": {
         "title": "انتخاب سرور",
@@ -62,6 +62,7 @@
         "no_servers_available": "هیچ سروری موجود نیست",
         "testing_servers": "در حال تست سرورها...",
         "servers_updated": "سرورها به‌روزرسانی شدند",
+        "loaded_from_cache": "بارگذاری از حافظه (حالت آفلاین)",
         "error_updating": "خطا در به‌روزرسانی سرورها",
         "test_ping": "تست پینگ",
         "all_servers_timeout": "همه سرورها تایم‌اوت شدند",

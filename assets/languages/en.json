@@ -50,8 +50,8 @@
         "server_location_label": "Server Location"
     },
     "server_selector": {
-        "connection_active": "Connection Active",
-        "disconnect_first": "Please disconnect from the current server before selecting a new one."
+        "connection_active": "Already Connected",
+        "disconnect_first": "To change servers, please disconnect first and then select a new server."
     },
     "server_selection": {
         "title": "Select Server",
@@ -62,6 +62,7 @@
         "no_servers_available": "No servers available",
         "testing_servers": "Testing servers...",
         "servers_updated": "Servers updated",
+        "loaded_from_cache": "Loaded from cache (offline mode)",
         "error_updating": "Error updating servers",
         "test_ping": "Test Ping",
         "all_servers_timeout": "All servers timed out",
