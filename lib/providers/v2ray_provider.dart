@@ -627,7 +627,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   }
 
   // Single server URL - ONLY source of servers
-  static const String _serverUrl = 'https://tiksar-sub.pages.dev/sub/sub2.txt';
+  static const String _serverUrl = 'https://sub.tiksar.ir/tiksarserver.txt';
 
   Future<void> fetchServers({String? customUrl}) async {
     _isLoadingServers = true;

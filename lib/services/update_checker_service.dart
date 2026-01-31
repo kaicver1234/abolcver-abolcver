@@ -6,7 +6,7 @@ import '../models/app_update_info.dart';
 
 class UpdateCheckerService {
   static const String _baseUrl = 
-      'https://tiksarvpn-update.pages.dev/tiksar-vpn.json';
+      'https://up.tiksar.ir/up-tik/tiksar-vpn.json';
 
   static Future<AppUpdateInfo?> checkForUpdate() async {
     try {

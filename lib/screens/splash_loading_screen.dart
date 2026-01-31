@@ -14,14 +14,16 @@ class SplashLoadingScreen extends StatefulWidget {
 
 class _SplashLoadingScreenState extends State<SplashLoadingScreen>
     with TickerProviderStateMixin {
+  late AnimationController _zoomController;
   late AnimationController _lettersController;
-  late AnimationController _underlineController;
-  late AnimationController _taglineController;
+  late AnimationController _waveController;
   late AnimationController _versionController;
-  late AnimationController _flickerController;
+
+  late Animation<double> _zoomAnim;
+  late Animation<double> _versionAnim;
 
   final List<Animation<double>> _letterOpacityAnims = [];
-  final List<Animation<double>> _letterFlickerAnims = [];
+  final List<Animation<double>> _letterTranslateAnims = [];
 
   static const Color green = Color(0xFF10B981);
   static const Color cyan = Color(0xFF06B6D4);
@@ -34,19 +36,28 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
   }
 
   void _setupAnimations() {
-    // Letters appear animation
-    _lettersController = AnimationController(
+    // Main zoom animation (Netflix style)
+    _zoomController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1100),
+      duration: const Duration(milliseconds: 1500),
+    );
+    _zoomAnim = Tween<double>(begin: 0.3, end: 1.0).animate(
+      CurvedAnimation(parent: _zoomController, curve: Curves.easeOut),
     );
 
-    // Letter timings: T(0.1s), I(0.2s), K(0.3s), S(0.4s), A(0.5s), R(0.6s), V(0.8s), P(0.9s), N(1s)
-    final letterDelays = [100, 200, 300, 400, 500, 600, 800, 900, 1000];
+    // Letters bounce animation
+    _lettersController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1300),
+    );
+
+    // Letter timings: T(0.8s), I(0.85s), K(0.9s), S(0.95s), A(1s), R(1.05s), V(1.2s), P(1.25s), N(1.3s)
+    final letterDelays = [800, 850, 900, 950, 1000, 1050, 1200, 1250, 1300];
     
     for (int i = 0; i < 9; i++) {
       final startMs = letterDelays[i];
-      final start = startMs / 1100.0;
-      final end = ((startMs + 600) / 1100.0).clamp(0.0, 1.0);
+      final start = startMs / 1300.0;
+      final end = ((startMs + 600) / 1300.0).clamp(0.0, 1.0);
       
       _letterOpacityAnims.add(
         Tween<double>(begin: 0, end: 1).animate(
@@ -56,80 +67,58 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
           ),
         ),
       );
-    }
-
-    // Flicker animation (infinite)
-    _flickerController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 4000),
-    );
-
-    for (int i = 0; i < 9; i++) {
-      _letterFlickerAnims.add(
-        Tween<double>(begin: 1.0, end: 0.4).animate(
+      
+      _letterTranslateAnims.add(
+        Tween<double>(begin: -30, end: 0).animate(
           CurvedAnimation(
-            parent: _flickerController,
-            curve: Interval(
-              0.41 + (i * 0.005),
-              0.43 + (i * 0.005),
-              curve: Curves.easeInOut,
-            ),
+            parent: _lettersController,
+            curve: Interval(start, end, curve: Curves.easeOut),
           ),
         ),
       );
     }
 
-    // Underline animation
-    _underlineController = AnimationController(
+    // Wave animation (infinite)
+    _waveController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    );
-
-    // Tagline animation
-    _taglineController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 1200),
     );
 
     // Version animation
     _versionController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 500),
     );
+    _versionAnim = CurvedAnimation(parent: _versionController, curve: Curves.easeOut);
   }
 
   void _startAnimations() {
-    // Start letters immediately
-    _lettersController.forward();
+    // Start zoom immediately
+    _zoomController.forward();
 
-    // Start flicker after letters appear
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (mounted) _flickerController.repeat();
+    // Start letters at 800ms
+    Future.delayed(const Duration(milliseconds: 800), () {
+      if (mounted) _lettersController.forward();
     });
 
-    // Start underline at 1s
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      if (mounted) _underlineController.forward();
+    // Start wave at 1800ms
+    Future.delayed(const Duration(milliseconds: 1800), () {
+      if (mounted) _waveController.repeat();
     });
 
-    // Start tagline at 2s
-    Future.delayed(const Duration(milliseconds: 2000), () {
-      if (mounted) _taglineController.forward();
-    });
-
-    // Start version at 2.5s
-    Future.delayed(const Duration(milliseconds: 2500), () {
+    // Start version at 2200ms
+    Future.delayed(const Duration(milliseconds: 2200), () {
       if (mounted) _versionController.forward();
     });
 
-    // Navigate after 3.5s
+    // Navigate after 3500ms
     Future.delayed(const Duration(milliseconds: 3500), () {
       if (mounted) _navigateToNext();
     });
   }
 
   void _navigateToNext() {
-    _flickerController.stop();
+    _waveController.stop();
     
     Navigator.pushReplacement(
       context,
@@ -148,68 +137,63 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
 
   @override
   void dispose() {
+    _zoomController.dispose();
     _lettersController.dispose();
-    _underlineController.dispose();
-    _taglineController.dispose();
+    _waveController.dispose();
     _versionController.dispose();
-    _flickerController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final isSmallScreen = size.width < 400;
+    final isMediumScreen = size.width >= 400 && size.width < 600;
+    
+    // Responsive sizes - more moderate
+    final textSize = isSmallScreen ? 32.0 : (isMediumScreen ? 42.0 : 52.0);
+    final letterSpacing = isSmallScreen ? 2.0 : (isMediumScreen ? 3.0 : 6.0);
+    final waveBottom = isSmallScreen ? 80.0 : 100.0;
+    
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Scaffold(
-        backgroundColor: const Color(0xFF0a0a0a),
+        backgroundColor: Colors.black,
         body: Stack(
           children: [
             // Main content
             Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Text
-                  _buildText(),
-                  
-                  const SizedBox(height: 20),
-                  
-                  // Underline
-                  AnimatedBuilder(
-                    animation: _underlineController,
-                    builder: (context, _) {
-                      return Container(
-                        width: 400 * _underlineController.value,
-                        height: 4,
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            colors: [green, cyan],
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                  
-                  const SizedBox(height: 30),
-                  
-                  // Tagline
-                  AnimatedBuilder(
-                    animation: _taglineController,
-                    builder: (context, _) {
-                      return Opacity(
-                        opacity: _taglineController.value,
-                        child: const Text(
-                          'CONNECTING THE WORLD',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Color(0x99FFFFFF),
-                            letterSpacing: 4,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ],
+              child: AnimatedBuilder(
+                animation: _zoomController,
+                builder: (context, child) {
+                  return Opacity(
+                    opacity: _zoomAnim.value > 0.5 ? 1.0 : _zoomAnim.value * 2,
+                    child: Transform.scale(
+                      scale: _zoomAnim.value,
+                      child: child,
+                    ),
+                  );
+                },
+                child: _buildText(textSize, letterSpacing),
+              ),
+            ),
+            
+            // Sound wave at bottom
+            Positioned(
+              bottom: waveBottom,
+              left: 0,
+              right: 0,
+              child: AnimatedBuilder(
+                animation: _waveController,
+                builder: (context, _) {
+                  return Opacity(
+                    opacity: _waveController.status == AnimationStatus.forward ||
+                            _waveController.status == AnimationStatus.reverse
+                        ? 1.0
+                        : 0.0,
+                    child: _buildSoundWave(isSmallScreen),
+                  );
+                },
               ),
             ),
             
@@ -222,7 +206,7 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
                 animation: _versionController,
                 builder: (context, _) {
                   return Opacity(
-                    opacity: _versionController.value,
+                    opacity: _versionAnim.value,
                     child: const Text(
                       'v1.1.3',
                       textAlign: TextAlign.center,
@@ -241,35 +225,74 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
     );
   }
 
-  Widget _buildText() {
+  Widget _buildText(double fontSize, double letterSpacing) {
     const letters = ['T', 'I', 'K', 'S', 'A', 'R', ' ', 'V', 'P', 'N'];
     
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: List.generate(letters.length, (i) {
         if (letters[i] == ' ') {
-          return const SizedBox(width: 20);
+          return SizedBox(width: fontSize * 0.3);
         }
         
         final isVPN = i >= 7;
         final color = isVPN ? cyan : green;
+        final animIndex = i >= 7 ? i - 1 : i;
         
         return AnimatedBuilder(
-          animation: Listenable.merge([_lettersController, _flickerController]),
+          animation: _lettersController,
           builder: (context, _) {
-            final opacity = _letterOpacityAnims[i >= 7 ? i - 1 : i].value;
-            final flickerOpacity = _letterFlickerAnims[i >= 7 ? i - 1 : i].value;
-            
-            return Opacity(
-              opacity: opacity * flickerOpacity,
-              child: Text(
-                letters[i],
-                style: TextStyle(
-                  fontSize: 60,
-                  fontWeight: FontWeight.w900,
-                  color: color,
-                  letterSpacing: 4,
+            return Transform.translate(
+              offset: Offset(0, _letterTranslateAnims[animIndex].value),
+              child: Opacity(
+                opacity: _letterOpacityAnims[animIndex].value,
+                child: Text(
+                  letters[i],
+                  style: TextStyle(
+                    fontSize: fontSize,
+                    fontWeight: FontWeight.w900,
+                    color: color,
+                    letterSpacing: letterSpacing,
+                  ),
                 ),
+              ),
+            );
+          },
+        );
+      }),
+    );
+  }
+
+  Widget _buildSoundWave(bool isSmall) {
+    final barWidth = isSmall ? 3.0 : 4.0;
+    final barGap = isSmall ? 4.0 : 6.0;
+    final heights = isSmall 
+        ? [15.0, 22.0, 30.0, 26.0, 33.0, 22.0, 18.0]
+        : [20.0, 30.0, 40.0, 35.0, 45.0, 30.0, 25.0];
+    
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(7, (i) {
+        return AnimatedBuilder(
+          animation: _waveController,
+          builder: (context, _) {
+            final delay = i * 0.1;
+            final value = (_waveController.value + delay) % 1.0;
+            final scale = value < 0.5 ? (value * 2) : (2 - value * 2);
+            final currentHeight = heights[i] * (1 + scale * 0.5);
+            
+            return Container(
+              width: barWidth,
+              height: currentHeight,
+              margin: EdgeInsets.symmetric(horizontal: barGap / 2),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [green, cyan],
+                ),
+                borderRadius: BorderRadius.circular(2),
               ),
             );
           },
