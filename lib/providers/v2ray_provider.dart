@@ -8,6 +8,7 @@ import '../models/subscription.dart';
 import '../services/v2ray_service.dart';
 import '../services/server_service.dart';
 import '../services/analytics_service.dart';
+import '../services/ping_test_service.dart';
 
 class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   final V2RayService _v2rayService = V2RayService();
@@ -30,7 +31,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   // Getter for wasUsingSmartConnect
   bool get wasUsingSmartConnect => _wasUsingSmartConnect;
   
-  // Smart Connect: Find and connect to fastest server (tests first 7 servers)
+  // Smart Connect: Find and connect to fastest server (tests first 15 servers)
   Future<void> smartConnect() async {
     // Prevent multiple simultaneous calls
     if (_isConnecting) {
@@ -66,106 +67,33 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       // Clear ping cache to get fresh results
       _v2rayService.clearPingCache();
       
-      debugPrint('⚡ Smart Connect: Testing ALL 7 servers using V2Ray core...');
+      debugPrint('⚡ Smart Connect: Testing first 15 servers using v2rayNG method...');
       
-      // Test first 7 servers
-      final serversToTest = servers.take(7).toList();
-      final Map<V2RayConfig, int> pingResults = {};
+      // Test first 15 servers using professional PingTestService (v2rayNG style)
+      final serversToTest = servers.take(15).toList();
       
-      // تست به صورت batch های کوچک (2 تا 2 تا) برای دقت بیشتر
-      const batchSize = 2;
+      // Create ping test service instance
+      final pingTestService = PingTestService(_v2rayService);
       
-      for (int i = 0; i < serversToTest.length; i += batchSize) {
-        final batchEnd = (i + batchSize).clamp(0, serversToTest.length);
-        final batch = serversToTest.sublist(i, batchEnd);
-        
-        debugPrint('   📦 Testing batch ${i ~/ batchSize + 1}: servers ${i + 1}-$batchEnd');
-        
-        // تست این batch به صورت موازی
-        final batchFutures = batch.asMap().entries.map((entry) async {
-          final server = entry.value;
-          final globalIndex = i + entry.key;
-          debugPrint('      📡 [${globalIndex + 1}/7] Testing ${server.remark}...');
-          
-          try {
-            // Use V2Ray core ping directly with 7 second timeout
-            final ping = await _v2rayService.getServerDelayDirect(server);
-            
-            if (ping != null && ping > 0 && ping < 10000) {
-              debugPrint('      ✓ ${server.remark}: ${ping}ms');
-              return MapEntry(server, ping);
-            } else {
-              debugPrint('      ✗ ${server.remark}: timeout or invalid');
-              return null;
-            }
-          } catch (e) {
-            debugPrint('      ✗ ${server.remark}: error - $e');
-            return null;
-          }
-        }).toList();
-        
-        // منتظر این batch بمون
-        try {
-          final batchResults = await Future.wait(batchFutures).timeout(
-            const Duration(seconds: 8),
-            onTimeout: () {
-              debugPrint('      ⚠️ Batch timeout, continuing...');
-              return List.filled(batchFutures.length, null);
-            },
-          );
-          
-          // جمع‌آوری نتایج موفق
-          for (final result in batchResults) {
-            if (result != null) {
-              pingResults[result.key] = result.value;
-            }
-          }
-          
-        } catch (e) {
-          debugPrint('      ⚠️ Batch error: $e, continuing...');
-        }
-        
-        // تاخیر کوچک بین batch ها (200ms)
-        if (batchEnd < serversToTest.length) {
-          await Future.delayed(const Duration(milliseconds: 200));
-        }
-      }
+      // Start ping test (v2rayNG style: all servers at once, CPU * 4 threads)
+      final pingResults = await pingTestService.testServers(serversToTest);
       
-      debugPrint('⚡ Smart Connect: Got ${pingResults.length}/7 successful responses');
+      // Cleanup
+      pingTestService.dispose();
       
-      // اگه هیچ نتیجه‌ای نگرفتیم، یه بار دیگه تلاش کن
-      if (pingResults.isEmpty) {
-        debugPrint('⚠️ No results in first attempt, retrying first 3 servers...');
-        
-        for (int i = 0; i < 3 && i < serversToTest.length; i++) {
-          final server = serversToTest[i];
-          try {
-            debugPrint('   🔄 Retry [${i + 1}/3]: ${server.remark}...');
-            final ping = await _v2rayService.getServerDelayDirect(server);
-            
-            if (ping != null && ping > 0 && ping < 10000) {
-              debugPrint('   ✓ ${server.remark}: ${ping}ms');
-              pingResults[server] = ping;
-              // ادامه بده تا همه 3 تا رو امتحان کنه
-            }
-          } catch (e) {
-            debugPrint('   ✗ Retry failed: $e');
-          }
-          
-          await Future.delayed(const Duration(milliseconds: 300));
-        }
-      }
+      debugPrint('⚡ Smart Connect: Got ${pingResults.length}/15 responses');
       
-      // Find fastest server
+      // Find fastest server from results
       V2RayConfig? fastestServer;
       int lowestPing = 999999;
       
-      pingResults.forEach((server, ping) {
-        if (ping < lowestPing) {
+      for (final server in serversToTest) {
+        final ping = pingResults[server.id];
+        if (ping != null && ping > 0 && ping < 10000 && ping < lowestPing) {
           lowestPing = ping;
           fastestServer = server;
         }
-      });
+      }
       
       // Use fastest server or fallback to first
       final serverToConnect = fastestServer ?? servers.first;
@@ -454,8 +382,16 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       });
 
       // STEP 5: Fetch servers from main URL (replaces all old servers)
-      await fetchServers();
-      debugPrint('✅ Servers loaded: ${_configs.length} servers');
+      try {
+        await fetchServers();
+        debugPrint('✅ Servers loaded: ${_configs.length} servers');
+      } catch (e) {
+        debugPrint('⚠️ Failed to fetch servers during init: $e');
+        // Continue with cached servers if available
+        if (_configs.isEmpty) {
+          _setError('Could not load servers. Please check your internet connection.');
+        }
+      }
       
       // STEP 6: Final sync to ensure everything is correct
       await _enhancedSyncWithVpnServiceState();

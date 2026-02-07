@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter/foundation.dart';
 import '../models/v2ray_config.dart';
 import 'package:flutter_v2ray/flutter_v2ray.dart';
 
@@ -11,16 +12,41 @@ class ServerService {
   Future<List<V2RayConfig>> fetchServers({required String customUrl}) async {
     try {
       final url = customUrl;
-      final response = await http.get(Uri.parse(url));
+      
+      debugPrint('🌐 Starting server fetch from: $url');
+      debugPrint('🌐 Device: Making HTTP request...');
+      
+      // Add timeout for slow networks (especially important for J7 and older devices)
+      final response = await http.get(
+        Uri.parse(url),
+      ).timeout(
+        const Duration(seconds: 15), // Generous timeout for slow networks
+        onTimeout: () {
+          debugPrint('❌ HTTP request timeout after 15 seconds');
+          throw Exception('Connection timeout - please check your internet');
+        },
+      );
+
+      debugPrint('🌐 HTTP response received: ${response.statusCode}');
+      debugPrint('🌐 Response body length: ${response.body.length} bytes');
 
       if (response.statusCode == 200) {
         final String responseBody = response.body;
+        
+        // Check if response is empty
+        if (responseBody.trim().isEmpty) {
+          debugPrint('❌ Server returned empty response');
+          throw Exception('Server returned empty response');
+        }
+        
         final List<V2RayConfig> servers = [];
 
         // Split the response by lines and process each line
         final lines = responseBody.split('\n');
+        debugPrint('🌐 Processing ${lines.length} lines...');
 
-        // Fetched lines from server
+        int successCount = 0;
+        int failCount = 0;
 
         for (var line in lines) {
           line = line.trim();
@@ -44,6 +70,9 @@ class ServerService {
               final config = _parseJsonConfig(serverJson);
               if (config != null) {
                 servers.add(config);
+                successCount++;
+              } else {
+                failCount++;
               }
             }
             // If not JSON, try to parse as a V2Ray URI (vmess://, vless://, etc.)
@@ -51,21 +80,35 @@ class ServerService {
               final config = _parseUriConfig(configLine, countryCode: countryCode);
               if (config != null) {
                 servers.add(config);
+                successCount++;
+              } else {
+                failCount++;
               }
             }
           } catch (e) {
-            // Error parsing server line: $e
+            failCount++;
+            debugPrint('⚠️ Error parsing line: $e');
           }
         }
 
+        debugPrint('✅ Parsing complete: $successCount success, $failCount failed');
+
         // Successfully parsed servers
+        if (servers.isEmpty) {
+          debugPrint('❌ No valid servers found in response');
+          throw Exception('No valid servers found in response');
+        }
+        
+        debugPrint('✅ Returning ${servers.length} servers');
         return servers;
       } else {
-        throw Exception('Failed to load servers: ${response.statusCode}');
+        debugPrint('❌ HTTP error: ${response.statusCode}');
+        throw Exception('Server error: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      // Error fetching servers
-      return [];
+      debugPrint('❌ fetchServers failed: $e');
+      // Re-throw with more context for better error handling
+      throw Exception('Failed to fetch servers: $e');
     }
   }
 

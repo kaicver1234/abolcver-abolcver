@@ -362,24 +362,28 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
 
   Widget _buildVPNTab(V2RayProvider provider) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final verticalPadding = screenHeight < 700 ? 12.0 : 20.0;
+    final horizontalPadding = screenHeight < 700 ? 16.0 : 20.0;
+    
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
       child: Padding(
-        padding: const EdgeInsets.all(20.0),
+        padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: verticalPadding),
         child: Column(
           children: [
             const AnnouncementBannerWidget(),
-            const SizedBox(height: 20),
+            SizedBox(height: screenHeight < 700 ? 16 : 20),
             _buildConnectionButton(provider),
-            const SizedBox(height: 24),
+            SizedBox(height: screenHeight < 700 ? 16 : 24),
             _buildStatusSection(provider),
-            const SizedBox(height: 24),
+            SizedBox(height: screenHeight < 700 ? 16 : 24),
             _buildServerCard(provider),
             if (provider.activeConfig != null) ...[
-              const SizedBox(height: 16),
+              SizedBox(height: screenHeight < 700 ? 12 : 16),
               _buildStatsCard(provider),
             ],
-            const SizedBox(height: 20),
+            SizedBox(height: screenHeight < 700 ? 16 : 20),
           ],
         ),
       ),
@@ -388,6 +392,12 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   Widget _buildConnectionButton(V2RayProvider provider) {
     final isConnected = provider.activeConfig != null;
+    final screenHeight = MediaQuery.of(context).size.height;
+    
+    // Responsive sizing based on screen height
+    final double buttonSize = screenHeight < 700 ? 130 : 150;
+    final double glowSize = screenHeight < 700 ? 170 : 200;
+    final double iconSize = screenHeight < 700 ? 45 : 55;
     
     // Colors based on state
     final Color buttonColor;
@@ -412,8 +422,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           // Glow effect
           AnimatedContainer(
             duration: const Duration(milliseconds: 400),
-            width: 200,
-            height: 200,
+            width: glowSize,
+            height: glowSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               boxShadow: [
@@ -428,8 +438,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           // Spinner for connecting
           if (_isConnecting)
             SizedBox(
-              width: 170,
-              height: 170,
+              width: buttonSize + 20,
+              height: buttonSize + 20,
               child: CircularProgressIndicator(
                 strokeWidth: 3,
                 valueColor: AlwaysStoppedAnimation<Color>(buttonColor.withValues(alpha: 0.8)),
@@ -438,8 +448,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           // Main button
           AnimatedContainer(
             duration: const Duration(milliseconds: 400),
-            width: 150,
-            height: 150,
+            width: buttonSize,
+            height: buttonSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: LinearGradient(
@@ -464,17 +474,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             ),
             child: Center(
               child: _isConnecting
-                  ? const SizedBox(
-                      width: 45,
-                      height: 45,
-                      child: CircularProgressIndicator(
+                  ? SizedBox(
+                      width: iconSize - 10,
+                      height: iconSize - 10,
+                      child: const CircularProgressIndicator(
                         color: Colors.white,
                         strokeWidth: 3,
                       ),
                     )
                   : Icon(
                       Icons.power_settings_new,
-                      size: 55,
+                      size: iconSize,
                       color: Colors.white.withValues(alpha: isConnected ? 1.0 : 0.6),
                     ),
             ),
@@ -486,6 +496,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   Widget _buildStatusSection(V2RayProvider provider) {
     final isConnected = provider.activeConfig != null;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final timerFontSize = screenHeight < 700 ? 28.0 : 34.0;
     
     if (!isConnected && !_isConnecting) {
       return const SizedBox.shrink();
@@ -547,7 +559,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               return Text(
                 provider.v2rayService.getFormattedConnectedTime(),
                 style: GoogleFonts.poppins(
-                  fontSize: 34,
+                  fontSize: timerFontSize,
                   fontWeight: FontWeight.w700,
                   color: _timerColor,
                 ),
@@ -745,6 +757,9 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     required String icon,
     bool smallFont = false,
   }) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
+    
     return Expanded(
       child: Column(
         children: [
@@ -758,10 +773,11 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   smallFont ? value : value.split(' ').first,
                   style: TextStyle(
                     color: color,
-                    fontSize: smallFont ? 12 : 18,
+                    fontSize: smallFont ? (isSmallScreen ? 10 : 12) : (isSmallScreen ? 15 : 18),
                     fontWeight: FontWeight.w700,
                   ),
                   overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
               if (!smallFont && value.contains(' ')) ...[
@@ -770,7 +786,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   value.split(' ').last,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.4),
-                    fontSize: 11,
+                    fontSize: isSmallScreen ? 9 : 11,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -781,13 +797,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text(icon, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 10)),
+              Text(icon, style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: isSmallScreen ? 8 : 10)),
               const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4),
-                  fontSize: 11,
+              Flexible(
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    fontSize: isSmallScreen ? 9 : 11,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ),
             ],

@@ -589,42 +589,52 @@ class V2RayService extends ChangeNotifier {
     }
   }
 
-  // Direct ping using V2Ray core - NO CACHE, for Smart Connect
+  // Direct ping using V2Ray core - Inspired by v2rayNG's RealPingWorkerService
+  // This uses the native V2Ray core's measureOutboundDelay method for accurate results
   Future<int?> getServerDelayDirect(V2RayConfig config) async {
     try {
       await initialize();
 
-      // Safely parse the config
-      V2RayURL parser;
-      try {
-        parser = FlutterV2ray.parseFromURL(config.fullConfig);
-      } catch (parseError) {
-        debugPrint('❌ Failed to parse config ${config.remark}: $parseError');
-        return null;
+      // Safely parse the config with retry mechanism
+      V2RayURL? parser;
+      int parseAttempts = 0;
+      while (parser == null && parseAttempts < 2) {
+        try {
+          parser = FlutterV2ray.parseFromURL(config.fullConfig);
+        } catch (parseError) {
+          parseAttempts++;
+          if (parseAttempts >= 2) {
+            debugPrint('❌ Parse failed ${config.remark}: $parseError');
+            return null;
+          }
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
       }
 
-      debugPrint('🔍 V2Ray core ping: ${config.remark}...');
-      
-      // استفاده از هسته V2Ray با timeout 7 ثانیه
+      if (parser == null) return null;
+
+      // Use V2Ray core's native ping method (similar to v2rayNG's measureOutboundDelay)
+      // This is more accurate than TCP/ICMP ping as it tests the actual proxy connection
       final delay = await _flutterV2ray
           .getServerDelay(config: parser.getFullConfiguration())
           .timeout(
-            const Duration(seconds: 7),
+            const Duration(seconds: 5),
             onTimeout: () {
-              debugPrint('⚠️ V2Ray ping timeout for ${config.remark}');
+              debugPrint('⏱️ Timeout ${config.remark}');
               return -1;
             },
           );
 
+      // Valid delay range: 0-10000ms (same as v2rayNG)
       if (delay >= 0 && delay < 10000) {
-        debugPrint('✓ V2Ray ping ${config.remark}: ${delay}ms');
+        debugPrint('✓ ${config.remark}: ${delay}ms');
         return delay;
       } else {
-        debugPrint('✗ V2Ray ping ${config.remark}: invalid ($delay)');
+        debugPrint('✗ ${config.remark}: invalid');
         return null;
       }
     } catch (e) {
-      debugPrint('❌ V2Ray ping error ${config.remark}: $e');
+      debugPrint('❌ ${config.remark}: $e');
       return null;
     }
   }

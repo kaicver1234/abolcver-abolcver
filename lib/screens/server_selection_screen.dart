@@ -6,6 +6,7 @@ import '../providers/language_provider.dart';
 import '../models/v2ray_config.dart';
 import '../utils/app_localizations.dart';
 import '../widgets/cyber_glow_background.dart';
+import '../services/ping_test_service.dart';
 
 class ServerSelectionScreen extends StatefulWidget {
   const ServerSelectionScreen({super.key});
@@ -23,6 +24,10 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   late AnimationController _refreshAnimController;
   late PageController _pageController;
   int _currentTab = 0; // 0 = Free, 1 = Premium
+  
+  // Professional ping test service (v2rayNG style)
+  PingTestService? _pingTestService;
+  String _testStatusText = '';
 
   @override
   void initState() {
@@ -32,6 +37,29 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       duration: const Duration(milliseconds: 1000),
     );
     _pageController = PageController(initialPage: 0);
+    
+    // Initialize ping test service (v2rayNG style)
+    final provider = Provider.of<V2RayProvider>(context, listen: false);
+    _pingTestService = PingTestService(provider.v2rayService);
+    
+    // Listen to ping test progress (v2rayNG format: "left / count")
+    _pingTestService!.progressStream.listen((progress) {
+      if (mounted) {
+        setState(() {
+          _testStatusText = progress; // progress is already a String
+        });
+      }
+    });
+    
+    // Listen to ping test results
+    _pingTestService!.resultStream.listen((result) {
+      if (mounted) {
+        setState(() {
+          _pingResults[result.configId] = result.delay;
+        });
+        _sortServersByPing(provider, _pingResults);
+      }
+    });
     
     // Preload flags when screen opens
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -67,6 +95,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   void dispose() {
     _refreshAnimController.dispose();
     _pageController.dispose();
+    _pingTestService?.dispose(); // Cleanup ping test service
     _sortedConfigs = null;
     _pingResults.clear();
     super.dispose();
@@ -80,6 +109,8 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     
     try {
       final provider = Provider.of<V2RayProvider>(context, listen: false);
+      
+      debugPrint('🔄 Refreshing servers...');
       await provider.fetchServers();
       
       if (mounted) {
@@ -88,17 +119,33 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           _pingResults.clear();
         });
         
-        // Only show success message if no error
-        if (provider.errorMessage.isEmpty) {
+        // Show appropriate message based on result
+        if (provider.errorMessage.isEmpty && provider.serverConfigs.isNotEmpty) {
           _showSnackBar(
             AppLocalizations.of(context).translate('server_selection.servers_updated'),
             const Color(0xFF10B981),
+          );
+        } else if (provider.errorMessage.isNotEmpty) {
+          // Show error to user
+          _showSnackBar(
+            provider.errorMessage,
+            Colors.orange,
+          );
+        } else if (provider.serverConfigs.isEmpty) {
+          _showSnackBar(
+            'No servers available',
+            Colors.orange,
           );
         }
       }
     } catch (e) {
       debugPrint('❌ Error refreshing servers: $e');
-      // Silently use cache, no error message to user
+      if (mounted) {
+        _showSnackBar(
+          'Failed to refresh: ${e.toString()}',
+          Colors.red,
+        );
+      }
     } finally {
       if (mounted) {
         _refreshAnimController.stop();
@@ -351,9 +398,13 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
               height: 44,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF10B981), Color(0xFF059669)],
-                ),
+                gradient: _isTesting 
+                    ? LinearGradient(
+                        colors: [Colors.grey.shade600, Colors.grey.shade700],
+                      )
+                    : const LinearGradient(
+                        colors: [Color(0xFF10B981), Color(0xFF059669)],
+                      ),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -373,7 +424,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
                   const SizedBox(width: 8),
                   Text(
                     _isTesting 
-                        ? '...' 
+                        ? (_testStatusText.isNotEmpty ? _testStatusText : '...') 
                         : AppLocalizations.of(context).translate('server_selection.test_ping'),
                     style: const TextStyle(
                       color: Colors.white,
@@ -809,11 +860,22 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     return clean.trim().isEmpty ? remark : clean.trim();
   }
 
+  /// Professional ping test using v2rayNG's approach
+  /// Features:
+  /// - CPU-based parallel processing
+  /// - Progressive UI updates
+  /// - Cancellable operations
+  /// - Proper error handling
   Future<void> _testAllServerPings() async {
     if (_isTesting || !mounted) return;
+    
+    // Cancel any ongoing test
+    _pingTestService?.cancel();
+    
     setState(() {
       _isTesting = true;
       _pingResults.clear();
+      _testStatusText = 'Initializing...';
     });
 
     V2RayProvider? provider;
@@ -828,7 +890,10 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     final configs = provider.serverConfigs;
     if (configs.isEmpty) {
       if (mounted) {
-        setState(() => _isTesting = false);
+        setState(() {
+          _isTesting = false;
+          _testStatusText = '';
+        });
         _showSnackBar(
           AppLocalizations.of(context).translate('server_selection.no_servers_available'),
           Colors.orange,
@@ -837,77 +902,32 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       return;
     }
 
-    final Map<String, int> results = {};
-    
     try {
-      debugPrint('🚀 Starting fast V2Ray ping test for ${configs.length} servers...');
+      debugPrint('🚀 Starting professional ping test (v2rayNG method)');
       
-      // پاک کردن cache قبلی
+      // Clear previous cache
       provider.v2rayService.clearPingCache();
       
-      // تست سرورها به صورت موازی با batch های کوچک (3 تا 3 تا)
-      const batchSize = 3;
+      // Start ping test using professional service
+      final results = await _pingTestService!.testServers(configs);
       
-      for (int i = 0; i < configs.length; i += batchSize) {
-        if (!mounted) return;
-        
-        final batchEnd = (i + batchSize).clamp(0, configs.length);
-        final batch = configs.sublist(i, batchEnd);
-        
-        debugPrint('📦 Testing batch ${i ~/ batchSize + 1}: servers ${i + 1}-$batchEnd');
-        
-        // تست همزمان سرورهای این batch
-        final futures = batch.map((config) async {
-          try {
-            final ping = await provider!.v2rayService.getServerDelayDirect(config);
-            final pingValue = ping ?? 99999;
-            
-            if (!mounted) return;
-            
-            results[config.id] = pingValue;
-            
-            // به‌روزرسانی UI
-            if (mounted) {
-              setState(() {
-                _pingResults = Map.from(results);
-              });
-              _sortServersByPing(provider, results);
-            }
-            
-            debugPrint(pingValue < 99999 
-                ? '✓ ${config.remark}: ${pingValue}ms' 
-                : '✗ ${config.remark}: timeout');
-          } catch (e) {
-            if (!mounted) return;
-            
-            results[config.id] = 99999;
-            if (mounted) {
-              setState(() => _pingResults = Map.from(results));
-              _sortServersByPing(provider!, results);
-            }
-            
-            debugPrint('✗ ${config.remark}: error');
-          }
-        }).toList();
-        
-        // منتظر تموم شدن این batch
-        await Future.wait(futures);
-        
-        // تاخیر کوچک بین batch ها (فقط 100ms)
-        if (batchEnd < configs.length && mounted) {
-          await Future.delayed(const Duration(milliseconds: 100));
-        }
-      }
-
       if (!mounted) return;
-
-      final successCount = results.values.where((ping) => ping < 99999).length;
-      debugPrint('✅ Fast ping test completed: $successCount/${configs.length} successful');
       
+      // Update final results
+      setState(() {
+        _pingResults = results;
+      });
+      
+      // Sort servers by ping
+      _sortServersByPing(provider, results);
+      
+      // Show completion message
+      final successCount = results.values.where((ping) => ping < 99999).length;
       _showSnackBar(
         '${AppLocalizations.of(context).translate('server_selection.servers_updated')} ($successCount/${configs.length})',
         const Color(0xFF10B981),
       );
+      
     } catch (e) {
       debugPrint('❌ Error testing pings: $e');
       if (mounted) {
@@ -917,7 +937,12 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
         );
       }
     } finally {
-      if (mounted) setState(() => _isTesting = false);
+      if (mounted) {
+        setState(() {
+          _isTesting = false;
+          _testStatusText = '';
+        });
+      }
     }
   }
 
