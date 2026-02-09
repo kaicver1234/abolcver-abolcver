@@ -141,77 +141,166 @@ class _AnnouncementBannerWidgetState extends State<AnnouncementBannerWidget>
 
     final color = _getColor(_banner!.type);
     final hasAction = _banner!.actionUrl != null && _banner!.actionUrl!.isNotEmpty;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmallScreen = screenWidth < 360;
 
     return SlideTransition(
       position: _slideAnimation,
       child: FadeTransition(
         opacity: _fadeAnimation,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 14),
-          padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+          margin: EdgeInsets.only(bottom: isSmallScreen ? 12 : 14),
+          padding: EdgeInsets.fromLTRB(
+            isSmallScreen ? 12 : 14,
+            isSmallScreen ? 10 : 12,
+            isSmallScreen ? 8 : 10,
+            isSmallScreen ? 10 : 12,
+          ),
           decoration: BoxDecoration(
-            color: const Color(0xFF1a1f2e),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(
-              color: color.withValues(alpha: 0.25),
-              width: 1,
+            gradient: LinearGradient(
+              colors: [
+                const Color(0xFF1a1f2e),
+                const Color(0xFF151923),
+              ],
             ),
+            borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 14),
+            border: Border.all(
+              color: color.withValues(alpha: 0.3),
+              width: 1.5,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: color.withValues(alpha: 0.15),
+                blurRadius: 12,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
               // Message row with close button
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: Text(
-                      _banner!.message,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.85),
-                        fontSize: 13,
-                        height: 1.4,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _dismiss,
-                    child: Icon(
-                      Icons.close_rounded,
-                      color: Colors.white.withValues(alpha: 0.4),
-                      size: 18,
-                    ),
-                  ),
-                ],
-              ),
-              // Action button below message
-              if (hasAction) ...[
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: () => _launchUrl(_banner!.actionUrl!),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  // Icon indicator
+                  Container(
+                    padding: EdgeInsets.all(isSmallScreen ? 6 : 7),
                     decoration: BoxDecoration(
                       color: color.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
-                      _banner!.actionText ?? 'مشاهده',
-                      style: TextStyle(
-                        color: color,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                    child: Icon(
+                      _getIcon(_banner!.type),
+                      color: color,
+                      size: isSmallScreen ? 16 : 18,
+                    ),
+                  ),
+                  SizedBox(width: isSmallScreen ? 10 : 12),
+                  // Message text - centered and flexible
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Text(
+                          _banner!.message,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.9),
+                            fontSize: isSmallScreen ? 12 : 13,
+                            height: 1.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        // Action button below message (centered)
+                        if (hasAction) ...[
+                          SizedBox(height: isSmallScreen ? 8 : 10),
+                          GestureDetector(
+                            onTap: () => _launchUrl(_banner!.actionUrl!),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(
+                                horizontal: isSmallScreen ? 12 : 14,
+                                vertical: isSmallScreen ? 7 : 8,
+                              ),
+                              decoration: BoxDecoration(
+                                gradient: LinearGradient(
+                                  colors: [
+                                    color,
+                                    color.withValues(alpha: 0.8),
+                                  ],
+                                ),
+                                borderRadius: BorderRadius.circular(8),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: color.withValues(alpha: 0.3),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    _banner!.actionText ?? 'مشاهده',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: isSmallScreen ? 11 : 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                  SizedBox(width: isSmallScreen ? 4 : 6),
+                                  Icon(
+                                    Icons.arrow_forward_rounded,
+                                    color: Colors.white,
+                                    size: isSmallScreen ? 14 : 16,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  SizedBox(width: isSmallScreen ? 8 : 10),
+                  // Close button
+                  GestureDetector(
+                    onTap: _dismiss,
+                    child: Container(
+                      padding: EdgeInsets.all(isSmallScreen ? 4 : 5),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Icon(
+                        Icons.close_rounded,
+                        color: Colors.white.withValues(alpha: 0.5),
+                        size: isSmallScreen ? 16 : 18,
                       ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ],
           ),
         ),
       ),
     );
+  }
+
+  IconData _getIcon(String type) {
+    switch (type) {
+      case 'warning':
+        return Icons.warning_amber_rounded;
+      case 'error':
+        return Icons.error_outline_rounded;
+      case 'success':
+        return Icons.check_circle_outline_rounded;
+      default:
+        return Icons.info_outline_rounded;
+    }
   }
 }

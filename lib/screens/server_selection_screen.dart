@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -41,8 +40,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     );
     _pageController = PageController(initialPage: 0);
     
-    // Load saved ping results and batch size
-    _loadSavedPingResults();
+    // Load batch size
     _loadBatchSize();
     
     // Preload flags when screen opens
@@ -63,76 +61,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       }
     } catch (e) {
       debugPrint('Error loading batch size: $e');
-    }
-  }
-  
-  /// Load saved ping results from SharedPreferences
-  Future<void> _loadSavedPingResults() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final savedPings = prefs.getString('saved_ping_results');
-      
-      if (savedPings != null && savedPings.isNotEmpty) {
-        final Map<String, dynamic> pingData = {};
-        try {
-          // Parse JSON
-          final decoded = jsonDecode(savedPings);
-          if (decoded is Map) {
-            pingData.addAll(Map<String, dynamic>.from(decoded));
-          }
-        } catch (e) {
-          debugPrint('Error parsing saved pings: $e');
-          return;
-        }
-        
-        final now = DateTime.now().millisecondsSinceEpoch;
-        final oneHourInMillis = 60 * 60 * 1000; // 1 hour
-        
-        // Load valid ping results (less than 1 hour old)
-        for (final entry in pingData.entries) {
-          try {
-            final pingInfo = entry.value as Map<String, dynamic>;
-            final timestamp = pingInfo['timestamp'] as int;
-            
-            // Only load pings that are less than 1 hour old
-            if (now - timestamp < oneHourInMillis) {
-              _pingResults[entry.key] = pingInfo['ping'] as int;
-            }
-          } catch (e) {
-            debugPrint('Error loading ping entry: $e');
-          }
-        }
-        
-        if (mounted && _pingResults.isNotEmpty) {
-          setState(() {});
-          debugPrint('✅ Loaded ${_pingResults.length} saved ping results');
-        }
-      }
-    } catch (e) {
-      debugPrint('Error loading saved ping results: $e');
-    }
-  }
-  
-  /// Save ping results to SharedPreferences
-  Future<void> _savePingResults() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final Map<String, dynamic> pingData = {};
-      
-      // Save ping results with timestamp
-      for (final entry in _pingResults.entries) {
-        pingData[entry.key] = {
-          'ping': entry.value,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        };
-      }
-      
-      // Convert to JSON string for storage
-      final jsonString = jsonEncode(pingData);
-      await prefs.setString('saved_ping_results', jsonString);
-      debugPrint('💾 Saved ${_pingResults.length} ping results');
-    } catch (e) {
-      debugPrint('Error saving ping results: $e');
     }
   }
 
@@ -493,54 +421,49 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           ),
           SizedBox(width: isSmallScreen ? 10 : 12),
           // Test Ping button
-          Expanded(
-            child: GestureDetector(
-              onTap: _isTesting ? null : _testAllServerPings,
-              child: Container(
-                height: isSmallScreen ? 40 : 44,
-                padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16),
-                decoration: BoxDecoration(
-                  gradient: _isTesting 
-                      ? LinearGradient(
-                          colors: [Colors.grey.shade600, Colors.grey.shade700],
-                        )
-                      : const LinearGradient(
-                          colors: [Color(0xFF10B981), Color(0xFF059669)],
-                        ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (_isTesting)
-                      SizedBox(
-                        width: isSmallScreen ? 16 : 18,
-                        height: isSmallScreen ? 16 : 18,
-                        child: const CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
+          GestureDetector(
+            onTap: _isTesting ? null : _testAllServerPings,
+            child: Container(
+              height: isSmallScreen ? 40 : 44,
+              padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 14 : 16),
+              decoration: BoxDecoration(
+                gradient: _isTesting 
+                    ? LinearGradient(
+                        colors: [Colors.grey.shade600, Colors.grey.shade700],
                       )
-                    else
-                      Icon(Icons.speed, color: Colors.white, size: isSmallScreen ? 18 : 20),
-                    SizedBox(width: isSmallScreen ? 6 : 8),
-                    Flexible(
-                      child: Text(
-                        _isTesting 
-                            ? (_testStatusText.isNotEmpty ? _testStatusText : '...') 
-                            : AppLocalizations.of(context).translate('server_selection.test_ping'),
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: isSmallScreen ? 12 : 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                    : const LinearGradient(
+                        colors: [Color(0xFF10B981), Color(0xFF059669)],
                       ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isTesting)
+                    SizedBox(
+                      width: isSmallScreen ? 14 : 16,
+                      height: isSmallScreen ? 14 : 16,
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  else
+                    Icon(Icons.speed, color: Colors.white, size: isSmallScreen ? 16 : 18),
+                  SizedBox(width: isSmallScreen ? 6 : 8),
+                  Text(
+                    _isTesting 
+                        ? (_testStatusText.isNotEmpty ? _testStatusText : '...') 
+                        : AppLocalizations.of(context).translate('server_selection.test_ping'),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: isSmallScreen ? 11 : 13,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
-                ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
           ),
@@ -987,6 +910,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     setState(() {
       _isTesting = true;
       _pingResults.clear();
+      _sortedConfigs = null; // Reset sorting
       _testedCount = 0;
       _totalCount = 0;
       _testStatusText = 'Initializing...';
@@ -1055,10 +979,13 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
               }
               
               // Update UI immediately after this server is tested
+              // AND sort servers in real-time
               if (mounted) {
                 setState(() {
                   _testedCount = serverIndex + 1;
                   _testStatusText = '$_testedCount / $_totalCount';
+                  // Sort servers immediately after each result
+                  _sortServersByPing(provider, _pingResults);
                 });
               }
             }),
@@ -1076,10 +1003,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       
       if (!mounted) return;
       
-      // Save ping results to storage
-      await _savePingResults();
-      
-      // Sort servers by ping
+      // Final sort (already sorted in real-time, but ensure it's final)
       _sortServersByPing(provider, _pingResults);
       
       // Show completion message

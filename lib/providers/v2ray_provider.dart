@@ -67,10 +67,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       }
       
       debugPrint('📋 Total servers available: ${servers.length}');
-      debugPrint('🎯 Testing first 15 servers using V2Ray core delay...');
+      debugPrint('🎯 Testing first 10 servers using V2Ray core delay...');
       
-      // Test first 15 servers using V2Ray core delay
-      final serversToTest = servers.take(15).toList();
+      // Test first 10 servers using V2Ray core delay
+      final serversToTest = servers.take(10).toList();
       debugPrint('📦 Servers to test: ${serversToTest.length}');
       
       // Test servers in batches (10 at a time)

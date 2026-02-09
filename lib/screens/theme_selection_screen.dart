@@ -174,26 +174,15 @@ class ThemeSelectionScreen extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Text(
-                          theme.emoji,
-                          style: TextStyle(fontSize: isSmallScreen ? 20 : 24),
-                        ),
-                        SizedBox(width: isSmallScreen ? 8 : 10),
-                        Expanded(
-                          child: Text(
-                            themeName,
-                            style: TextStyle(
-                              color: Color(currentColors.textPrimaryColor),
-                              fontSize: isSmallScreen ? 15 : 17,
-                              fontWeight: FontWeight.w600,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                    Text(
+                      themeName,
+                      style: TextStyle(
+                        color: Color(currentColors.textPrimaryColor),
+                        fontSize: isSmallScreen ? 15 : 17,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     SizedBox(height: isSmallScreen ? 6 : 8),
                     _buildColorPalette(themeColors, isSmallScreen),
@@ -232,67 +221,57 @@ class ThemeSelectionScreen extends StatelessWidget {
   }
 
   Widget _buildThemePreview(ThemeColors colors, bool isSmallScreen) {
-    final size = isSmallScreen ? 60.0 : 70.0;
+    final size = isSmallScreen ? 50.0 : 55.0;
     
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: Color(colors.backgroundColor),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Color(colors.borderColor).withValues(alpha: 0.2),
+    return Stack(
+      alignment: Alignment.center,
+      children: [
+        // Glow effect
+        Container(
+          width: size + 8,
+          height: size + 8,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(
+                color: Color(colors.primaryColor).withValues(alpha: 0.3),
+                blurRadius: 15,
+                spreadRadius: 1,
+              ),
+            ],
+          ),
         ),
-      ),
-      child: Stack(
-        children: [
-          // Background pattern
-          Positioned.fill(
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(11),
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(colors.primaryColor).withValues(alpha: 0.2),
-                    Color(colors.secondaryColor).withValues(alpha: 0.1),
-                  ],
-                ),
-              ),
+        // Main circle
+        Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(colors.primaryColor).withValues(alpha: 0.6),
+                Color(colors.secondaryColor).withValues(alpha: 0.4),
+              ],
+            ),
+            border: Border.all(
+              color: Color(colors.primaryColor).withValues(alpha: 0.5),
+              width: 2,
             ),
           ),
-          // Mini UI elements
-          Positioned(
-            top: 8,
-            left: 8,
-            right: 8,
+          child: Center(
             child: Container(
-              height: 3,
-              decoration: BoxDecoration(
-                color: Color(colors.primaryColor),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          Positioned(
-            bottom: 8,
-            left: 8,
-            child: Container(
-              width: size * 0.4,
-              height: size * 0.4,
+              width: size * 0.35,
+              height: size * 0.35,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Color(colors.primaryColor).withValues(alpha: 0.3),
-                border: Border.all(
-                  color: Color(colors.primaryColor),
-                  width: 2,
-                ),
+                color: Color(colors.primaryColor),
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

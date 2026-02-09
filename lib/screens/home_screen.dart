@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../providers/v2ray_provider.dart';
 import '../providers/language_provider.dart';
+import '../providers/theme_provider.dart';
 import '../widgets/cyber_glow_background.dart';
 import '../models/app_language.dart';
 import '../utils/app_localizations.dart';
@@ -188,8 +189,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   Widget build(BuildContext context) {
     super.build(context);
     
-    return Consumer2<V2RayProvider, LanguageProvider>(
-      builder: (context, v2rayProvider, languageProvider, child) {
+    return Consumer3<V2RayProvider, LanguageProvider, ThemeProvider>(
+      builder: (context, v2rayProvider, languageProvider, themeProvider, child) {
         return Directionality(
           textDirection: languageProvider.textDirection,
           child: CyberGlowBackground(
@@ -222,44 +223,51 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   Widget _buildHeader(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Brand Name
-          RichText(
-            text: TextSpan(
-              style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w700),
-              children: const [
-                TextSpan(text: 'Tiksar', style: TextStyle(color: Colors.white)),
-                TextSpan(text: 'VPN', style: TextStyle(color: Color(0xFFa78bfa))),
-              ],
-            ),
-          ),
-          // Language Button
-          GestureDetector(
-            onTap: () => _showLanguageModal(context),
-            child: Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.04),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-                borderRadius: BorderRadius.circular(12),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, _) {
+        final colors = themeProvider.colors;
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Brand Name
+              RichText(
+                text: TextSpan(
+                  style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w700),
+                  children: [
+                    TextSpan(text: 'Tiksar', style: TextStyle(color: Color(colors.textPrimaryColor))),
+                    TextSpan(text: 'VPN', style: TextStyle(color: Color(colors.secondaryColor))),
+                  ],
+                ),
               ),
-              child: Icon(Icons.language, color: Colors.white.withValues(alpha: 0.5), size: 20),
-            ),
+              // Language Button
+              GestureDetector(
+                onTap: () => _showLanguageModal(context),
+                child: Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: Color(colors.surfaceColor).withValues(alpha: colors.surfaceOpacity),
+                    border: Border.all(color: Color(colors.borderColor).withValues(alpha: 0.1)),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Icons.language, color: Color(colors.textSecondaryColor).withValues(alpha: 0.7), size: 20),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   void _showLanguageModal(BuildContext context) {
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
+    final colors = themeProvider.colors;
     final languages = [
-      {'name': 'فارسی', 'code': 'fa', 'flag': '🦁'},
+      {'name': 'فارسی', 'code': 'fa', 'flag': '🇮🇷'},
       {'name': 'English', 'code': 'en', 'flag': '🇬🇧'},
     ];
 
@@ -269,8 +277,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       builder: (context) => Container(
         margin: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFF14141a),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          color: Color(colors.cardColor),
+          border: Border.all(color: Color(colors.borderColor).withValues(alpha: 0.1)),
           borderRadius: BorderRadius.circular(24),
         ),
         child: Column(
@@ -283,7 +291,12 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 children: [
                   Text(
                     AppLocalizations.of(context).translate('language_settings.language'),
-                    style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w700),
+                    style: TextStyle(
+                      color: Color(colors.textPrimaryColor),
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.3,
+                    ),
                   ),
                   GestureDetector(
                     onTap: () => Navigator.pop(context),
@@ -291,10 +304,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                       width: 36,
                       height: 36,
                       decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: 0.05),
+                        color: Color(colors.surfaceColor).withValues(alpha: colors.surfaceOpacity),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(Icons.close, color: Colors.white.withValues(alpha: 0.6), size: 18),
+                      child: Icon(Icons.close, color: Color(colors.textSecondaryColor).withValues(alpha: 0.7), size: 18),
                     ),
                   ),
                 ],
@@ -302,6 +315,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             ),
             ...languages.map((lang) {
               final isSelected = languageProvider.currentLanguage.code == lang['code'];
+              final isFarsi = lang['code'] == 'fa';
               return GestureDetector(
                 onTap: () async {
                   final newLanguage = AppLanguage(
@@ -318,32 +332,51 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 },
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  padding: EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: isFarsi ? 16 : 14, // More padding for Farsi
+                  ),
                   decoration: BoxDecoration(
-                    color: isSelected ? const Color(0xFF10b981).withValues(alpha: 0.12) : Colors.white.withValues(alpha: 0.03),
+                    color: isSelected 
+                        ? Color(colors.primaryColor).withValues(alpha: 0.12) 
+                        : Color(colors.surfaceColor).withValues(alpha: colors.surfaceOpacity),
                     border: Border.all(
-                      color: isSelected ? const Color(0xFF10b981).withValues(alpha: 0.3) : Colors.white.withValues(alpha: 0.05),
+                      color: isSelected 
+                          ? Color(colors.primaryColor).withValues(alpha: 0.3) 
+                          : Color(colors.borderColor).withValues(alpha: 0.08),
+                      width: isSelected ? 1.5 : 1,
                     ),
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
                     children: [
-                      Text(lang['flag']!, style: const TextStyle(fontSize: 24)),
-                      const SizedBox(width: 14),
+                      Text(
+                        lang['flag']!,
+                        style: const TextStyle(fontSize: 26),
+                      ),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: Text(
                           lang['name']!,
-                          style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: Color(colors.textPrimaryColor),
+                            fontSize: isFarsi ? 16 : 15,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: isFarsi ? 0.3 : 0,
+                            height: isFarsi ? 1.6 : 1.4,
+                          ),
                         ),
                       ),
                       Container(
-                        width: 22,
-                        height: 22,
+                        width: 24,
+                        height: 24,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: isSelected ? const Color(0xFF10b981) : Colors.transparent,
+                          color: isSelected ? Color(colors.primaryColor) : Colors.transparent,
                           border: Border.all(
-                            color: isSelected ? const Color(0xFF10b981) : Colors.white.withValues(alpha: 0.2),
+                            color: isSelected 
+                                ? Color(colors.primaryColor) 
+                                : Color(colors.borderColor).withValues(alpha: 0.3),
                             width: 2,
                           ),
                         ),
@@ -436,16 +469,12 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               ],
             ),
           ),
-          // Spinner for connecting
-          if (_isConnecting)
-            SizedBox(
-              width: buttonSize + 20,
-              height: buttonSize + 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 3,
-                valueColor: AlwaysStoppedAnimation<Color>(buttonColor.withValues(alpha: 0.8)),
-              ),
-            ),
+          // 3 expanding rings for connecting state
+          if (_isConnecting) ...[
+            _buildExpandingRing(buttonSize, glowColor, 0),
+            _buildExpandingRing(buttonSize, glowColor, 600),
+            _buildExpandingRing(buttonSize, glowColor, 1200),
+          ],
           // Main button
           AnimatedContainer(
             duration: const Duration(milliseconds: 400),
@@ -474,24 +503,50 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               ],
             ),
             child: Center(
-              child: _isConnecting
-                  ? SizedBox(
-                      width: iconSize - 10,
-                      height: iconSize - 10,
-                      child: const CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 3,
-                      ),
-                    )
-                  : Icon(
-                      Icons.power_settings_new,
-                      size: iconSize,
-                      color: Colors.white.withValues(alpha: isConnected ? 1.0 : 0.6),
-                    ),
+              child: Icon(
+                Icons.power_settings_new,
+                size: iconSize,
+                color: Colors.white.withValues(alpha: _isConnecting ? 0.9 : (isConnected ? 1.0 : 0.6)),
+              ),
             ),
           ),
         ],
       ),
+    );
+  }
+
+  // Expanding ring animation - starts from button and expands outward
+  Widget _buildExpandingRing(double buttonSize, Color color, int delayMs) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 1800),
+      builder: (context, value, child) {
+        // Wait for delay before starting
+        final adjustedValue = (value * 1800 - delayMs) / 1800;
+        if (adjustedValue < 0) return const SizedBox.shrink();
+        
+        final clampedValue = adjustedValue.clamp(0.0, 1.0);
+        
+        return Opacity(
+          opacity: (1 - clampedValue) * 0.6,
+          child: Container(
+            width: buttonSize + (clampedValue * 80),
+            height: buttonSize + (clampedValue * 80),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: color,
+                width: 2.5,
+              ),
+            ),
+          ),
+        );
+      },
+      onEnd: () {
+        if (mounted && _isConnecting) {
+          setState(() {});
+        }
+      },
     );
   }
 
@@ -827,6 +882,9 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   Widget _buildToolsTab(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final colors = themeProvider.colors;
+    
     return Padding(
       padding: const EdgeInsets.all(20.0),
       child: Column(
@@ -836,7 +894,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           Text(
             AppLocalizations.of(context).translate('navigation.tools'),
             style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.95),
+              color: Color(colors.textPrimaryColor),
               fontSize: 24,
               fontWeight: FontWeight.bold,
             ),
@@ -844,7 +902,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           const SizedBox(height: 8),
           Text(
             AppLocalizations.of(context).translate('home.quick_actions'),
-            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
+            style: TextStyle(color: Color(colors.textSecondaryColor).withValues(alpha: 0.7), fontSize: 14),
           ),
           const SizedBox(height: 24),
           Expanded(child: _buildToolsList(context)),
@@ -902,68 +960,76 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     required String subtitle,
     required VoidCallback onTap,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(20),
-          child: Container(
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.08),
-                  Colors.white.withValues(alpha: 0.03),
-                ],
-              ),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, _) {
+        final colors = themeProvider.colors;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 16),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onTap,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(icon, color: Colors.white.withValues(alpha: 0.9), size: 24),
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Color(colors.surfaceColor).withValues(alpha: colors.surfaceOpacity),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Color(colors.borderColor).withValues(alpha: 0.1)),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(label, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      Text(subtitle, style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
-                    ],
-                  ),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Color(colors.primaryColor).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(icon, color: Color(colors.primaryColor), size: 24),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(label, style: TextStyle(color: Color(colors.textPrimaryColor), fontSize: 16, fontWeight: FontWeight.w600)),
+                          const SizedBox(height: 4),
+                          Text(subtitle, style: TextStyle(color: Color(colors.textSecondaryColor).withValues(alpha: 0.7), fontSize: 13)),
+                        ],
+                      ),
+                    ),
+                    Icon(Icons.arrow_forward_ios, color: Color(colors.textSecondaryColor).withValues(alpha: 0.4), size: 16),
+                  ],
                 ),
-                Icon(Icons.arrow_forward_ios, color: Colors.white.withValues(alpha: 0.4), size: 16),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
   Widget _buildAboutTab(BuildContext context) {
     final remoteConfig = RemoteConfigService();
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final colors = themeProvider.colors;
     final description = remoteConfig.getAboutDescription(languageProvider.currentLanguage.code);
+    
+    final screenWidth = MediaQuery.of(context).size.width;
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmallScreen = screenWidth < 360 || screenHeight < 700;
+    final isMediumScreen = screenWidth >= 360 && screenWidth < 400;
     
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      padding: EdgeInsets.symmetric(
+        horizontal: isSmallScreen ? 20 : 24,
+        vertical: isSmallScreen ? 16 : 20,
+      ),
       child: Column(
         children: [
-          const SizedBox(height: 20),
+          SizedBox(height: isSmallScreen ? 12 : 20),
           
           // Logo with animated glow effect
           Stack(
@@ -973,21 +1039,22 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 tween: Tween<double>(begin: 0, end: 1),
                 duration: const Duration(seconds: 2),
                 builder: (context, value, child) {
+                  final logoSize = isSmallScreen ? 100.0 : 120.0;
                   return Container(
-                    width: 120,
-                    height: 120,
+                    width: logoSize,
+                    height: logoSize,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: const Color(0xFF10b981).withValues(alpha: 0.3 * value),
-                          blurRadius: 50,
-                          spreadRadius: 10,
+                          color: Color(colors.primaryColor).withValues(alpha: 0.3 * value),
+                          blurRadius: isSmallScreen ? 40 : 50,
+                          spreadRadius: isSmallScreen ? 8 : 10,
                         ),
                         BoxShadow(
-                          color: const Color(0xFF06b6d4).withValues(alpha: 0.2 * value),
-                          blurRadius: 70,
-                          spreadRadius: 15,
+                          color: Color(colors.accentColor).withValues(alpha: 0.2 * value),
+                          blurRadius: isSmallScreen ? 60 : 70,
+                          spreadRadius: isSmallScreen ? 12 : 15,
                         ),
                       ],
                     ),
@@ -995,18 +1062,18 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 },
               ),
               Container(
-                width: 100,
-                height: 100,
+                width: isSmallScreen ? 80 : 100,
+                height: isSmallScreen ? 80 : 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   gradient: LinearGradient(
                     colors: [
-                      const Color(0xFF10b981).withValues(alpha: 0.3),
-                      const Color(0xFF06b6d4).withValues(alpha: 0.2),
+                      Color(colors.primaryColor).withValues(alpha: 0.3),
+                      Color(colors.accentColor).withValues(alpha: 0.2),
                     ],
                   ),
                   border: Border.all(
-                    color: const Color(0xFF10b981).withValues(alpha: 0.3),
+                    color: Color(colors.primaryColor).withValues(alpha: 0.3),
                     width: 2,
                   ),
                 ),
@@ -1017,17 +1084,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             ],
           ),
           
-          const SizedBox(height: 28),
+          SizedBox(height: isSmallScreen ? 20 : 28),
           
           // App Name with gradient animation
           ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              colors: [Colors.white, Color(0xFFa78bfa), Color(0xFF6366f1)],
+            shaderCallback: (bounds) => LinearGradient(
+              colors: [Color(colors.textPrimaryColor), Color(colors.secondaryColor), Color(colors.primaryColor)],
             ).createShader(bounds),
             child: Text(
               'TiksarVPN',
               style: GoogleFonts.poppins(
-                fontSize: 38,
+                fontSize: isSmallScreen ? 32 : (isMediumScreen ? 36 : 38),
                 fontWeight: FontWeight.w800,
                 color: Colors.white,
                 letterSpacing: -0.5,
@@ -1035,33 +1102,36 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             ),
           ),
           
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 10 : 12),
           
           // Version with icon
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            padding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 12 : 14,
+              vertical: isSmallScreen ? 6 : 8,
+            ),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF10b981).withValues(alpha: 0.2),
-                  const Color(0xFF06b6d4).withValues(alpha: 0.15),
+                  Color(colors.primaryColor).withValues(alpha: 0.2),
+                  Color(colors.accentColor).withValues(alpha: 0.15),
                 ],
               ),
               borderRadius: BorderRadius.circular(20),
               border: Border.all(
-                color: const Color(0xFF10b981).withValues(alpha: 0.3),
+                color: Color(colors.primaryColor).withValues(alpha: 0.3),
               ),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(Icons.verified, color: const Color(0xFF10b981), size: 16),
-                const SizedBox(width: 6),
+                Icon(Icons.verified, color: Color(colors.primaryColor), size: isSmallScreen ? 14 : 16),
+                SizedBox(width: isSmallScreen ? 5 : 6),
                 Text(
                   'Version 1.1.3',
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 13,
+                    color: Color(colors.textPrimaryColor).withValues(alpha: 0.8),
+                    fontSize: isSmallScreen ? 12 : 13,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -1069,79 +1139,84 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             ),
           ),
           
-          const SizedBox(height: 32),
+          SizedBox(height: isSmallScreen ? 24 : 32),
           
           // Description with subtle background
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+            padding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 16 : 20,
+              vertical: isSmallScreen ? 14 : 18,
+            ),
             decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  Colors.white.withValues(alpha: 0.06),
-                  Colors.white.withValues(alpha: 0.02),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(20),
+              color: Color(colors.surfaceColor).withValues(alpha: colors.surfaceOpacity),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 20),
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.1),
+                color: Color(colors.borderColor).withValues(alpha: 0.1),
               ),
             ),
             child: Text(
               description,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.8),
-                fontSize: 15,
-                height: 1.8,
+                color: Color(colors.textSecondaryColor).withValues(alpha: 0.8),
+                fontSize: isSmallScreen ? 13 : 15,
+                height: isSmallScreen ? 1.6 : 1.8,
               ),
             ),
           ),
           
-          const SizedBox(height: 28),
+          SizedBox(height: isSmallScreen ? 20 : 28),
           
           // Developer with beating heart
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+            padding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 14 : 18,
+              vertical: isSmallScreen ? 12 : 14,
+            ),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: [
-                  const Color(0xFF6366f1).withValues(alpha: 0.15),
-                  const Color(0xFF8b5cf6).withValues(alpha: 0.1),
+                  Color(colors.secondaryColor).withValues(alpha: 0.15),
+                  Color(colors.secondaryColor).withValues(alpha: 0.1),
                 ],
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 14 : 16),
               border: Border.all(
-                color: const Color(0xFF6366f1).withValues(alpha: 0.25),
+                color: Color(colors.secondaryColor).withValues(alpha: 0.25),
               ),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
-                  AppLocalizations.of(context).translate('about.developed_with'),
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.7),
-                    fontSize: 15,
+                Flexible(
+                  child: Text(
+                    AppLocalizations.of(context).translate('about.developed_with'),
+                    style: TextStyle(
+                      color: Color(colors.textSecondaryColor).withValues(alpha: 0.7),
+                      fontSize: isSmallScreen ? 13 : 15,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: isSmallScreen ? 6 : 8),
                 const _BeatingHeart(),
-                const SizedBox(width: 8),
-                Text(
-                  AppLocalizations.of(context).translate('about.developer'),
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+                SizedBox(width: isSmallScreen ? 6 : 8),
+                Flexible(
+                  child: Text(
+                    AppLocalizations.of(context).translate('about.developer'),
+                    style: GoogleFonts.poppins(
+                      color: Color(colors.textPrimaryColor),
+                      fontSize: isSmallScreen ? 13 : 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
           ),
           
-          const SizedBox(height: 36),
+          SizedBox(height: isSmallScreen ? 28 : 36),
           
           // Social Links with hover effect
           _buildAnimatedSocialLink(
@@ -1149,36 +1224,39 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             title: remoteConfig.telegramId,
             color: const Color(0xFF0088CC),
             url: remoteConfig.telegramUrl,
+            isSmallScreen: isSmallScreen,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 10 : 12),
           _buildAnimatedSocialLink(
             icon: Icons.camera_alt_rounded,
             title: remoteConfig.instagramId,
             color: const Color(0xFFE1306C),
             url: remoteConfig.instagramUrl,
+            isSmallScreen: isSmallScreen,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: isSmallScreen ? 10 : 12),
           _buildAnimatedSocialLink(
-            icon: Icons.location_city_rounded,
+            icon: Icons.camera_alt_rounded,
             title: remoteConfig.tiksarPageId,
             color: const Color(0xFF833AB4),
             url: remoteConfig.tiksarPageUrl,
+            isSmallScreen: isSmallScreen,
           ),
           
-          const SizedBox(height: 36),
+          SizedBox(height: isSmallScreen ? 28 : 36),
           
           // Features with gradient backgrounds
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildAnimatedFeature(Icons.security, const Color(0xFF10b981)),
-              _buildAnimatedFeature(Icons.flash_on, const Color(0xFFfbbf24)),
-              _buildAnimatedFeature(Icons.public, const Color(0xFF3b82f6)),
-              _buildAnimatedFeature(Icons.verified_user, const Color(0xFFa78bfa)),
+              _buildAnimatedFeature(Icons.security, Color(colors.primaryColor), isSmallScreen),
+              _buildAnimatedFeature(Icons.flash_on, Color(colors.warningColor), isSmallScreen),
+              _buildAnimatedFeature(Icons.public, Color(colors.accentColor), isSmallScreen),
+              _buildAnimatedFeature(Icons.verified_user, Color(colors.secondaryColor), isSmallScreen),
             ],
           ),
           
-          const SizedBox(height: 40),
+          SizedBox(height: isSmallScreen ? 32 : 40),
           
           // Copyright with icon
           Row(
@@ -1186,21 +1264,25 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             children: [
               Icon(
                 Icons.copyright,
-                color: Colors.white.withValues(alpha: 0.4),
-                size: 14,
+                color: Color(colors.textSecondaryColor).withValues(alpha: 0.4),
+                size: isSmallScreen ? 12 : 14,
               ),
-              const SizedBox(width: 6),
-              Text(
-                AppLocalizations.of(context).translate('about.copyright'),
-                style: TextStyle(
-                  color: Colors.white.withValues(alpha: 0.4),
-                  fontSize: 12,
+              SizedBox(width: isSmallScreen ? 5 : 6),
+              Flexible(
+                child: Text(
+                  AppLocalizations.of(context).translate('about.copyright'),
+                  style: TextStyle(
+                    color: Color(colors.textSecondaryColor).withValues(alpha: 0.4),
+                    fontSize: isSmallScreen ? 11 : 12,
+                  ),
+                  textAlign: TextAlign.center,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
           ),
           
-          const SizedBox(height: 20),
+          SizedBox(height: isSmallScreen ? 16 : 20),
         ],
       ),
     );
@@ -1211,90 +1293,96 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     required String title,
     required Color color,
     required String url,
+    required bool isSmallScreen,
   }) {
-    return GestureDetector(
-      onTap: () async {
-        final uri = Uri.parse(url);
-        try {
-          await launchUrl(uri, mode: LaunchMode.externalApplication);
-        } catch (_) {}
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withValues(alpha: 0.06),
-              Colors.white.withValues(alpha: 0.02),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    color,
-                    color.withValues(alpha: 0.7),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(14),
-                boxShadow: [
-                  BoxShadow(
-                    color: color.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 4),
+    return Consumer<ThemeProvider>(
+      builder: (context, themeProvider, _) {
+        final colors = themeProvider.colors;
+        return GestureDetector(
+          onTap: () async {
+            final uri = Uri.parse(url);
+            try {
+              await launchUrl(uri, mode: LaunchMode.externalApplication);
+            } catch (_) {}
+          },
+          child: Container(
+            padding: EdgeInsets.symmetric(
+              horizontal: isSmallScreen ? 14 : 18,
+              vertical: isSmallScreen ? 12 : 14,
+            ),
+            decoration: BoxDecoration(
+              color: Color(colors.surfaceColor).withValues(alpha: colors.surfaceOpacity),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 14 : 16),
+              border: Border.all(color: Color(colors.borderColor).withValues(alpha: 0.1)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: isSmallScreen ? 44 : 48,
+                  height: isSmallScreen ? 44 : 48,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        color,
+                        color.withValues(alpha: 0.7),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(isSmallScreen ? 12 : 14),
+                    boxShadow: [
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.3),
+                        blurRadius: isSmallScreen ? 10 : 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              child: Icon(icon, color: Colors.white, size: 24),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                title,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
+                  child: Icon(icon, color: Colors.white, size: isSmallScreen ? 22 : 24),
                 ),
-              ),
+                SizedBox(width: isSmallScreen ? 12 : 16),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: TextStyle(
+                      color: Color(colors.textPrimaryColor),
+                      fontSize: isSmallScreen ? 14 : 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                Container(
+                  padding: EdgeInsets.all(isSmallScreen ? 5 : 6),
+                  decoration: BoxDecoration(
+                    color: Color(colors.surfaceColor).withValues(alpha: colors.surfaceOpacity),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.arrow_forward_ios,
+                    color: Color(colors.textSecondaryColor).withValues(alpha: 0.5),
+                    size: isSmallScreen ? 12 : 14,
+                  ),
+                ),
+              ],
             ),
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                Icons.arrow_forward_ios,
-                color: Colors.white.withValues(alpha: 0.5),
-                size: 14,
-              ),
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
-  Widget _buildAnimatedFeature(IconData icon, Color color) {
+  Widget _buildAnimatedFeature(IconData icon, Color color, bool isSmallScreen) {
     return TweenAnimationBuilder(
       tween: Tween<double>(begin: 0, end: 1),
       duration: const Duration(milliseconds: 800),
       builder: (context, value, child) {
+        final size = isSmallScreen ? 56.0 : 64.0;
+        final iconSize = isSmallScreen ? 26.0 : 30.0;
+        
         return Transform.scale(
           scale: 0.8 + (0.2 * value),
           child: Container(
-            width: 64,
-            height: 64,
+            width: size,
+            height: size,
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -1304,7 +1392,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   color.withValues(alpha: 0.1),
                 ],
               ),
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 18),
               border: Border.all(
                 color: color.withValues(alpha: 0.3),
                 width: 1.5,
@@ -1312,12 +1400,12 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
               boxShadow: [
                 BoxShadow(
                   color: color.withValues(alpha: 0.2 * value),
-                  blurRadius: 12,
+                  blurRadius: isSmallScreen ? 10 : 12,
                   offset: const Offset(0, 4),
                 ),
               ],
             ),
-            child: Icon(icon, color: color, size: 30),
+            child: Icon(icon, color: color, size: iconSize),
           ),
         );
       },
@@ -1327,12 +1415,15 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
 
   Widget _buildBottomNav() {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final colors = themeProvider.colors;
+    
     return Container(
       margin: const EdgeInsets.fromLTRB(24, 0, 24, 24),
       height: 60,
       decoration: BoxDecoration(
-        color: const Color(0xFF121214).withValues(alpha: 0.9),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        color: Color(colors.cardColor).withValues(alpha: colors.cardOpacity),
+        border: Border.all(color: Color(colors.borderColor).withValues(alpha: 0.1)),
         borderRadius: BorderRadius.circular(30),
       ),
       child: Row(
@@ -1346,6 +1437,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   Widget _buildNavItem(int index, String label) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final colors = themeProvider.colors;
     final isActive = _currentPage == index;
     
     return Expanded(
@@ -1362,14 +1455,18 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         child: Container(
           margin: const EdgeInsets.all(5),
           decoration: BoxDecoration(
-            color: isActive ? Colors.white.withValues(alpha: 0.08) : Colors.transparent,
+            color: isActive 
+                ? Color(colors.primaryColor).withValues(alpha: 0.15) 
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(26),
           ),
           child: Center(
             child: Text(
               label,
               style: TextStyle(
-                color: isActive ? Colors.white : Colors.white.withValues(alpha: 0.4),
+                color: isActive 
+                    ? Color(colors.primaryColor) 
+                    : Color(colors.textSecondaryColor).withValues(alpha: 0.5),
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
               ),

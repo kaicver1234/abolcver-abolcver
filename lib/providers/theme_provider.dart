@@ -8,7 +8,7 @@ class ThemeProvider with ChangeNotifier {
     name: 'Default',
     nameEn: 'Dark Green',
     nameFa: 'سبز تیره',
-    emoji: '🟢',
+    emoji: '💚',
     colors: ThemeColors.defaultTheme(),
   );
 
@@ -22,7 +22,7 @@ class ThemeProvider with ChangeNotifier {
       name: 'Default',
       nameEn: 'Dark Green',
       nameFa: 'سبز تیره',
-      emoji: '🟢',
+      emoji: '💚',
       colors: ThemeColors.defaultTheme(),
     ),
     AppThemeModel(
@@ -38,7 +38,7 @@ class ThemeProvider with ChangeNotifier {
       name: 'Ocean',
       nameEn: 'Dark Blue',
       nameFa: 'آبی تیره',
-      emoji: '🔵',
+      emoji: '🌊',
       colors: ThemeColors.oceanTheme(),
     ),
     AppThemeModel(
@@ -46,15 +46,15 @@ class ThemeProvider with ChangeNotifier {
       name: 'Sunset',
       nameEn: 'Dark Purple',
       nameFa: 'بنفش تیره',
-      emoji: '🟣',
+      emoji: '🌅',
       colors: ThemeColors.sunsetTheme(),
     ),
     AppThemeModel(
       id: 'forest',
-      name: 'Forest',
+      name: 'Fire',
       nameEn: 'Dark Red',
       nameFa: 'قرمز تیره',
-      emoji: '🔴',
+      emoji: '🔥',
       colors: ThemeColors.forestTheme(),
     ),
   ];

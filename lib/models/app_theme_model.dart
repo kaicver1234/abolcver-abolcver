@@ -107,14 +107,14 @@ class ThemeColors {
     this.cardOpacity = 0.08,
   });
 
-  // Default Dark Theme (Current - Green/Purple)
+  // Dark Green Theme - Fresh & Modern
   factory ThemeColors.defaultTheme() => ThemeColors(
-    backgroundColor: 0xFF0a0a0f,
+    backgroundColor: 0xFF0a0e14,
     surfaceColor: 0xFFFFFFFF,
     cardColor: 0xFFFFFFFF,
     primaryColor: 0xFF10b981,
     secondaryColor: 0xFFa78bfa,
-    accentColor: 0xFF06b6d4,
+    accentColor: 0xFF34d399,
     textPrimaryColor: 0xFFFFFFFF,
     textSecondaryColor: 0xFFFFFFFF,
     successColor: 0xFF10b981,
@@ -122,7 +122,7 @@ class ThemeColors {
     warningColor: 0xFFfbbf24,
     timerColor: 0xFF10b981,
     downloadColor: 0xFF10b981,
-    uploadColor: 0xFF06b6d4,
+    uploadColor: 0xFF34d399,
     borderColor: 0xFFFFFFFF,
     dividerColor: 0xFFFFFFFF,
     backgroundOpacity: 1.0,
@@ -130,44 +130,44 @@ class ThemeColors {
     cardOpacity: 0.08,
   );
 
-  // Light Theme - Soft and comfortable for eyes
+  // Light Theme - Soft & Eye-Friendly
   factory ThemeColors.lightTheme() => ThemeColors(
-    backgroundColor: 0xFFf8f9fb,
+    backgroundColor: 0xFFf5f5f5, // Soft gray (warm and comfortable)
     surfaceColor: 0xFF1e293b,
-    cardColor: 0xFFFFFFFF,
-    primaryColor: 0xFF10b981,
-    secondaryColor: 0xFFa78bfa,
-    accentColor: 0xFF06b6d4,
-    textPrimaryColor: 0xFF0f172a,
-    textSecondaryColor: 0xFF475569,
-    successColor: 0xFF10b981,
-    errorColor: 0xFFef4444,
-    warningColor: 0xFFf59e0b,
-    timerColor: 0xFF10b981,
-    downloadColor: 0xFF10b981,
-    uploadColor: 0xFF06b6d4,
-    borderColor: 0xFFcbd5e1,
-    dividerColor: 0xFFe2e8f0,
+    cardColor: 0xFFfefefe, // Off-white
+    primaryColor: 0xFF059669, // Emerald green
+    secondaryColor: 0xFF7c3aed, // Deep purple
+    accentColor: 0xFF10b981, // Light emerald
+    textPrimaryColor: 0xFF1f2937, // Dark gray (not black)
+    textSecondaryColor: 0xFF6b7280, // Medium gray
+    successColor: 0xFF059669,
+    errorColor: 0xFFdc2626,
+    warningColor: 0xFFea580c,
+    timerColor: 0xFF059669,
+    downloadColor: 0xFF059669,
+    uploadColor: 0xFF10b981,
+    borderColor: 0xFFd1d5db,
+    dividerColor: 0xFFe5e7eb,
     backgroundOpacity: 1.0,
-    surfaceOpacity: 0.03,
+    surfaceOpacity: 0.04,
     cardOpacity: 1.0,
   );
 
-  // Blue Theme - Same structure, blue colors
+  // Dark Blue Theme - Professional & Calm
   factory ThemeColors.oceanTheme() => ThemeColors(
-    backgroundColor: 0xFF0a0a0f,
+    backgroundColor: 0xFF0a1628,
     surfaceColor: 0xFFFFFFFF,
     cardColor: 0xFFFFFFFF,
-    primaryColor: 0xFF3b82f6,
-    secondaryColor: 0xFF8b5cf6,
+    primaryColor: 0xFF0ea5e9,
+    secondaryColor: 0xFF6366f1,
     accentColor: 0xFF06b6d4,
     textPrimaryColor: 0xFFFFFFFF,
     textSecondaryColor: 0xFFFFFFFF,
-    successColor: 0xFF3b82f6,
+    successColor: 0xFF0ea5e9,
     errorColor: 0xFFef4444,
     warningColor: 0xFFfbbf24,
-    timerColor: 0xFF3b82f6,
-    downloadColor: 0xFF3b82f6,
+    timerColor: 0xFF0ea5e9,
+    downloadColor: 0xFF0ea5e9,
     uploadColor: 0xFF06b6d4,
     borderColor: 0xFFFFFFFF,
     dividerColor: 0xFFFFFFFF,
@@ -176,14 +176,14 @@ class ThemeColors {
     cardOpacity: 0.08,
   );
 
-  // Purple Theme - Same structure, purple colors
+  // Dark Purple Theme - Vibrant & Energetic
   factory ThemeColors.sunsetTheme() => ThemeColors(
-    backgroundColor: 0xFF0a0a0f,
+    backgroundColor: 0xFF1a0a1e,
     surfaceColor: 0xFFFFFFFF,
     cardColor: 0xFFFFFFFF,
     primaryColor: 0xFFa855f7,
     secondaryColor: 0xFFec4899,
-    accentColor: 0xFF8b5cf6,
+    accentColor: 0xFFf472b6,
     textPrimaryColor: 0xFFFFFFFF,
     textSecondaryColor: 0xFFFFFFFF,
     successColor: 0xFFa855f7,
@@ -199,22 +199,22 @@ class ThemeColors {
     cardOpacity: 0.08,
   );
 
-  // Red Theme - Same structure, red colors
+  // Dark Red Theme - Bold & Powerful
   factory ThemeColors.forestTheme() => ThemeColors(
-    backgroundColor: 0xFF0a0a0f,
+    backgroundColor: 0xFF1a0a0a,
     surfaceColor: 0xFFFFFFFF,
     cardColor: 0xFFFFFFFF,
-    primaryColor: 0xFFef4444,
-    secondaryColor: 0xFFf97316,
+    primaryColor: 0xFFff3b3b,
+    secondaryColor: 0xFFff6b35,
     accentColor: 0xFFfbbf24,
     textPrimaryColor: 0xFFFFFFFF,
     textSecondaryColor: 0xFFFFFFFF,
-    successColor: 0xFFef4444,
-    errorColor: 0xFFef4444,
+    successColor: 0xFFff3b3b,
+    errorColor: 0xFFdc2626,
     warningColor: 0xFFfbbf24,
-    timerColor: 0xFFef4444,
-    downloadColor: 0xFFef4444,
-    uploadColor: 0xFFf97316,
+    timerColor: 0xFFff3b3b,
+    downloadColor: 0xFFff3b3b,
+    uploadColor: 0xFFff6b35,
     borderColor: 0xFFFFFFFF,
     dividerColor: 0xFFFFFFFF,
     backgroundOpacity: 1.0,
