@@ -237,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w700),
                   children: [
                     TextSpan(text: 'Tiksar', style: TextStyle(color: Color(colors.textPrimaryColor))),
-                    TextSpan(text: 'VPN', style: TextStyle(color: Color(colors.secondaryColor))),
+                    const TextSpan(text: 'VPN', style: TextStyle(color: Color(0xFFef4444))),
                   ],
                 ),
               ),
@@ -471,9 +471,9 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           ),
           // 3 expanding rings for connecting state
           if (_isConnecting) ...[
-            _buildExpandingRing(buttonSize, glowColor, 0),
-            _buildExpandingRing(buttonSize, glowColor, 600),
-            _buildExpandingRing(buttonSize, glowColor, 1200),
+            _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 0),
+            _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 600),
+            _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 1200),
           ],
           // Main button
           AnimatedContainer(
@@ -512,41 +512,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           ),
         ],
       ),
-    );
-  }
-
-  // Expanding ring animation - starts from button and expands outward
-  Widget _buildExpandingRing(double buttonSize, Color color, int delayMs) {
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0.0, end: 1.0),
-      duration: const Duration(milliseconds: 1800),
-      builder: (context, value, child) {
-        // Wait for delay before starting
-        final adjustedValue = (value * 1800 - delayMs) / 1800;
-        if (adjustedValue < 0) return const SizedBox.shrink();
-        
-        final clampedValue = adjustedValue.clamp(0.0, 1.0);
-        
-        return Opacity(
-          opacity: (1 - clampedValue) * 0.6,
-          child: Container(
-            width: buttonSize + (clampedValue * 80),
-            height: buttonSize + (clampedValue * 80),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: color,
-                width: 2.5,
-              ),
-            ),
-          ),
-        );
-      },
-      onEnd: () {
-        if (mounted && _isConnecting) {
-          setState(() {});
-        }
-      },
     );
   }
 
@@ -1221,6 +1186,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           // Social Links with hover effect
           _buildAnimatedSocialLink(
             icon: Icons.send_rounded,
+            name: 'Telegram',
             title: remoteConfig.telegramId,
             color: const Color(0xFF0088CC),
             url: remoteConfig.telegramUrl,
@@ -1229,6 +1195,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           SizedBox(height: isSmallScreen ? 10 : 12),
           _buildAnimatedSocialLink(
             icon: Icons.camera_alt_rounded,
+            name: 'Instagram',
             title: remoteConfig.instagramId,
             color: const Color(0xFFE1306C),
             url: remoteConfig.instagramUrl,
@@ -1236,27 +1203,15 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           ),
           SizedBox(height: isSmallScreen ? 10 : 12),
           _buildAnimatedSocialLink(
-            icon: Icons.camera_alt_rounded,
+            icon: Icons.location_city_rounded,
+            name: 'Tiksar Village',
             title: remoteConfig.tiksarPageId,
             color: const Color(0xFF833AB4),
             url: remoteConfig.tiksarPageUrl,
             isSmallScreen: isSmallScreen,
           ),
           
-          SizedBox(height: isSmallScreen ? 28 : 36),
-          
-          // Features with gradient backgrounds
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildAnimatedFeature(Icons.security, Color(colors.primaryColor), isSmallScreen),
-              _buildAnimatedFeature(Icons.flash_on, Color(colors.warningColor), isSmallScreen),
-              _buildAnimatedFeature(Icons.public, Color(colors.accentColor), isSmallScreen),
-              _buildAnimatedFeature(Icons.verified_user, Color(colors.secondaryColor), isSmallScreen),
-            ],
-          ),
-          
-          SizedBox(height: isSmallScreen ? 32 : 40),
+          SizedBox(height: isSmallScreen ? 24 : 32),
           
           // Copyright with icon
           Row(
@@ -1290,6 +1245,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   Widget _buildAnimatedSocialLink({
     required IconData icon,
+    required String name,
     required String title,
     required Color color,
     required String url,
@@ -1340,14 +1296,29 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 ),
                 SizedBox(width: isSmallScreen ? 12 : 16),
                 Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: Color(colors.textPrimaryColor),
-                      fontSize: isSmallScreen ? 14 : 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                    overflow: TextOverflow.ellipsis,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: TextStyle(
+                          color: Color(colors.textPrimaryColor),
+                          fontSize: isSmallScreen ? 14 : 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        title,
+                        style: TextStyle(
+                          color: Color(colors.textSecondaryColor).withValues(alpha: 0.6),
+                          fontSize: isSmallScreen ? 12 : 13,
+                          fontWeight: FontWeight.w400,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
                 ),
                 Container(
@@ -1369,50 +1340,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       },
     );
   }
-
-  Widget _buildAnimatedFeature(IconData icon, Color color, bool isSmallScreen) {
-    return TweenAnimationBuilder(
-      tween: Tween<double>(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 800),
-      builder: (context, value, child) {
-        final size = isSmallScreen ? 56.0 : 64.0;
-        final iconSize = isSmallScreen ? 26.0 : 30.0;
-        
-        return Transform.scale(
-          scale: 0.8 + (0.2 * value),
-          child: Container(
-            width: size,
-            height: size,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  color.withValues(alpha: 0.2),
-                  color.withValues(alpha: 0.1),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(isSmallScreen ? 16 : 18),
-              border: Border.all(
-                color: color.withValues(alpha: 0.3),
-                width: 1.5,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.2 * value),
-                  blurRadius: isSmallScreen ? 10 : 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Icon(icon, color: color, size: iconSize),
-          ),
-        );
-      },
-    );
-  }
-
-
 
   Widget _buildBottomNav() {
     final themeProvider = Provider.of<ThemeProvider>(context);
@@ -1522,6 +1449,77 @@ class _BeatingHeartState extends State<_BeatingHeart>
             Icons.favorite,
             color: Color(0xFFef4444),
             size: 16,
+          ),
+        );
+      },
+    );
+  }
+}
+
+// Separate StatefulWidget for expanding ring to avoid freeze
+class _ExpandingRing extends StatefulWidget {
+  final double buttonSize;
+  final Color color;
+  final int delayMs;
+
+  const _ExpandingRing({
+    required this.buttonSize,
+    required this.color,
+    required this.delayMs,
+  });
+
+  @override
+  State<_ExpandingRing> createState() => _ExpandingRingState();
+}
+
+class _ExpandingRingState extends State<_ExpandingRing>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+    );
+    
+    // Start with delay
+    Future.delayed(Duration(milliseconds: widget.delayMs), () {
+      if (mounted) {
+        _controller.repeat();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Opacity(
+          opacity: (1 - _animation.value) * 0.5,
+          child: Container(
+            width: widget.buttonSize + (_animation.value * 100),
+            height: widget.buttonSize + (_animation.value * 100),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: widget.color,
+                width: 2,
+              ),
+            ),
           ),
         );
       },

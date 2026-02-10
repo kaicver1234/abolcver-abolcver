@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -24,61 +23,44 @@ class CyberGlowBackground extends StatelessWidget {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, _) {
         final colors = themeProvider.colors;
+        final themeId = themeProvider.currentTheme.id;
         final baseColor = Color(colors.backgroundColor);
-        final centerDarkColor = Color(colors.backgroundColor).withValues(alpha: 0.95);
-        final isLightTheme = themeProvider.currentTheme.id == 'light';
         
         return AnnotatedRegion<SystemUiOverlayStyle>(
-          value: isLightTheme 
-              ? SystemUiOverlayStyle.dark.copyWith(
-                  statusBarColor: Colors.transparent,
-                  systemNavigationBarColor: baseColor,
-                )
-              : SystemUiOverlayStyle.light.copyWith(
-                  statusBarColor: Colors.transparent,
-                  systemNavigationBarColor: baseColor,
-                ),
+          value: SystemUiOverlayStyle.light.copyWith(
+            statusBarColor: Colors.transparent,
+            systemNavigationBarColor: baseColor,
+          ),
           child: Scaffold(
             backgroundColor: baseColor,
             body: Stack(
               children: [
-                // Layer 1: Base background
-                ColoredBox(
-                  color: baseColor,
-                  child: const SizedBox.expand(),
+                // Layer 1: Base background (very dark)
+                const ColoredBox(
+                  color: Color(0xFF050505),
+                  child: SizedBox.expand(),
                 ),
                 
-                // Layer 2: Center gradient (lighter for light theme)
-                if (!isLightTheme)
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: const Alignment(0.0, -0.2),
-                          radius: 1.5,
-                          colors: [centerDarkColor, baseColor],
-                          stops: const [0.0, 0.7],
-                        ),
-                      ),
-                    ),
-                  ),
-                
-                // Layer 3: Top glow (subtle for light theme)
+                // Layer 2: Bottom glow (theme-specific gradient from bottom)
                 Positioned(
-                  top: -150,
+                  bottom: 0,
                   left: 0,
                   right: 0,
-                  child: _buildTopGlow(colors, isLightTheme),
+                  child: _buildBottomGlow(context, colors, themeId),
                 ),
                 
-                // Layer 4: Bottom glow (very subtle for light theme)
-                if (showBottomGlow)
-                  Positioned(
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    child: _buildBottomGlow(context, colors, isLightTheme),
-                  ),
+                // Layer 3: Center fade (dark gradient to top)
+                Positioned.fill(
+                  child: _buildCenterFade(),
+                ),
+                
+                // Layer 4: Top dim (solid dark)
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: _buildTopDim(context),
+                ),
                 
                 // Content
                 child,
@@ -90,81 +72,121 @@ class CyberGlowBackground extends StatelessWidget {
     );
   }
 
-  Widget _buildTopGlow(colors, bool isLightTheme) {
-    final glowColor = isLightTheme
-        ? Color(colors.primaryColor).withValues(alpha: 0.03)
-        : Color(colors.secondaryColor).withValues(
-            alpha: enableBlur ? 0.08 : 0.12,
-          );
+  Widget _buildBottomGlow(BuildContext context, colors, String themeId) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final bottomHeight = screenHeight * 0.5;
     
-    final gradient = RadialGradient(
-      center: const Alignment(0.0, -0.4),
-      radius: 0.9,
-      colors: [glowColor, Colors.transparent],
-      stops: const [0.0, 0.6],
-    );
-
-    final glowGradient = SizedBox(
-      height: 450,
-      child: DecoratedBox(
-        decoration: BoxDecoration(gradient: gradient),
+    // Different gradient colors based on theme
+    List<Color> gradientColors;
+    
+    switch (themeId) {
+      case 'default': // Dark Red
+        gradientColors = const [
+          Color.fromRGBO(60, 5, 15, 0.55),
+          Color.fromRGBO(70, 8, 18, 0.45),
+          Color.fromRGBO(80, 10, 22, 0.36),
+          Color.fromRGBO(90, 12, 26, 0.28),
+          Color.fromRGBO(100, 14, 30, 0.20),
+          Color.fromRGBO(110, 16, 34, 0.12),
+          Color.fromRGBO(120, 18, 38, 0.06),
+          Color.fromRGBO(130, 20, 42, 0.03),
+          Colors.transparent,
+        ];
+        break;
+      case 'ocean': // Dark Blue
+        gradientColors = const [
+          Color.fromRGBO(5, 15, 60, 0.55),
+          Color.fromRGBO(8, 18, 70, 0.45),
+          Color.fromRGBO(10, 22, 80, 0.36),
+          Color.fromRGBO(12, 26, 90, 0.28),
+          Color.fromRGBO(14, 30, 100, 0.20),
+          Color.fromRGBO(16, 34, 110, 0.12),
+          Color.fromRGBO(18, 38, 120, 0.06),
+          Color.fromRGBO(20, 42, 130, 0.03),
+          Colors.transparent,
+        ];
+        break;
+      case 'sunset': // Dark Purple
+        gradientColors = const [
+          Color.fromRGBO(40, 5, 50, 0.55),
+          Color.fromRGBO(50, 8, 60, 0.45),
+          Color.fromRGBO(60, 10, 70, 0.36),
+          Color.fromRGBO(70, 12, 80, 0.28),
+          Color.fromRGBO(80, 14, 90, 0.20),
+          Color.fromRGBO(90, 16, 100, 0.12),
+          Color.fromRGBO(100, 18, 110, 0.06),
+          Color.fromRGBO(110, 20, 120, 0.03),
+          Colors.transparent,
+        ];
+        break;
+      case 'forest': // Dark Green
+        gradientColors = const [
+          Color.fromRGBO(5, 60, 15, 0.55),
+          Color.fromRGBO(8, 70, 18, 0.45),
+          Color.fromRGBO(10, 80, 22, 0.36),
+          Color.fromRGBO(12, 90, 26, 0.28),
+          Color.fromRGBO(14, 100, 30, 0.20),
+          Color.fromRGBO(16, 110, 34, 0.12),
+          Color.fromRGBO(18, 120, 38, 0.06),
+          Color.fromRGBO(20, 130, 42, 0.03),
+          Colors.transparent,
+        ];
+        break;
+      default:
+        gradientColors = const [
+          Color.fromRGBO(60, 5, 15, 0.55),
+          Color.fromRGBO(70, 8, 18, 0.45),
+          Color.fromRGBO(80, 10, 22, 0.36),
+          Color.fromRGBO(90, 12, 26, 0.28),
+          Color.fromRGBO(100, 14, 30, 0.20),
+          Color.fromRGBO(110, 16, 34, 0.12),
+          Color.fromRGBO(120, 18, 38, 0.06),
+          Color.fromRGBO(130, 20, 42, 0.03),
+          Colors.transparent,
+        ];
+    }
+    
+    return Container(
+      height: bottomHeight,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: gradientColors,
+          stops: const [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
+        ),
       ),
     );
-
-    // Only apply blur if enabled (expensive operation)
-    if (enableBlur && !isLightTheme) {
-      return ClipRect(
-        child: BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: 30,
-            sigmaY: 30,
-            tileMode: TileMode.clamp,
-          ),
-          child: glowGradient,
-        ),
-      );
-    }
-
-    return glowGradient;
   }
 
-  Widget _buildBottomGlow(BuildContext context, colors, bool isLightTheme) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final screenHeight = MediaQuery.sizeOf(context).height;
-        final bottomHeight = screenHeight * 0.45;
-        
-        final bottomGradient = isLightTheme
-            ? RadialGradient(
-                center: const Alignment(0.0, 1.0),
-                radius: 1.2,
-                colors: [
-                  Color(colors.primaryColor).withValues(alpha: 0.02),
-                  Color(colors.secondaryColor).withValues(alpha: 0.015),
-                  Colors.transparent,
-                ],
-                stops: const [0.0, 0.5, 1.0],
-              )
-            : RadialGradient(
-                center: const Alignment(0.0, 1.0),
-                radius: 1.2,
-                colors: [
-                  Color(colors.primaryColor).withValues(alpha: 0.08),
-                  Color(colors.primaryColor).withValues(alpha: 0.05),
-                  Color(colors.accentColor).withValues(alpha: 0.04),
-                  Color(colors.primaryColor).withValues(alpha: 0.02),
-                  Colors.transparent,
-                ],
-                stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
-              );
-        
-        return SizedBox(
-          height: bottomHeight,
-          child: DecoratedBox(
-            decoration: BoxDecoration(gradient: bottomGradient),
-          ),
-        );
-      },
+  Widget _buildCenterFade() {
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.bottomCenter,
+          end: Alignment.topCenter,
+          colors: [
+            Colors.transparent,
+            Colors.transparent,
+            Color.fromRGBO(5, 5, 5, 0.4),
+            Color.fromRGBO(5, 5, 5, 0.75),
+            Color.fromRGBO(5, 5, 5, 0.92),
+            Color.fromRGBO(5, 5, 5, 1),
+            Color.fromRGBO(5, 5, 5, 1),
+          ],
+          stops: [0.0, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTopDim(BuildContext context) {
+    final screenHeight = MediaQuery.sizeOf(context).height;
+    final topHeight = screenHeight * 0.5;
+    
+    return Container(
+      height: topHeight,
+      color: const Color(0xFF050505),
     );
   }
 }

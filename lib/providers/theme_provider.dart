@@ -6,9 +6,9 @@ class ThemeProvider with ChangeNotifier {
   AppThemeModel _currentTheme = AppThemeModel(
     id: 'default',
     name: 'Default',
-    nameEn: 'Dark Green',
-    nameFa: 'سبز تیره',
-    emoji: '💚',
+    nameEn: 'Dark Red',
+    nameFa: 'قرمز تیره',
+    emoji: '🔥',
     colors: ThemeColors.defaultTheme(),
   );
 
@@ -20,18 +20,10 @@ class ThemeProvider with ChangeNotifier {
     AppThemeModel(
       id: 'default',
       name: 'Default',
-      nameEn: 'Dark Green',
-      nameFa: 'سبز تیره',
-      emoji: '💚',
+      nameEn: 'Dark Red',
+      nameFa: 'قرمز تیره',
+      emoji: '🔥',
       colors: ThemeColors.defaultTheme(),
-    ),
-    AppThemeModel(
-      id: 'light',
-      name: 'Light',
-      nameEn: 'Light Mode',
-      nameFa: 'حالت روشن',
-      emoji: '☀️',
-      colors: ThemeColors.lightTheme(),
     ),
     AppThemeModel(
       id: 'ocean',
@@ -51,10 +43,10 @@ class ThemeProvider with ChangeNotifier {
     ),
     AppThemeModel(
       id: 'forest',
-      name: 'Fire',
-      nameEn: 'Dark Red',
-      nameFa: 'قرمز تیره',
-      emoji: '🔥',
+      name: 'Forest',
+      nameEn: 'Dark Green',
+      nameFa: 'سبز تیره',
+      emoji: '💚',
       colors: ThemeColors.forestTheme(),
     ),
   ];

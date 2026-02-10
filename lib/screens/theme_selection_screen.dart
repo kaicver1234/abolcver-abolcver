@@ -171,22 +171,15 @@ class ThemeSelectionScreen extends StatelessWidget {
               SizedBox(width: isSmallScreen ? 14 : 16),
               // Theme info
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      themeName,
-                      style: TextStyle(
-                        color: Color(currentColors.textPrimaryColor),
-                        fontSize: isSmallScreen ? 15 : 17,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    SizedBox(height: isSmallScreen ? 6 : 8),
-                    _buildColorPalette(themeColors, isSmallScreen),
-                  ],
+                child: Text(
+                  themeName,
+                  style: TextStyle(
+                    color: Color(currentColors.textPrimaryColor),
+                    fontSize: isSmallScreen ? 15 : 17,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
               // Selection indicator
@@ -223,87 +216,24 @@ class ThemeSelectionScreen extends StatelessWidget {
   Widget _buildThemePreview(ThemeColors colors, bool isSmallScreen) {
     final size = isSmallScreen ? 50.0 : 55.0;
     
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        // Glow effect
-        Container(
-          width: size + 8,
-          height: size + 8,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: Color(colors.primaryColor).withValues(alpha: 0.3),
-                blurRadius: 15,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-        ),
-        // Main circle
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(colors.primaryColor).withValues(alpha: 0.6),
-                Color(colors.secondaryColor).withValues(alpha: 0.4),
-              ],
-            ),
-            border: Border.all(
-              color: Color(colors.primaryColor).withValues(alpha: 0.5),
-              width: 2,
-            ),
-          ),
-          child: Center(
-            child: Container(
-              width: size * 0.35,
-              height: size * 0.35,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Color(colors.primaryColor),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildColorPalette(ThemeColors colors, bool isSmallScreen) {
-    final colorSize = isSmallScreen ? 16.0 : 18.0;
-    final spacing = isSmallScreen ? 6.0 : 8.0;
-    
-    return Row(
-      children: [
-        _buildColorDot(Color(colors.primaryColor), colorSize),
-        SizedBox(width: spacing),
-        _buildColorDot(Color(colors.secondaryColor), colorSize),
-        SizedBox(width: spacing),
-        _buildColorDot(Color(colors.accentColor), colorSize),
-        SizedBox(width: spacing),
-        _buildColorDot(Color(colors.successColor), colorSize),
-      ],
-    );
-  }
-
-  Widget _buildColorDot(Color color, double size) {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
+        borderRadius: BorderRadius.circular(14),
+        gradient: LinearGradient(
+          begin: Alignment.bottomLeft,
+          end: Alignment.topRight,
+          colors: [
+            Color(colors.primaryColor),
+            Color(colors.secondaryColor),
+          ],
+        ),
         boxShadow: [
           BoxShadow(
-            color: color.withValues(alpha: 0.4),
-            blurRadius: 4,
-            spreadRadius: 1,
+            color: Color(colors.primaryColor).withValues(alpha: 0.4),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
