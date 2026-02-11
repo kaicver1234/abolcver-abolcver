@@ -442,8 +442,6 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     final double buttonSize = screenHeight < 700 ? 130 : 150;
     final double glowSize = screenHeight < 700 ? 170 : 200;
     final double iconSize = screenHeight < 700 ? 45 : 55;
-    // Container size to hold all animations without layout shift
-    final double containerSize = screenHeight < 700 ? 200 : 240;
     
     // Colors based on state
     final Color buttonColor;
@@ -462,73 +460,99 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     
     return GestureDetector(
       onTap: _isConnecting ? null : _handleConnectionToggle,
-      child: SizedBox(
-        width: containerSize,
-        height: containerSize,
-        child: Stack(
-          alignment: Alignment.center,
-          clipBehavior: Clip.none,
-          children: [
-            // Glow effect - only show when connected or connecting
-            if (isConnected || _isConnecting)
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 400),
-                width: glowSize,
-                height: glowSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: glowColor.withValues(alpha: isConnected || _isConnecting ? 0.4 : 0.2),
-                      blurRadius: 60,
-                      spreadRadius: 10,
-                    ),
-                  ],
-                ),
-              ),
-            // 3 expanding rings for connecting state
-            if (_isConnecting) ...[
-              _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 0),
-              _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 600),
-              _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 1200),
-            ],
-            // Main button
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Glow effect - only show when connected or connecting
+          if (isConnected || _isConnecting)
             AnimatedContainer(
               duration: const Duration(milliseconds: 400),
-              width: buttonSize,
-              height: buttonSize,
+              width: glowSize,
+              height: glowSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    buttonColor.withValues(alpha: 0.6),
-                    buttonColor.withValues(alpha: 0.4),
-                  ],
-                ),
-                border: Border.all(
-                  color: buttonColor.withValues(alpha: 0.5),
-                  width: 2,
-                ),
-                boxShadow: (isConnected || _isConnecting) ? [
+                boxShadow: [
                   BoxShadow(
-                    color: buttonColor.withValues(alpha: 0.35),
-                    blurRadius: 30,
-                    spreadRadius: 2,
+                    color: glowColor.withValues(alpha: isConnected || _isConnecting ? 0.4 : 0.2),
+                    blurRadius: 60,
+                    spreadRadius: 10,
                   ),
-                ] : [], // No shadow when disconnected
-              ),
-              child: Center(
-                child: Icon(
-                  Icons.power_settings_new,
-                  size: iconSize,
-                  color: Colors.white.withValues(alpha: _isConnecting ? 0.9 : (isConnected ? 1.0 : 0.6)),
-                ),
+                ],
               ),
             ),
-          ],
-        ),
+          // Simple pulsing animation for connecting state
+          if (_isConnecting)
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.95, end: 1.05),
+              duration: const Duration(milliseconds: 800),
+              curve: Curves.easeInOut,
+              builder: (context, value, child) {
+                return Transform.scale(
+                  scale: value,
+                  child: Container(
+                    width: buttonSize,
+                    height: buttonSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: glowColor.withValues(alpha: 0.3),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                );
+              },
+              onEnd: () {
+                if (mounted && _isConnecting) {
+                  setState(() {}); // Trigger rebuild to restart animation
+                }
+              },
+            ),
+          // Main button
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 400),
+            width: buttonSize,
+            height: buttonSize,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  buttonColor.withValues(alpha: 0.6),
+                  buttonColor.withValues(alpha: 0.4),
+                ],
+              ),
+              border: Border.all(
+                color: buttonColor.withValues(alpha: 0.5),
+                width: 2,
+              ),
+              boxShadow: (isConnected || _isConnecting) ? [
+                BoxShadow(
+                  color: buttonColor.withValues(alpha: 0.35),
+                  blurRadius: 30,
+                  spreadRadius: 2,
+                ),
+              ] : [], // No shadow when disconnected
+            ),
+            child: Center(
+              child: _isConnecting
+                  ? SizedBox(
+                      width: iconSize * 0.6,
+                      height: iconSize * 0.6,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    )
+                  : Icon(
+                      Icons.power_settings_new,
+                      size: iconSize,
+                      color: Colors.white.withValues(alpha: isConnected ? 1.0 : 0.6),
+                    ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1498,77 +1522,6 @@ class _BeatingHeartState extends State<_BeatingHeart>
             Icons.favorite,
             color: Color(0xFFef4444),
             size: 16,
-          ),
-        );
-      },
-    );
-  }
-}
-
-// Separate StatefulWidget for expanding ring to avoid freeze
-class _ExpandingRing extends StatefulWidget {
-  final double buttonSize;
-  final Color color;
-  final int delayMs;
-
-  const _ExpandingRing({
-    required this.buttonSize,
-    required this.color,
-    required this.delayMs,
-  });
-
-  @override
-  State<_ExpandingRing> createState() => _ExpandingRingState();
-}
-
-class _ExpandingRingState extends State<_ExpandingRing>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2000),
-    );
-    
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeOut),
-    );
-    
-    // Start with delay
-    Future.delayed(Duration(milliseconds: widget.delayMs), () {
-      if (mounted) {
-        _controller.repeat();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Opacity(
-          opacity: (1 - _animation.value) * 0.5,
-          child: Container(
-            width: widget.buttonSize + (_animation.value * 100),
-            height: widget.buttonSize + (_animation.value * 100),
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: widget.color,
-                width: 2,
-              ),
-            ),
           ),
         );
       },
