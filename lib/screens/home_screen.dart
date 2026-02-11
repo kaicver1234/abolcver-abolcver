@@ -397,10 +397,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
 
   Widget _buildVPNTab(V2RayProvider provider) {
     final screenHeight = MediaQuery.of(context).size.height;
+    final screenWidth = MediaQuery.of(context).size.width;
     final verticalPadding = screenHeight < 700 ? 12.0 : 20.0;
     final horizontalPadding = screenHeight < 700 ? 16.0 : 20.0;
-    // Responsive status section height
-    final statusSectionHeight = screenHeight < 700 ? 78.0 : 86.0;
+    
+    // Responsive dimensions based on screen size
+    final isSmallScreen = screenHeight < 700 || screenWidth < 360;
+    final statusSectionHeight = isSmallScreen ? 75.0 : 86.0;
+    final serverCardHeight = isSmallScreen ? 82.0 : 88.0;
     
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -415,10 +419,10 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             // Fixed height container to prevent layout shift
             SizedBox(
               height: statusSectionHeight,
-              child: _buildStatusSection(provider),
+              child: _buildStatusSection(provider, isSmallScreen),
             ),
             SizedBox(height: screenHeight < 700 ? 16 : 24),
-            _buildServerCard(provider),
+            _buildServerCard(provider, serverCardHeight, isSmallScreen),
             if (provider.activeConfig != null) ...[
               SizedBox(height: screenHeight < 700 ? 12 : 16),
               _buildStatsCard(provider),
@@ -522,10 +526,12 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     );
   }
 
-  Widget _buildStatusSection(V2RayProvider provider) {
+  Widget _buildStatusSection(V2RayProvider provider, bool isSmallScreen) {
     final isConnected = provider.activeConfig != null;
     final screenHeight = MediaQuery.of(context).size.height;
     final timerFontSize = screenHeight < 700 ? 28.0 : 34.0;
+    final badgeWidth = isSmallScreen ? 130.0 : 140.0;
+    final badgeFontSize = isSmallScreen ? 13.0 : 14.0;
     
     // Always return a container with fixed height to prevent layout shift
     return Center(
@@ -535,9 +541,12 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           if (isConnected || _isConnecting) ...[
             // Status badge with fixed width to prevent jumping
             SizedBox(
-              width: 140, // Fixed width to prevent text change from causing layout shift
+              width: badgeWidth,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 14 : 18,
+                  vertical: isSmallScreen ? 8 : 10,
+                ),
                 decoration: BoxDecoration(
                   color: isConnected 
                       ? const Color(0xFF10b981).withValues(alpha: 0.12)
@@ -554,8 +563,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Container(
-                      width: 8,
-                      height: 8,
+                      width: isSmallScreen ? 7 : 8,
+                      height: isSmallScreen ? 7 : 8,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: isConnected ? const Color(0xFF10b981) : const Color(0xFFfbbf24),
@@ -567,14 +576,14 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: isSmallScreen ? 6 : 8),
                     Text(
                       isConnected 
                           ? AppLocalizations.of(context).translate('home.connected')
                           : AppLocalizations.of(context).translate('home.connecting'),
                       style: TextStyle(
                         color: isConnected ? const Color(0xFF10b981) : const Color(0xFFfbbf24),
-                        fontSize: 14,
+                        fontSize: badgeFontSize,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -582,7 +591,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 ),
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: isSmallScreen ? 6 : 8),
             // Timer - always reserve space even when connecting
             SizedBox(
               height: timerFontSize + 4, // Fixed height for timer
@@ -608,7 +617,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     );
   }
 
-  Widget _buildServerCard(V2RayProvider provider) {
+  Widget _buildServerCard(V2RayProvider provider, double cardHeight, bool isSmallScreen) {
     final isSmartConnect = provider.wasUsingSmartConnect;
     final selectedConfig = provider.selectedConfig ?? provider.activeConfig;
     
@@ -629,10 +638,18 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       serverName = AppLocalizations.of(context).translate('server_selection.select_server');
     }
     
+    final iconSize = isSmallScreen ? 48.0 : 52.0;
+    final titleFontSize = isSmallScreen ? 15.0 : 16.0;
+    final subtitleFontSize = isSmallScreen ? 12.0 : 13.0;
+    final subtitleHeight = isSmallScreen ? 16.0 : 18.0;
+    final cardPadding = isSmallScreen ? 16.0 : 18.0;
+    
     return GestureDetector(
       onTap: () => _onServerCardTap(provider),
       child: Container(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(cardPadding),
+        // Fixed height to prevent layout shift
+        height: cardHeight,
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.03),
           border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
@@ -641,46 +658,54 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         child: Row(
           children: [
             // Icon/Flag
-            _buildServerIcon(countryCode, isSmartConnect && provider.activeConfig == null),
-            const SizedBox(width: 14),
+            _buildServerIcon(countryCode, isSmartConnect && provider.activeConfig == null, iconSize),
+            SizedBox(width: isSmallScreen ? 12 : 14),
             // Details
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
                     serverName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.white,
-                      fontSize: 16,
+                      fontSize: titleFontSize,
                       fontWeight: FontWeight.w600,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  if (subtitle != null)
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        fontSize: 13,
-                      ),
-                    ),
+                  // Always reserve space for subtitle
+                  SizedBox(
+                    height: subtitleHeight,
+                    child: subtitle != null
+                        ? Text(
+                            subtitle,
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.4),
+                              fontSize: subtitleFontSize,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        : const SizedBox.shrink(),
+                  ),
                 ],
               ),
             ),
-            Icon(Icons.chevron_left, color: Colors.white.withValues(alpha: 0.2), size: 20),
+            Icon(Icons.chevron_left, color: Colors.white.withValues(alpha: 0.2), size: isSmallScreen ? 18 : 20),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildServerIcon(String? countryCode, bool isSmartConnect) {
+  Widget _buildServerIcon(String? countryCode, bool isSmartConnect, double size) {
     if (countryCode != null) {
       return Container(
-        width: 52,
-        height: 52,
+        width: size,
+        height: size,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
@@ -699,7 +724,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             placeholder: (context, url) => Container(color: Colors.white.withValues(alpha: 0.1)),
             errorWidget: (context, url, error) => Container(
               color: const Color(0xFF6366F1).withValues(alpha: 0.2),
-              child: const Icon(Icons.public, color: Color(0xFF6366F1), size: 24),
+              child: Icon(Icons.public, color: const Color(0xFF6366F1), size: size * 0.46),
             ),
           ),
         ),
@@ -707,8 +732,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     }
     
     return Container(
-      width: 52,
-      height: 52,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: isSmartConnect
@@ -720,7 +745,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
       child: Icon(
         isSmartConnect ? Icons.flash_on : Icons.language,
         color: isSmartConnect ? const Color(0xFF10b981) : const Color(0xFF6366f1),
-        size: 26,
+        size: size * 0.5,
       ),
     );
   }

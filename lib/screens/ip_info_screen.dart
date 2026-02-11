@@ -36,7 +36,12 @@ class _IpInfoScreenState extends State<IpInfoScreen> {
     try {
       final response = await http.get(
         Uri.parse('http://ip-api.com/json/?fields=status,message,continent,country,countryCode,region,regionName,city,lat,lon,timezone,isp,org,as,query'),
-      ).timeout(const Duration(seconds: 10));
+      ).timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw Exception('Connection timeout. Please check your internet connection.');
+        },
+      );
 
       if (!mounted) return;
 
@@ -58,14 +63,32 @@ class _IpInfoScreenState extends State<IpInfoScreen> {
       } else {
         if (!mounted) return;
         setState(() {
-          _errorMessage = 'Failed to connect to the server';
+          _errorMessage = 'Server error (${response.statusCode}). Please try again later.';
           _isLoading = false;
         });
       }
+    } on http.ClientException catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'No internet connection. Please check your network settings.';
+        _isLoading = false;
+      });
+    } on FormatException catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Invalid response from server. Please try again.';
+        _isLoading = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'Error: ${e.toString()}';
+        if (e.toString().contains('timeout')) {
+          _errorMessage = 'Connection timeout. Please check your internet connection.';
+        } else if (e.toString().contains('SocketException')) {
+          _errorMessage = 'No internet connection. Please check your network settings.';
+        } else {
+          _errorMessage = 'Unable to fetch IP information. Please try again.';
+        }
         _isLoading = false;
       });
     }
@@ -214,6 +237,22 @@ class _IpInfoScreenState extends State<IpInfoScreen> {
   }
 
   Widget _buildErrorState(colors) {
+    // Determine error icon and color based on error type
+    IconData errorIcon = Icons.wifi_off_rounded;
+    Color iconColor = Color(colors.errorColor);
+    String errorTitle = 'Connection Failed';
+    
+    if (_errorMessage?.contains('internet') == true || _errorMessage?.contains('network') == true) {
+      errorIcon = Icons.wifi_off_rounded;
+      errorTitle = 'No Internet Connection';
+    } else if (_errorMessage?.contains('timeout') == true) {
+      errorIcon = Icons.access_time_rounded;
+      errorTitle = 'Connection Timeout';
+    } else if (_errorMessage?.contains('Server') == true) {
+      errorIcon = Icons.cloud_off_rounded;
+      errorTitle = 'Server Error';
+    }
+    
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
@@ -221,55 +260,137 @@ class _IpInfoScreenState extends State<IpInfoScreen> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(24),
               decoration: BoxDecoration(
-                color: Color(colors.errorColor).withValues(alpha: 0.1),
+                color: iconColor.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
+                border: Border.all(
+                  color: iconColor.withValues(alpha: 0.2),
+                  width: 2,
+                ),
               ),
               child: Icon(
-                Icons.error_outline,
-                size: 48,
-                color: Color(colors.errorColor),
+                errorIcon,
+                size: 56,
+                color: iconColor,
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 28),
             Text(
-              'Connection Failed',
+              errorTitle,
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: Color(colors.textPrimaryColor),
               ),
+              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Text(
               _errorMessage ?? 'Unable to fetch IP information',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Color(colors.textSecondaryColor).withValues(alpha: 0.6),
-                fontSize: 14,
+                color: Color(colors.textSecondaryColor).withValues(alpha: 0.7),
+                fontSize: 15,
+                height: 1.5,
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 36),
             GestureDetector(
               onTap: _fetchIpInfo,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 16),
                 decoration: BoxDecoration(
-                  color: Color(colors.primaryColor),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Try Again',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
+                  gradient: LinearGradient(
+                    colors: [
+                      Color(colors.primaryColor),
+                      Color(colors.secondaryColor),
+                    ],
                   ),
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Color(colors.primaryColor).withValues(alpha: 0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.refresh_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Try Again',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
+            const SizedBox(height: 20),
+            // Tips section
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Color(colors.surfaceColor).withValues(alpha: colors.surfaceOpacity),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Color(colors.borderColor).withValues(alpha: 0.1),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.lightbulb_outline_rounded,
+                        size: 18,
+                        color: Color(colors.warningColor),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Troubleshooting Tips',
+                        style: TextStyle(
+                          color: Color(colors.textPrimaryColor),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildTip(colors, '• Check your internet connection'),
+                  _buildTip(colors, '• Try disabling VPN temporarily'),
+                  _buildTip(colors, '• Restart your device'),
+                ],
+              ),
+            ),
           ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildTip(colors, String text) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: Color(colors.textSecondaryColor).withValues(alpha: 0.6),
+          fontSize: 13,
+          height: 1.4,
         ),
       ),
     );
