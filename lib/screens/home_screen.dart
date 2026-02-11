@@ -268,7 +268,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     final colors = themeProvider.colors;
     final languages = [
       {'name': 'فارسی', 'code': 'fa', 'flag': '🇮🇷'},
-      {'name': 'English', 'code': 'en', 'flag': '🇬🇧'},
+      {'name': 'English', 'code': 'en', 'flag': '🇺🇸'},
     ];
 
     showModalBottomSheet(
@@ -442,6 +442,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     final double buttonSize = screenHeight < 700 ? 130 : 150;
     final double glowSize = screenHeight < 700 ? 170 : 200;
     final double iconSize = screenHeight < 700 ? 45 : 55;
+    // Container size to hold all animations without layout shift
+    final double containerSize = screenHeight < 700 ? 200 : 240;
     
     // Colors based on state
     final Color buttonColor;
@@ -460,68 +462,73 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     
     return GestureDetector(
       onTap: _isConnecting ? null : _handleConnectionToggle,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Glow effect - only show when connected or connecting
-          if (isConnected || _isConnecting)
+      child: SizedBox(
+        width: containerSize,
+        height: containerSize,
+        child: Stack(
+          alignment: Alignment.center,
+          clipBehavior: Clip.none,
+          children: [
+            // Glow effect - only show when connected or connecting
+            if (isConnected || _isConnecting)
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 400),
+                width: glowSize,
+                height: glowSize,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: glowColor.withValues(alpha: isConnected || _isConnecting ? 0.4 : 0.2),
+                      blurRadius: 60,
+                      spreadRadius: 10,
+                    ),
+                  ],
+                ),
+              ),
+            // 3 expanding rings for connecting state
+            if (_isConnecting) ...[
+              _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 0),
+              _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 600),
+              _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 1200),
+            ],
+            // Main button
             AnimatedContainer(
               duration: const Duration(milliseconds: 400),
-              width: glowSize,
-              height: glowSize,
+              width: buttonSize,
+              height: buttonSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: glowColor.withValues(alpha: isConnected || _isConnecting ? 0.4 : 0.2),
-                    blurRadius: 60,
-                    spreadRadius: 10,
-                  ),
-                ],
-              ),
-            ),
-          // 3 expanding rings for connecting state
-          if (_isConnecting) ...[
-            _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 0),
-            _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 600),
-            _ExpandingRing(buttonSize: buttonSize, color: glowColor, delayMs: 1200),
-          ],
-          // Main button
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 400),
-            width: buttonSize,
-            height: buttonSize,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  buttonColor.withValues(alpha: 0.6),
-                  buttonColor.withValues(alpha: 0.4),
-                ],
-              ),
-              border: Border.all(
-                color: buttonColor.withValues(alpha: 0.5),
-                width: 2,
-              ),
-              boxShadow: (isConnected || _isConnecting) ? [
-                BoxShadow(
-                  color: buttonColor.withValues(alpha: 0.35),
-                  blurRadius: 30,
-                  spreadRadius: 2,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    buttonColor.withValues(alpha: 0.6),
+                    buttonColor.withValues(alpha: 0.4),
+                  ],
                 ),
-              ] : [], // No shadow when disconnected
-            ),
-            child: Center(
-              child: Icon(
-                Icons.power_settings_new,
-                size: iconSize,
-                color: Colors.white.withValues(alpha: _isConnecting ? 0.9 : (isConnected ? 1.0 : 0.6)),
+                border: Border.all(
+                  color: buttonColor.withValues(alpha: 0.5),
+                  width: 2,
+                ),
+                boxShadow: (isConnected || _isConnecting) ? [
+                  BoxShadow(
+                    color: buttonColor.withValues(alpha: 0.35),
+                    blurRadius: 30,
+                    spreadRadius: 2,
+                  ),
+                ] : [], // No shadow when disconnected
+              ),
+              child: Center(
+                child: Icon(
+                  Icons.power_settings_new,
+                  size: iconSize,
+                  color: Colors.white.withValues(alpha: _isConnecting ? 0.9 : (isConnected ? 1.0 : 0.6)),
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -676,21 +683,22 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  // Always reserve space for subtitle
-                  SizedBox(
-                    height: subtitleHeight,
-                    child: subtitle != null
-                        ? Text(
-                            subtitle,
-                            style: TextStyle(
-                              color: Colors.white.withValues(alpha: 0.4),
-                              fontSize: subtitleFontSize,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          )
-                        : const SizedBox.shrink(),
-                  ),
+                  // Always reserve space for subtitle to keep title centered
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    SizedBox(
+                      height: subtitleHeight,
+                      child: Text(
+                        subtitle,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          fontSize: subtitleFontSize,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -1227,7 +1235,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           // Social Links with hover effect
           _buildAnimatedSocialLink(
             icon: Icons.send_rounded,
-            name: 'Telegram',
+            name: AppLocalizations.of(context).translate('about.telegram'),
             title: remoteConfig.telegramId,
             color: const Color(0xFF0088CC),
             url: remoteConfig.telegramUrl,
@@ -1236,7 +1244,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           SizedBox(height: isSmallScreen ? 10 : 12),
           _buildAnimatedSocialLink(
             icon: Icons.camera_alt_rounded,
-            name: 'Instagram',
+            name: AppLocalizations.of(context).translate('about.instagram'),
             title: remoteConfig.instagramId,
             color: const Color(0xFFE1306C),
             url: remoteConfig.instagramUrl,
@@ -1245,7 +1253,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
           SizedBox(height: isSmallScreen ? 10 : 12),
           _buildAnimatedSocialLink(
             icon: Icons.location_city_rounded,
-            name: 'Tiksar Village',
+            name: AppLocalizations.of(context).translate('about.tiksar_village_page'),
             title: remoteConfig.tiksarPageId,
             color: const Color(0xFF833AB4),
             url: remoteConfig.tiksarPageUrl,

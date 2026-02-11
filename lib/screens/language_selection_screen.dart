@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/language_provider.dart';
-import '../widgets/cyber_glow_background.dart';
 import '../models/app_language.dart';
 import 'privacy_welcome_screen.dart';
 
@@ -14,324 +12,210 @@ class LanguageSelectionScreen extends StatefulWidget {
   State<LanguageSelectionScreen> createState() => _LanguageSelectionScreenState();
 }
 
-class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> 
-    with SingleTickerProviderStateMixin {
+class _LanguageSelectionScreenState extends State<LanguageSelectionScreen> {
   AppLanguage? _selectedLanguage;
-  late AnimationController _contentController;
   bool _isChangingLanguage = false;
 
-  final List<Map<String, dynamic>> languages = [
-    {
-      'language': const AppLanguage(name: 'English', code: 'en', flag: '🇬🇧', direction: 'ltr'),
-      'name': 'English',
-      'nativeName': 'English',
-      'flag': '🇬🇧',
-      'gradient': [const Color(0xFF6366F1), const Color(0xFF8B5CF6)],
-    },
-    {
-      'language': const AppLanguage(name: 'فارسی', code: 'fa', flag: '🇮🇷', direction: 'rtl'),
-      'name': 'Persian',
-      'nativeName': 'فارسی',
-      'flag': '🇮🇷',
-      'gradient': [const Color(0xFF10B981), const Color(0xFF059669)],
-    },
+  static const List<_LanguageData> _languages = [
+    _LanguageData(
+      language: AppLanguage(name: 'English', code: 'en', flag: '🇺🇸', direction: 'ltr'),
+      name: 'English',
+      nativeName: 'English',
+      flag: '🇺🇸',
+      gradientStart: Color(0xFF10B981),
+      gradientEnd: Color(0xFF34D399),
+    ),
+    _LanguageData(
+      language: AppLanguage(name: 'فارسی', code: 'fa', flag: '🇮🇷', direction: 'rtl'),
+      name: 'فارسی',
+      nativeName: 'Persian',
+      flag: '🇮🇷',
+      gradientStart: Color(0xFF06B6D4),
+      gradientEnd: Color(0xFF22D3EE),
+    ),
   ];
 
   @override
   void initState() {
     super.initState();
-    _contentController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..forward();
-    
-    // Get current language
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final languageProvider = Provider.of<LanguageProvider>(
-        context, 
-        listen: false
-      );
-      setState(() {
-        _selectedLanguage = languageProvider.currentLanguage;
-      });
+      if (mounted) {
+        final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
+        setState(() {
+          _selectedLanguage = languageProvider.currentLanguage;
+        });
+      }
     });
   }
 
-  @override
-  void dispose() {
-    _contentController.dispose();
-    super.dispose();
-  }
-
   Future<void> _selectLanguage(AppLanguage language) async {
-    if (_isChangingLanguage) return;
-    
-    if (!mounted) return;
+    if (_isChangingLanguage || !mounted) return;
     
     setState(() {
       _selectedLanguage = language;
       _isChangingLanguage = true;
     });
     
-    // Apply language change
-    final languageProvider = Provider.of<LanguageProvider>(
-      context, 
-      listen: false
-    );
+    final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     await languageProvider.changeLanguage(language);
     
-    // Save selection
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('language_selected', true);
     
-    // Navigate to welcome screen
     if (mounted) {
-      Navigator.pushReplacement(
+      await Navigator.pushReplacement(
         context,
-        PageRouteBuilder(
-          pageBuilder: (context, animation, secondaryAnimation) => 
-              const PrivacyWelcomeScreen(),
-          transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            return FadeTransition(
-              opacity: animation,
-              child: SlideTransition(
-                position: Tween<Offset>(
-                  begin: const Offset(0.3, 0),
-                  end: Offset.zero,
-                ).animate(CurvedAnimation(
-                  parent: animation,
-                  curve: Curves.easeOutCubic,
-                )),
-                child: child,
-              ),
-            );
-          },
-          transitionDuration: const Duration(milliseconds: 800),
-        ),
+        MaterialPageRoute(builder: (context) => const PrivacyWelcomeScreen()),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return CyberGlowBackground(
-      child: Stack(
+    return Scaffold(
+      backgroundColor: const Color(0xFF0a0a0a),
+      body: Stack(
         children: [
-          // Floating Orbs (kept for visual effect)
-          ...List.generate(5, (index) {
-            return _FloatingOrb(
-              delay: Duration(milliseconds: index * 400),
-              size: 150.0 + (index * 30),
-              color: [
-                const Color(0xFF6366F1),
-                const Color(0xFF8B5CF6),
-                const Color(0xFF10B981),
-                const Color(0xFFF59E0B),
-                const Color(0xFFEC4899),
-              ][index],
-            );
-          }),
+          // Background decorations matching app theme
+          Positioned(
+            top: -80,
+            right: -80,
+            child: Container(
+              width: 200,
+              height: 200,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF6366F1).withValues(alpha: 0.08),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -100,
+            left: -100,
+            child: Container(
+              width: 250,
+              height: 250,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF10B981).withValues(alpha: 0.08),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+          // Bottom glow
+          Positioned(
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: MediaQuery.of(context).size.height * 0.45,
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.transparent,
+                    const Color(0xFF10B981).withValues(alpha: 0.03),
+                    const Color(0xFF10B981).withValues(alpha: 0.06),
+                  ],
+                  stops: const [0.0, 0.6, 1.0],
+                ),
+              ),
+            ),
+          ),
           
           // Content
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(30),
+                physics: const ClampingScrollPhysics(),
+                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
                 child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    // Title
+                    // Icon
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(
-                          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                          colors: [Color(0xFF10B981), Color(0xFF34D399)],
                         ),
                         boxShadow: [
                           BoxShadow(
-                            color: const Color(0xFF6366F1).withValues(alpha: 0.5),
-                            blurRadius: 30,
-                            spreadRadius: 5,
+                            color: const Color(0xFF10B981).withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            spreadRadius: 2,
                           ),
                         ],
                       ),
                       child: const Icon(
-                        Icons.language,
-                        size: 50,
+                        Icons.language_rounded,
+                        size: 40,
                         color: Colors.white,
                       ),
-                    ).animate()
-                        .scale(duration: 800.ms, curve: Curves.elasticOut)
-                        .fadeIn(),
+                    ),
                     
-                    const SizedBox(height: 30),
+                    const SizedBox(height: 28),
                     
-                    Text(
+                    // Title English
+                    const Text(
                       'Choose Your Language',
-                      style: const TextStyle(
-                        fontSize: 28,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                         letterSpacing: -0.5,
                       ),
-                    ).animate()
-                        .fadeIn(delay: 200.ms)
-                        .slideY(begin: 0.3, end: 0),
+                    ),
                     
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 4),
                     
+                    // Title Persian
                     Text(
-                      'Select your preferred language',
+                      'زبان خود را انتخاب کنید',
+                      textAlign: TextAlign.center,
                       style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white.withValues(alpha: 0.7),
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white.withValues(alpha: 0.85),
+                        letterSpacing: 0,
                       ),
-                    ).animate()
-                        .fadeIn(delay: 300.ms)
-                        .slideY(begin: 0.3, end: 0),
+                    ),
                     
                     const SizedBox(height: 40),
                     
-                    // Language Options
-                    ...languages.asMap().entries.map((entry) {
-                      final index = entry.key;
-                      final lang = entry.value;
-                      final isSelected = _selectedLanguage == lang['language'];
-                      
-                      return GestureDetector(
-                        onTap: () => _selectLanguage(lang['language']),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          decoration: BoxDecoration(
-                            gradient: isSelected
-                                ? LinearGradient(colors: lang['gradient'])
-                                : null,
-                            color: isSelected
-                                ? null
-                                : Colors.white.withValues(alpha: 0.05),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: isSelected
-                                  ? Colors.transparent
-                                  : Colors.white.withValues(alpha: 0.1),
-                              width: 2,
-                            ),
-                            boxShadow: isSelected
-                                ? [
-                                    BoxShadow(
-                                      color: (lang['gradient'] as List<Color>)[0]
-                                          .withValues(alpha: 0.4),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 10),
-                                    ),
-                                  ]
-                                : [],
-                          ),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 20,
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                lang['flag'],
-                                style: const TextStyle(fontSize: 32),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      lang['name'],
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: isSelected
-                                            ? FontWeight.bold
-                                            : FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      lang['nativeName'],
-                                      style: TextStyle(
-                                        color: Colors.white.withValues(alpha: 0.7),
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              if (isSelected)
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.2),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.check,
-                                    color: Colors.white,
-                                    size: 20,
-                                  ),
-                                ).animate()
-                                    .scale(duration: 300.ms, curve: Curves.elasticOut),
-                            ],
-                          ),
-                        ),
-                      ).animate()
-                          .fadeIn(delay: Duration(milliseconds: 400 + index * 100))
-                          .slideX(begin: 0.3, end: 0);
+                    // Language cards
+                    ..._languages.map((langData) {
+                      final isSelected = _selectedLanguage == langData.language;
+                      return _LanguageCard(
+                        key: ValueKey(langData.language.code),
+                        data: langData,
+                        isSelected: isSelected,
+                        onTap: () => _selectLanguage(langData.language),
+                      );
                     }),
                     
-                    const SizedBox(height: 40),
+                    const SizedBox(height: 28),
                     
+                    // Continue button
                     if (_selectedLanguage != null)
-                      GestureDetector(
-                        onTap: _isChangingLanguage 
+                      _ContinueButton(
+                        isLoading: _isChangingLanguage,
+                        onPressed: _isChangingLanguage 
                             ? null 
                             : () => _selectLanguage(_selectedLanguage!),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 50,
-                            vertical: 18,
-                          ),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                            ),
-                            borderRadius: BorderRadius.circular(30),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(0xFF6366F1).withValues(alpha: 0.4),
-                                blurRadius: 20,
-                                offset: const Offset(0, 10),
-                              ),
-                            ],
-                          ),
-                          child: _isChangingLanguage
-                              ? const SizedBox(
-                                  width: 24,
-                                  height: 24,
-                                  child: CircularProgressIndicator(
-                                    color: Colors.white,
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'CONTINUE',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 1.5,
-                                  ),
-                                ),
-                        ),
-                      ).animate()
-                          .fadeIn(delay: 1000.ms)
-                          .scale(delay: 1000.ms),
+                      ),
                   ],
                 ),
               ),
@@ -343,77 +227,185 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
   }
 }
 
-class _FloatingOrb extends StatefulWidget {
-  final Duration delay;
-  final double size;
-  final Color color;
-  
-  const _FloatingOrb({
-    required this.delay,
-    required this.size,
-    required this.color,
+// Language data class
+class _LanguageData {
+  final AppLanguage language;
+  final String name;
+  final String nativeName;
+  final String flag;
+  final Color gradientStart;
+  final Color gradientEnd;
+
+  const _LanguageData({
+    required this.language,
+    required this.name,
+    required this.nativeName,
+    required this.flag,
+    required this.gradientStart,
+    required this.gradientEnd,
   });
-  
-  @override
-  State<_FloatingOrb> createState() => _FloatingOrbState();
 }
 
-class _FloatingOrbState extends State<_FloatingOrb>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _animation;
-  
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: Duration(seconds: 20 + (widget.delay.inMilliseconds % 10)),
-    )..repeat(reverse: true);
-    
-    _animation = Tween<double>(
-      begin: -widget.size,
-      end: MediaQuery.of(context).size.height + widget.size,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeInOutSine,
-    ));
-    
-    Future.delayed(widget.delay, () {
-      if (mounted) _controller.forward();
-    });
-  }
-  
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-  
+// Language card widget
+class _LanguageCard extends StatelessWidget {
+  final _LanguageData data;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _LanguageCard({
+    super.key,
+    required this.data,
+    required this.isSelected,
+    required this.onTap,
+  });
+
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _animation,
-      builder: (context, child) {
-        return Positioned(
-          left: (widget.size * 2) % MediaQuery.of(context).size.width,
-          top: _animation.value,
-          child: Container(
-            width: widget.size,
-            height: widget.size,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(18),
+          child: Ink(
             decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: RadialGradient(
-                colors: [
-                  widget.color.withValues(alpha: 0.3),
-                  widget.color.withValues(alpha: 0.1),
-                  widget.color.withValues(alpha: 0.0),
-                ],
+              gradient: isSelected
+                  ? LinearGradient(
+                      colors: [data.gradientStart, data.gradientEnd],
+                    )
+                  : null,
+              color: isSelected ? null : Colors.white.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: isSelected
+                    ? Colors.transparent
+                    : Colors.white.withValues(alpha: 0.06),
+                width: 1.5,
               ),
+              boxShadow: isSelected
+                  ? [
+                      BoxShadow(
+                        color: data.gradientStart.withValues(alpha: 0.3),
+                        blurRadius: 16,
+                        offset: const Offset(0, 8),
+                      ),
+                    ]
+                  : null,
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            child: Row(
+              children: [
+                // Flag
+                Text(
+                  data.flag,
+                  style: const TextStyle(fontSize: 34),
+                ),
+                
+                const SizedBox(width: 14),
+                
+                // Language info
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data.name,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: isSelected 
+                              ? FontWeight.bold 
+                              : FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        data.nativeName,
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.6),
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Check icon
+                if (isSelected)
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+              ],
             ),
           ),
-        );
-      },
+        ),
+      ),
+    );
+  }
+}
+
+// Continue button
+class _ContinueButton extends StatelessWidget {
+  final bool isLoading;
+  final VoidCallback? onPressed;
+
+  const _ContinueButton({
+    required this.isLoading,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: BorderRadius.circular(28),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(horizontal: 44, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF10B981), Color(0xFF34D399)],
+            ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF10B981).withValues(alpha: 0.4),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: isLoading
+              ? const SizedBox(
+                  width: 22,
+                  height: 22,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 2.5,
+                  ),
+                )
+              : const Text(
+                  'CONTINUE',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 1.2,
+                  ),
+                ),
+        ),
+      ),
     );
   }
 }
