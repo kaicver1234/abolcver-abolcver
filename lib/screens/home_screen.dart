@@ -237,7 +237,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                   style: GoogleFonts.poppins(fontSize: 22, fontWeight: FontWeight.w700),
                   children: [
                     TextSpan(text: 'Tiksar', style: TextStyle(color: Color(colors.textPrimaryColor))),
-                    const TextSpan(text: 'VPN', style: TextStyle(color: Color(0xFFef4444))),
+                    TextSpan(text: 'VPN', style: TextStyle(color: Color(colors.primaryColor))),
                   ],
                 ),
               ),
@@ -399,6 +399,8 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     final screenHeight = MediaQuery.of(context).size.height;
     final verticalPadding = screenHeight < 700 ? 12.0 : 20.0;
     final horizontalPadding = screenHeight < 700 ? 16.0 : 20.0;
+    // Responsive status section height
+    final statusSectionHeight = screenHeight < 700 ? 78.0 : 86.0;
     
     return SingleChildScrollView(
       physics: const BouncingScrollPhysics(),
@@ -412,7 +414,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
             SizedBox(height: screenHeight < 700 ? 16 : 24),
             // Fixed height container to prevent layout shift
             SizedBox(
-              height: 80, // Fixed height for status section
+              height: statusSectionHeight,
               child: _buildStatusSection(provider),
             ),
             SizedBox(height: screenHeight < 700 ? 16 : 24),
@@ -531,68 +533,75 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           if (isConnected || _isConnecting) ...[
-            // Status badge
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-              decoration: BoxDecoration(
-                color: isConnected 
-                    ? const Color(0xFF10b981).withValues(alpha: 0.12)
-                    : const Color(0xFFfbbf24).withValues(alpha: 0.12),
-                border: Border.all(
+            // Status badge with fixed width to prevent jumping
+            SizedBox(
+              width: 140, // Fixed width to prevent text change from causing layout shift
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                decoration: BoxDecoration(
                   color: isConnected 
-                      ? const Color(0xFF10b981).withValues(alpha: 0.3)
-                      : const Color(0xFFfbbf24).withValues(alpha: 0.3),
+                      ? const Color(0xFF10b981).withValues(alpha: 0.12)
+                      : const Color(0xFFfbbf24).withValues(alpha: 0.12),
+                  border: Border.all(
+                    color: isConnected 
+                        ? const Color(0xFF10b981).withValues(alpha: 0.3)
+                        : const Color(0xFFfbbf24).withValues(alpha: 0.3),
+                  ),
+                  borderRadius: BorderRadius.circular(30),
                 ),
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isConnected ? const Color(0xFF10b981) : const Color(0xFFfbbf24),
-                      boxShadow: [
-                        BoxShadow(
-                          color: (isConnected ? const Color(0xFF10b981) : const Color(0xFFfbbf24)).withValues(alpha: 0.5),
-                          blurRadius: 8,
-                        ),
-                      ],
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isConnected ? const Color(0xFF10b981) : const Color(0xFFfbbf24),
+                        boxShadow: [
+                          BoxShadow(
+                            color: (isConnected ? const Color(0xFF10b981) : const Color(0xFFfbbf24)).withValues(alpha: 0.5),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    isConnected 
-                        ? AppLocalizations.of(context).translate('home.connected')
-                        : AppLocalizations.of(context).translate('home.connecting'),
-                    style: TextStyle(
-                      color: isConnected ? const Color(0xFF10b981) : const Color(0xFFfbbf24),
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                    const SizedBox(width: 8),
+                    Text(
+                      isConnected 
+                          ? AppLocalizations.of(context).translate('home.connected')
+                          : AppLocalizations.of(context).translate('home.connecting'),
+                      style: TextStyle(
+                        color: isConnected ? const Color(0xFF10b981) : const Color(0xFFfbbf24),
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            if (isConnected) ...[
-              const SizedBox(height: 8),
-              // Timer
-              StreamBuilder(
-                stream: Stream.periodic(const Duration(seconds: 1)),
-                builder: (context, snapshot) {
-                  return Text(
-                    provider.v2rayService.getFormattedConnectedTime(),
-                    style: GoogleFonts.poppins(
-                      fontSize: timerFontSize,
-                      fontWeight: FontWeight.w700,
-                      color: _timerColor,
-                    ),
-                  );
-                },
-              ),
-            ],
+            const SizedBox(height: 8),
+            // Timer - always reserve space even when connecting
+            SizedBox(
+              height: timerFontSize + 4, // Fixed height for timer
+              child: isConnected
+                  ? StreamBuilder(
+                      stream: Stream.periodic(const Duration(seconds: 1)),
+                      builder: (context, snapshot) {
+                        return Text(
+                          provider.v2rayService.getFormattedConnectedTime(),
+                          style: GoogleFonts.poppins(
+                            fontSize: timerFontSize,
+                            fontWeight: FontWeight.w700,
+                            color: _timerColor,
+                          ),
+                        );
+                      },
+                    )
+                  : const SizedBox.shrink(), // Empty space when connecting
+            ),
           ],
         ],
       ),

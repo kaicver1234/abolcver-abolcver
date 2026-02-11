@@ -39,8 +39,6 @@ class AppThemeModel {
     switch (id) {
       case 'default':
         return ThemeColors.defaultTheme();
-      case 'light':
-        return ThemeColors.lightTheme();
       case 'ocean':
         return ThemeColors.oceanTheme();
       case 'sunset':
@@ -127,29 +125,6 @@ class ThemeColors {
     dividerColor: 0xFFFFFFFF,
     backgroundOpacity: 1.0,
     surfaceOpacity: 0.05,
-    cardOpacity: 1.0,
-  );
-
-  // Light Theme - Soft & Eye-Friendly
-  factory ThemeColors.lightTheme() => ThemeColors(
-    backgroundColor: 0xFFf5f5f5, // Soft gray (warm and comfortable)
-    surfaceColor: 0xFF1e293b,
-    cardColor: 0xFFfefefe, // Off-white
-    primaryColor: 0xFF059669, // Emerald green
-    secondaryColor: 0xFF7c3aed, // Deep purple
-    accentColor: 0xFF10b981, // Light emerald
-    textPrimaryColor: 0xFF1f2937, // Dark gray (not black)
-    textSecondaryColor: 0xFF6b7280, // Medium gray
-    successColor: 0xFF059669,
-    errorColor: 0xFFdc2626,
-    warningColor: 0xFFea580c,
-    timerColor: 0xFF059669,
-    downloadColor: 0xFF059669,
-    uploadColor: 0xFF10b981,
-    borderColor: 0xFFd1d5db,
-    dividerColor: 0xFFe5e7eb,
-    backgroundOpacity: 1.0,
-    surfaceOpacity: 0.04,
     cardOpacity: 1.0,
   );
 
