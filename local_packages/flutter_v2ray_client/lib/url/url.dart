@@ -35,7 +35,7 @@ abstract class V2RayURL {
   /// The remark or description (default: empty string).
   String get remark => '';
 
-  /// Inbound configuration for the proxy.
+  /// Inbound configuration for the proxy with optimized settings.
   Map<String, dynamic> inbound = {
     'tag': 'in_proxy',
     'port': 1080,
@@ -49,16 +49,25 @@ abstract class V2RayURL {
       'port': null,
       'network': null
     },
-    'sniffing': {'enabled': false, 'destOverride': null, 'metadataOnly': null},
+    'sniffing': {
+      'enabled': true,
+      'destOverride': ['http', 'tls', 'quic', 'fakedns'],
+      'metadataOnly': false,
+      'routeOnly': false,
+    },
     'streamSettings': null,
-    'allocate': null
+    'allocate': {
+      'strategy': 'always',
+      'refresh': 5,
+      'concurrency': 3,
+    }
   };
 
-  /// Log configuration.
+  /// Log configuration with minimal logging for better performance.
   Map<String, dynamic> log = {
     'access': '',
     'error': '',
-    'loglevel': 'error',
+    'loglevel': 'warning',  // Changed from 'error' to 'warning' for better debugging
     'dnsLog': false,
   };
 
@@ -77,7 +86,7 @@ abstract class V2RayURL {
       'network': null,
       'address': null,
       'port': null,
-      'domainStrategy': 'UseIp',
+      'domainStrategy': 'AsIs',  // Better performance than UseIp
       'redirect': null,
       'userLevel': null,
       'inboundTag': null,
@@ -114,15 +123,24 @@ abstract class V2RayURL {
     'mux': null
   };
 
-  /// DNS configuration.
+  /// DNS configuration with optimized servers.
   Map<String, dynamic> dns = {
-    'servers': ['8.8.8.8', '8.8.4.4']
+    'servers': [
+      '1.1.1.1',  // Cloudflare - faster
+      '1.0.0.1',  // Cloudflare backup
+      '8.8.8.8',  // Google
+      '8.8.4.4'   // Google backup
+    ],
+    'queryStrategy': 'UseIPv4',  // Prefer IPv4 for better compatibility
+    'disableCache': false,  // Enable DNS cache for speed
+    'disableFallback': false,
+    'tag': 'dns_inbound',
   };
 
-  /// Routing configuration.
+  /// Routing configuration with optimized strategy.
   Map<String, dynamic> routing = {
-    'domainStrategy': 'UseIp',
-    'domainMatcher': null,
+    'domainStrategy': 'AsIs',  // Faster than UseIp
+    'domainMatcher': 'hybrid',  // Better performance
     'rules': [],
     'balancers': []
   };
@@ -163,7 +181,12 @@ abstract class V2RayURL {
     'xhttpSettings': null, // Add xhttpSettings
     'httpupgradeSettings': null, // Add httpupgradeSettings
     'dsSettings': null,
-    'sockopt': null
+    'sockopt': {
+      'mark': 255,
+      'tcpFastOpen': true,
+      'tproxy': 'off',
+      'tcpKeepAliveInterval': 30,
+    }
   };
 
   /// Populates the stream settings based on transport parameters.
@@ -194,7 +217,7 @@ abstract class V2RayURL {
     if (transport == 'tcp') {
       streamSetting['tcpSettings'] = {
         'header': <String, dynamic>{'type': 'none', 'request': null},
-        'acceptProxyProtocol': null
+        'acceptProxyProtocol': false
       };
       if (headerType == 'http') {
         streamSetting['tcpSettings']['header']['type'] = 'http';
@@ -233,12 +256,12 @@ abstract class V2RayURL {
     } else if (transport == 'kcp') {
       streamSetting['kcpSettings'] = {
         'mtu': 1350,
-        'tti': 50,
-        'uplinkCapacity': 12,
+        'tti': 20,  // Reduced from 50 for faster response
+        'uplinkCapacity': 50,  // Increased from 12 for better upload
         'downlinkCapacity': 100,
         'congestion': false,
-        'readBufferSize': 1,
-        'writeBufferSize': 1,
+        'readBufferSize': 2,  // Increased from 1 for better buffering
+        'writeBufferSize': 2,  // Increased from 1 for better buffering
         'header': {
           'type': headerType ?? 'none',
         },
@@ -248,9 +271,9 @@ abstract class V2RayURL {
       streamSetting['wsSettings'] = {
         'path': path ?? ['/'],
         'headers': {'Host': host ?? ''},
-        'maxEarlyData': null,
-        'useBrowserForwarding': null,
-        'acceptProxyProtocol': null,
+        'maxEarlyData': 2048,
+        'useBrowserForwarding': false,
+        'acceptProxyProtocol': false,
       };
       sni = streamSetting['wsSettings']['headers']['Host'];
     } else if (transport == 'h2' || transport == 'http') {
@@ -272,6 +295,10 @@ abstract class V2RayURL {
       streamSetting['grpcSettings'] = {
         'serviceName': serviceName ?? '',
         'multiMode': mode == 'multi',
+        'idle_timeout': 60,
+        'health_check_timeout': 20,
+        'permit_without_stream': false,
+        'initial_windows_size': 65536,
       };
       sni = host ?? '';
     } else if (transport == 'xhttp') {
@@ -319,14 +346,14 @@ abstract class V2RayURL {
       'allowInsecure': allowInsecure,
       'serverName': sni,
       'alpn': alpns == '' ? null : alpns?.split(','),
-      'minVersion': null,
-      'maxVersion': null,
-      'preferServerCipherSuites': null,
+      'minVersion': '1.2',
+      'maxVersion': '1.3',
+      'preferServerCipherSuites': false,
       'cipherSuites': null,
       'fingerprint': fingerprint,
       'certificates': null,
-      'disableSystemRoot': null,
-      'enableSessionResumption': null,
+      'disableSystemRoot': false,
+      'enableSessionResumption': true,
       'show': false,
       'publicKey': publicKey,
       'shortId': shortId,
