@@ -27,52 +27,19 @@ class ModernBottomNav extends StatelessWidget {
         responsive.horizontalPadding,
       ),
       height: responsive.bottomNavHeight,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 30,
-            offset: const Offset(0, 10),
-          ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          for (int i = 0; i < items.length; i++) ...[
+            _buildNavItem(
+              context: context,
+              item: items[i],
+              isActive: currentIndex == i,
+              onTap: () => onTap(i),
+            ),
+            if (i < items.length - 1) const SizedBox(width: 12),
+          ],
         ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.white.withValues(alpha: 0.15),
-                  Colors.white.withValues(alpha: 0.08),
-                ],
-              ),
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.2),
-                width: 1.5,
-              ),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (int i = 0; i < items.length; i++) ...[
-                  _buildNavItem(
-                    context: context,
-                    item: items[i],
-                    isActive: currentIndex == i,
-                    onTap: () => onTap(i),
-                  ),
-                  if (i < items.length - 1) const SizedBox(width: 12),
-                ],
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }

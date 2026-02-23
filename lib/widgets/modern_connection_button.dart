@@ -32,23 +32,20 @@ class _ModernConnectionButtonState extends State<ModernConnectionButton>
     
     _pulseController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 2000),
+      duration: const Duration(milliseconds: 1500), // Faster
     );
     
     _rotationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3000),
+      duration: const Duration(milliseconds: 2000), // Faster
     );
     
-    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.15).animate(
+    _pulseAnimation = Tween<double>(begin: 1.0, end: 1.08).animate( // Less pulse
       CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
     
     if (widget.isConnecting) {
-      _pulseController.repeat(reverse: true);
       _rotationController.repeat();
-    } else if (widget.isConnected) {
-      _pulseController.repeat(reverse: true);
     }
   }
 
@@ -57,17 +54,9 @@ class _ModernConnectionButtonState extends State<ModernConnectionButton>
     super.didUpdateWidget(oldWidget);
     
     if (widget.isConnecting && !oldWidget.isConnecting) {
-      _pulseController.repeat(reverse: true);
       _rotationController.repeat();
     } else if (!widget.isConnecting && oldWidget.isConnecting) {
-      _pulseController.stop();
       _rotationController.stop();
-    }
-    
-    if (widget.isConnected && !oldWidget.isConnected) {
-      _pulseController.repeat(reverse: true);
-    } else if (!widget.isConnected && oldWidget.isConnected) {
-      _pulseController.stop();
     }
   }
 
@@ -96,113 +85,76 @@ class _ModernConnectionButtonState extends State<ModernConnectionButton>
     
     return GestureDetector(
       onTap: widget.onTap,
-      child: AnimatedBuilder(
-        animation: _pulseAnimation,
-        builder: (context, child) {
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              // Outer glow rings
-              if (widget.isConnected || widget.isConnecting) ...[
-                _buildGlowRing(
-                  size: widget.size * 1.4 * _pulseAnimation.value,
-                  color: Colors.white,
-                  opacity: 0.08,
-                ),
-                _buildGlowRing(
-                  size: widget.size * 1.25 * _pulseAnimation.value,
-                  color: Colors.white,
-                  opacity: 0.12,
-                ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Rotating ring for connecting state only
+          if (widget.isConnecting)
+            RotationTransition(
+              turns: _rotationController,
+              child: _buildRotatingRing(widget.size * 1.15, Colors.white),
+            ),
+          
+          // Main button
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
+            width: widget.size,
+            height: widget.size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: primaryColor,
+              boxShadow: [
+                if (widget.isConnected || widget.isConnecting) ...[
+                  BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.4),
+                    blurRadius: 40,
+                    spreadRadius: 0,
+                  ),
+                  BoxShadow(
+                    color: Colors.white.withValues(alpha: 0.2),
+                    blurRadius: 60,
+                    spreadRadius: 0,
+                  ),
+                ] else ...[
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.3),
+                    blurRadius: 30,
+                    offset: const Offset(0, 15),
+                  ),
+                ],
               ],
-              
-              // Rotating ring for connecting state
-              if (widget.isConnecting)
-                RotationTransition(
-                  turns: _rotationController,
-                  child: _buildRotatingRing(widget.size * 1.15, Colors.white),
-                ),
-              
-              // Main button
-              Container(
-                width: widget.size,
-                height: widget.size,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: primaryColor,
-                  boxShadow: [
-                    if (widget.isConnected || widget.isConnecting) ...[
-                      BoxShadow(
-                        color: Colors.white.withValues(alpha: 0.4),
-                        blurRadius: 40,
-                        spreadRadius: 0,
-                      ),
-                      BoxShadow(
-                        color: Colors.white.withValues(alpha: 0.2),
-                        blurRadius: 60,
-                        spreadRadius: 0,
-                      ),
-                    ] else ...[
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.3),
-                        blurRadius: 30,
-                        offset: const Offset(0, 15),
-                      ),
-                    ],
-                  ],
-                ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: widget.isConnected || widget.isConnecting
-                          ? Colors.white.withValues(alpha: 0.5)
-                          : Colors.white.withValues(alpha: 0.2),
-                      width: 3,
-                    ),
-                  ),
-                  child: Center(
-                    child: widget.isConnecting
-                        ? RotationTransition(
-                            turns: _rotationController,
-                            child: Icon(
-                              icon,
-                              size: widget.size * 0.35,
-                              color: Colors.black.withValues(alpha: 0.8),
-                            ),
-                          )
-                        : Icon(
-                            icon,
-                            size: widget.size * 0.35,
-                            color: widget.isConnected 
-                                ? Colors.black.withValues(alpha: 0.8)
-                                : Colors.white.withValues(alpha: 0.6),
-                          ),
-                  ),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: widget.isConnected || widget.isConnecting
+                      ? Colors.white.withValues(alpha: 0.5)
+                      : Colors.white.withValues(alpha: 0.2),
+                  width: 3,
                 ),
               ),
-              
-              // Inner highlight
-              if (widget.isConnected || widget.isConnecting)
-                Positioned(
-                  top: widget.size * 0.15,
-                  child: Container(
-                    width: widget.size * 0.4,
-                    height: widget.size * 0.2,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          Colors.white.withValues(alpha: 0.4),
-                          Colors.white.withValues(alpha: 0.0),
-                        ],
+              child: Center(
+                child: widget.isConnecting
+                    ? RotationTransition(
+                        turns: _rotationController,
+                        child: Icon(
+                          icon,
+                          size: widget.size * 0.35,
+                          color: Colors.black.withValues(alpha: 0.8),
+                        ),
+                      )
+                    : Icon(
+                        icon,
+                        size: widget.size * 0.35,
+                        color: widget.isConnected 
+                            ? Colors.black.withValues(alpha: 0.8)
+                            : Colors.white.withValues(alpha: 0.6),
                       ),
-                    ),
-                  ),
-                ),
-            ],
-          );
-        },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

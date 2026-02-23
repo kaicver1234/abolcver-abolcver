@@ -111,7 +111,10 @@
         "please_select_server": "Please select a server first",
         "connection_failed": "Connection failed",
         "no_servers_available": "No servers available",
-        "loading_servers": "Loading servers..."
+        "loading_servers": "Loading servers...",
+        "connecting": "Connecting",
+        "connected": "Connected",
+        "disconnected": "Disconnected"
     },
     "privacy_welcome": {
         "skip": "Skip",

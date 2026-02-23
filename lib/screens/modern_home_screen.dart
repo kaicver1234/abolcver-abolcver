@@ -29,7 +29,6 @@ class ModernHomeScreen extends StatefulWidget {
 class _ModernHomeScreenState extends State<ModernHomeScreen> 
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   bool _isConnecting = false;
-  late PageController _pageController;
   int _currentPage = 1; // Start from VPN tab (middle)
   
   @override
@@ -38,7 +37,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
   @override
   void initState() {
     super.initState();
-    _pageController = PageController(initialPage: 1);
     WidgetsBinding.instance.addObserver(this);
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -77,7 +75,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _pageController.dispose();
     super.dispose();
   }
 
@@ -155,11 +152,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
                 children: [
                   _buildModernHeader(context, languageProvider),
                   Expanded(
-                    child: PageView(
-                      controller: _pageController,
-                      onPageChanged: (index) {
-                        setState(() => _currentPage = index);
-                      },
+                    child: IndexedStack(
+                      index: _currentPage,
                       children: [
                         _buildToolsPage(context),
                         _buildVPNPage(v2rayProvider),
@@ -170,11 +164,9 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
                   ModernBottomNav(
                     currentIndex: _currentPage,
                     onTap: (index) {
-                      _pageController.animateToPage(
-                        index,
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                      );
+                      if (mounted) {
+                        setState(() => _currentPage = index);
+                      }
                     },
                     items: [
                       ModernNavItem(
@@ -259,18 +251,25 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
   void _showLanguageModal(BuildContext context) {
     final languageProvider = Provider.of<LanguageProvider>(context, listen: false);
     final languages = [
-      {'name': 'فارسی', 'code': 'fa', 'flag': '🇮🇷'},
+      {'name': 'پارسی', 'code': 'fa', 'flag': '🇮🇷'},
       {'name': 'English', 'code': 'en', 'flag': '🇺🇸'},
     ];
 
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => ModernGlassCard(
+      isScrollControlled: true,
+      builder: (context) => Container(
         margin: const EdgeInsets.all(20),
         padding: const EdgeInsets.all(24),
-        blur: 20,
-        opacity: 0.15,
+        decoration: BoxDecoration(
+          color: const Color(0xFF1a1a1a),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.15),
+            width: 1.5,
+          ),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -312,7 +311,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
                   await languageProvider.changeLanguage(newLanguage);
                   if (context.mounted) {
                     Navigator.pop(context);
-                    setState(() {});
                   }
                 },
                 child: Container(
@@ -376,6 +374,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
             isConnected 
                 ? provider.v2rayService.getFormattedConnectedTime()
                 : '00:00:00',
+            key: const ValueKey('timer'), // Prevent rebuild animation
             style: GoogleFonts.orbitron(
               fontSize: responsive.timerFontSize,
               fontWeight: FontWeight.w700,
@@ -442,6 +441,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     }
     
     return Column(
+      key: const ValueKey('connection_button'), // Prevent rebuild animation
       children: [
         ModernConnectionButton(
           isConnected: isConnected,
@@ -488,6 +488,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         MaterialPageRoute(builder: (context) => const ServerSelectionScreen()),
       ),
       child: Container(
+        key: const ValueKey('server_card'), // Prevent rebuild animation
         padding: EdgeInsets.all(responsive.serverCardPadding),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -660,6 +661,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
       stream: Stream.periodic(const Duration(milliseconds: 500)),
       builder: (context, snapshot) {
         return Row(
+          key: const ValueKey('stats'), // Prevent rebuild animation
           children: [
             Expanded(
               child: _buildStatCard(

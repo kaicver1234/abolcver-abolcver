@@ -64,79 +64,79 @@ class ResponsiveHelper {
   
   /// Connection button size
   double get connectionButtonSize => responsiveValue(
-    small: 120,
-    medium: 130,
-    large: 140,
+    small: 140,
+    medium: 150,
+    large: 160,
   );
   
   /// Connection button icon size
   double get connectionButtonIconSize => responsiveValue(
-    small: 34,
-    medium: 37,
-    large: 40,
+    small: 40,
+    medium: 43,
+    large: 46,
   );
   
   /// Header font size
   double get headerFontSize => responsiveValue(
-    small: 18,
-    medium: 19,
-    large: 20,
+    small: 20,
+    medium: 22,
+    large: 24,
   );
   
   /// Timer font size
   double get timerFontSize => responsiveValue(
-    small: 16,
-    medium: 17,
-    large: 18,
+    small: 18,
+    medium: 20,
+    large: 22,
   );
   
   /// Stats value font size
   double get statsValueFontSize => responsiveValue(
-    small: 12,
-    medium: 13,
-    large: 14,
+    small: 14,
+    medium: 15,
+    large: 16,
   );
   
   /// Stats label font size
   double get statsLabelFontSize => responsiveValue(
-    small: 9,
-    medium: 9.5,
-    large: 10,
+    small: 11,
+    medium: 11.5,
+    large: 12,
   );
   
   /// Stats icon size
   double get statsIconSize => responsiveValue(
-    small: 11,
-    medium: 12,
-    large: 13,
+    small: 13,
+    medium: 14,
+    large: 15,
   );
   
   /// Server card icon size
   double get serverIconSize => responsiveValue(
-    small: 42,
-    medium: 45,
-    large: 48,
+    small: 50,
+    medium: 54,
+    large: 58,
   );
   
   /// Server card padding
   double get serverCardPadding => responsiveValue(
-    small: 12,
-    medium: 13,
-    large: 14,
+    small: 14,
+    medium: 15,
+    large: 16,
   );
   
   /// Tool card icon size
   double get toolIconSize => responsiveValue(
-    small: 24,
-    medium: 26,
-    large: 28,
+    small: 28,
+    medium: 30,
+    large: 32,
   );
   
   /// Tool card padding
   double get toolCardPadding => responsiveValue(
-    small: 16,
-    medium: 18,
-    large: 20,
+    small: 18,
+    medium: 20,
+    large: 22,
   );
   
   /// Bottom nav height

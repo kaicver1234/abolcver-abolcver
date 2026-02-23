@@ -111,7 +111,10 @@
         "please_select_server": "لطفاً ابتدا یک سرور انتخاب کنید",
         "connection_failed": "اتصال ناموفق",
         "no_servers_available": "هیچ سروری موجود نیست",
-        "loading_servers": "در حال بارگذاری سرورها..."
+        "loading_servers": "در حال بارگذاری سرورها...",
+        "connecting": "در حال اتصال",
+        "connected": "متصل",
+        "disconnected": "قطع شده"
     },
     "privacy_welcome": {
         "skip": "رد کردن",

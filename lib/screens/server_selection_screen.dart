@@ -398,46 +398,40 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           ),
           SizedBox(width: isSmallScreen ? 10 : 12),
           // Test Ping button
-          Expanded(
-            child: GestureDetector(
-              onTap: _isTesting ? null : _testAllServerPings,
-              child: ModernGlassCard(
-                padding: EdgeInsets.symmetric(
-                  horizontal: isSmallScreen ? 14 : 16,
-                  vertical: isSmallScreen ? 10 : 12,
-                ),
-                borderRadius: BorderRadius.circular(14),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (_isTesting)
-                      SizedBox(
-                        width: isSmallScreen ? 14 : 16,
-                        height: isSmallScreen ? 14 : 16,
-                        child: const CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    else
-                      Icon(Icons.speed, color: Colors.white, size: isSmallScreen ? 16 : 18),
-                    SizedBox(width: isSmallScreen ? 6 : 8),
-                    Flexible(
-                      child: Text(
-                        _isTesting 
-                            ? (_testStatusText.isNotEmpty ? _testStatusText : '...') 
-                            : AppLocalizations.of(context).translate('server_selection.test_ping'),
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: isSmallScreen ? 12 : 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+          GestureDetector(
+            onTap: _isTesting ? null : _testAllServerPings,
+            child: ModernGlassCard(
+              padding: EdgeInsets.symmetric(
+                horizontal: isSmallScreen ? 14 : 16,
+                vertical: isSmallScreen ? 10 : 12,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isTesting)
+                    SizedBox(
+                      width: isSmallScreen ? 14 : 16,
+                      height: isSmallScreen ? 14 : 16,
+                      child: const CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
                       ),
+                    )
+                  else
+                    Icon(Icons.speed, color: Colors.white, size: isSmallScreen ? 16 : 18),
+                  SizedBox(width: isSmallScreen ? 6 : 8),
+                  Text(
+                    _isTesting 
+                        ? (_testStatusText.isNotEmpty ? _testStatusText : '...') 
+                        : AppLocalizations.of(context).translate('server_selection.test_ping'),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: isSmallScreen ? 12 : 14,
+                      fontWeight: FontWeight.w600,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -900,69 +894,49 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     }
 
     try {
-      debugPrint('🚀 Starting V2Ray core delay test for ${configs.length} servers');
-      debugPrint('📦 Batch size: $_batchSize servers at a time');
+      debugPrint('🚀 Starting V2Ray core delay test for ${configs.length} servers (one by one)');
       
       setState(() {
         _totalCount = configs.length;
         _testStatusText = '0 / $_totalCount';
       });
       
-      // Test servers in batches
+      // Test servers one by one (sequential)
       int successCount = 0;
       
-      for (int i = 0; i < configs.length; i += _batchSize) {
+      for (int i = 0; i < configs.length; i++) {
         if (!mounted || !_isTesting) break;
         
-        final end = (i + _batchSize < configs.length) ? i + _batchSize : configs.length;
-        final batch = configs.sublist(i, end);
+        final config = configs[i];
         
-        debugPrint('📊 Testing batch ${i ~/ _batchSize + 1}: servers $i to ${end - 1}');
+        debugPrint('📊 Testing server ${i + 1}/${configs.length}: ${config.remark}');
         
-        // Test batch in parallel but update UI as each completes
-        final futures = <Future<void>>[];
+        // Test single server
+        final delay = await _testSingleServer(config, provider);
         
-        for (int j = 0; j < batch.length; j++) {
-          final config = batch[j];
-          final serverIndex = i + j;
-          
-          futures.add(
-            _testSingleServer(config, provider).then((delay) {
-              if (delay >= 0 && delay < 10000) {
-                _pingResults[config.id] = delay;
-                successCount++;
-                debugPrint('   ✅ ${config.remark}: ${delay}ms');
-              } else {
-                _pingResults[config.id] = 99999; // Timeout
-                debugPrint('   ❌ ${config.remark}: Timeout');
-              }
-              
-              // Update UI immediately after this server is tested
-              // AND sort servers in real-time
-              if (mounted) {
-                setState(() {
-                  _testedCount = serverIndex + 1;
-                  _testStatusText = '$_testedCount / $_totalCount';
-                  // Sort servers immediately after each result
-                  _sortServersByPing(provider, _pingResults);
-                });
-              }
-            }),
-          );
+        if (delay >= 0 && delay < 10000) {
+          _pingResults[config.id] = delay;
+          successCount++;
+          debugPrint('   ✅ ${config.remark}: ${delay}ms');
+        } else {
+          _pingResults[config.id] = 99999; // Timeout
+          debugPrint('   ❌ ${config.remark}: Timeout');
         }
         
-        // Wait for all servers in this batch to complete
-        await Future.wait(futures);
-        
-        // Small delay between batches
-        if (end < configs.length) {
-          await Future.delayed(const Duration(milliseconds: 100));
+        // Update UI immediately after each server is tested
+        if (mounted) {
+          setState(() {
+            _testedCount = i + 1;
+            _testStatusText = '$_testedCount / $_totalCount';
+            // Sort servers immediately after each result
+            _sortServersByPing(provider, _pingResults);
+          });
         }
       }
       
       if (!mounted) return;
       
-      // Final sort (already sorted in real-time, but ensure it's final)
+      // Final sort
       _sortServersByPing(provider, _pingResults);
       
       // Show completion message

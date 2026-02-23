@@ -39,12 +39,13 @@ class AppTheme {
   static ThemeData darkTheme([String languageCode = 'en']) {
     final isRtlLanguage = languageCode == 'fa' || languageCode == 'ar';
 
+    // For RTL languages, use system default fonts which support Persian better
     final baseTextTheme = isRtlLanguage
-        ? GoogleFonts.vazirmatnTextTheme(ThemeData.dark().textTheme)
+        ? ThemeData.dark().textTheme
         : GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme);
 
     final baseAppBarTextStyle = isRtlLanguage
-        ? GoogleFonts.vazirmatn(
+        ? const TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w600,
             color: textLight,
@@ -56,7 +57,10 @@ class AppTheme {
           );
 
     final baseButtonTextStyle = isRtlLanguage
-        ? GoogleFonts.vazirmatn(fontSize: 16, fontWeight: FontWeight.w600)
+        ? const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          )
         : GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600);
 
     return ThemeData.dark().copyWith(
