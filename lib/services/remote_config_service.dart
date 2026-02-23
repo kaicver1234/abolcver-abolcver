@@ -39,8 +39,8 @@ class RemoteConfigService {
     'maintenance_mode': false,
     'maintenance_message': 'سرویس در حال بروزرسانی است',
     // About description
-    'about_description_en': 'Tiksar VPN is a powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access to the global web with complete privacy and security.',
-    'about_description_fa': 'تیکسر وی پی ان ابزاری قدرتمند برای دسترسی به اینترنت آزاد است. محدودیت‌ها را بشکنید و با حفظ کامل حریم خصوصی و امنیت، از دسترسی نامحدود به وب جهانی لذت ببرید.',
+    'about_description_en': 'A powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access with complete privacy.',
+    'about_description_fa': 'ابزاری قدرتمند برای دسترسی به اینترنت آزاد. محدودیت‌ها را بشکنید و با حفظ کامل حریم خصوصی از دسترسی نامحدود لذت ببرید.',
     // Social links
     'telegram_id': '@tiksar_vpn',
     'telegram_url': 'https://t.me/tiksar_vpn',
@@ -166,8 +166,8 @@ class RemoteConfigService {
   String getAboutDescription(String languageCode) {
     if (!_isSupported || _remoteConfig == null) {
       return languageCode == 'fa'
-          ? 'تیکسر وی پی ان ابزاری قدرتمند برای دسترسی به اینترنت آزاد است. محدودیت‌ها را بشکنید و با حفظ کامل حریم خصوصی و امنیت، از دسترسی نامحدود به وب جهانی لذت ببرید.'
-          : 'Tiksar VPN is a powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access to the global web with complete privacy and security.';
+          ? 'ابزاری قدرتمند برای دسترسی به اینترنت آزاد. محدودیت‌ها را بشکنید و با حفظ کامل حریم خصوصی از دسترسی نامحدود لذت ببرید.'
+          : 'A powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access with complete privacy.';
     }
     
     final key = 'about_description_$languageCode';
@@ -179,7 +179,7 @@ class RemoteConfigService {
     
     // Fallback to default
     return languageCode == 'fa'
-        ? 'تیکسر وی پی ان ابزاری قدرتمند برای دسترسی به اینترنت آزاد است. محدودیت‌ها را بشکنید و با حفظ کامل حریم خصوصی و امنیت، از دسترسی نامحدود به وب جهانی لذت ببرید.'
-        : 'Tiksar VPN is a powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access to the global web with complete privacy and security.';
+        ? 'ابزاری قدرتمند برای دسترسی به اینترنت آزاد. محدودیت‌ها را بشکنید و با حفظ کامل حریم خصوصی از دسترسی نامحدود لذت ببرید.'
+        : 'A powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access with complete privacy.';
   }
 }

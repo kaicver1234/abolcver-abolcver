@@ -55,7 +55,7 @@
     },
     "server_selection": {
         "title": "Select Server",
-        "smart_connect": "Smart Connect",
+        "smart_connect": "Auto Select",
         "smart_connect_description": "Automatically selects the fastest server",
         "finding_best_server": "Finding best server...",
         "select_server": "Select a server",
@@ -69,7 +69,8 @@
         "free": "Free",
         "premium": "Premium",
         "coming_soon": "Coming Soon",
-        "coming_soon_desc": "This feature will be available in future updates"
+        "coming_soon_desc": "This feature will be available in future updates",
+        "current_server": "Current Server"
     },
     "host_checker": {
         "title": "Host Checker",

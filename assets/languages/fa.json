@@ -1,6 +1,6 @@
 {
     "language": {
-        "name": "فارسی",
+        "name": "پارسی",
         "code": "fa",
         "flag": "🇮🇷",
         "direction": "rtl"
@@ -55,7 +55,7 @@
     },
     "server_selection": {
         "title": "انتخاب سرور",
-        "smart_connect": "اتصال هوشمند",
+        "smart_connect": "انتخاب خودکار",
         "smart_connect_description": "به صورت خودکار سریع‌ترین سرور را انتخاب می‌کند",
         "finding_best_server": "در حال یافتن بهترین سرور...",
         "select_server": "انتخاب یک سرور",
@@ -69,7 +69,8 @@
         "free": "رایگان",
         "premium": "ویژه",
         "coming_soon": "به زودی",
-        "coming_soon_desc": "این ویژگی در آینده تکمیل خواهد شد"
+        "coming_soon_desc": "این ویژگی در آینده تکمیل خواهد شد",
+        "current_server": "سرور فعلی"
     },
     "host_checker": {
         "title": "بررسی میزبان",

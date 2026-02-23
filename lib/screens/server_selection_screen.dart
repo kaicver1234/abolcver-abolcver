@@ -8,7 +8,7 @@ import '../models/v2ray_config.dart';
 import '../utils/app_localizations.dart';
 import '../utils/country_flags.dart';
 import '../widgets/app_background.dart';
-import '../widgets/cyber_glow_background.dart';
+import '../widgets/modern_glass_card.dart';
 
 class ServerSelectionScreen extends StatefulWidget {
   const ServerSelectionScreen({super.key});
@@ -172,28 +172,25 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     return Directionality(
       textDirection: languageProvider.textDirection,
       child: AppBackground(
-        useSecondaryBackground: true,
-        child: CyberGlowBackground(
-          child: SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(context),
-                _buildTabButtons(),
-                if (_currentTab == 0) _buildActionButtons(),
-                Expanded(
-                  child: PageView(
-                    controller: _pageController,
-                    onPageChanged: (index) {
-                      setState(() => _currentTab = index);
-                    },
-                    children: [
-                      _buildFreeServersTab(),
-                      _buildPremiumTab(),
-                    ],
-                  ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              _buildHeader(context),
+              _buildTabButtons(),
+              if (_currentTab == 0) _buildActionButtons(),
+              Expanded(
+                child: PageView(
+                  controller: _pageController,
+                  onPageChanged: (index) {
+                    setState(() => _currentTab = index);
+                  },
+                  children: [
+                    _buildFreeServersTab(),
+                    _buildPremiumTab(),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
@@ -206,9 +203,9 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        isSmallScreen ? 12 : 16,
-        8,
-        isSmallScreen ? 12 : 16,
+        isSmallScreen ? 16 : 20,
+        12,
+        isSmallScreen ? 16 : 20,
         isSmallScreen ? 12 : 16,
       ),
       child: Row(
@@ -216,18 +213,14 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           // Back button
           GestureDetector(
             onTap: () => Navigator.pop(context),
-            child: Container(
-              width: isSmallScreen ? 40 : 44,
-              height: isSmallScreen ? 40 : 44,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
+            child: ModernGlassCard(
+              padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+              borderRadius: BorderRadius.circular(14),
               child: Consumer<LanguageProvider>(
                 builder: (context, langProvider, _) => Icon(
                   langProvider.isRtl ? Icons.arrow_forward_ios : Icons.arrow_back_ios_new,
                   color: Colors.white,
-                  size: isSmallScreen ? 16 : 18,
+                  size: isSmallScreen ? 18 : 20,
                 ),
               ),
             ),
@@ -242,8 +235,8 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
                   AppLocalizations.of(context).translate('server_selection.title'),
                   style: TextStyle(
                     color: Colors.white,
-                    fontSize: isSmallScreen ? 18 : 22,
-                    fontWeight: FontWeight.bold,
+                    fontSize: isSmallScreen ? 20 : 24,
+                    fontWeight: FontWeight.w700,
                     letterSpacing: -0.5,
                   ),
                   maxLines: 1,
@@ -254,7 +247,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
                   AppLocalizations.of(context).translate('server_selection.select_server'),
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.5),
-                    fontSize: isSmallScreen ? 11 : 13,
+                    fontSize: isSmallScreen ? 12 : 13,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -272,13 +265,10 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     final isSmallScreen = screenWidth < 360;
     
     return Padding(
-      padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 12 : 16),
-      child: Container(
-        height: isSmallScreen ? 48 : 52,
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(14),
-        ),
+      padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 16 : 20),
+      child: ModernGlassCard(
+        padding: const EdgeInsets.all(4),
+        margin: const EdgeInsets.only(bottom: 16),
         child: Row(
           children: [
             // Free Tab
@@ -292,25 +282,19 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.all(4),
-                  padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10 : 12),
+                  padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 12 : 14),
                   decoration: BoxDecoration(
-                    gradient: _currentTab == 0
-                        ? const LinearGradient(
-                            colors: [Color(0xFF00FFA3), Color(0xFF00D9FF)],
-                          )
-                        : null,
-                    color: _currentTab == 0 ? null : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
+                    color: _currentTab == 0
+                        ? Colors.white.withValues(alpha: 0.15)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         Icons.public,
-                        color: _currentTab == 0 
-                            ? Colors.white 
-                            : Colors.white.withValues(alpha: 0.5),
+                        color: Colors.white,
                         size: isSmallScreen ? 18 : 20,
                       ),
                       SizedBox(width: isSmallScreen ? 6 : 8),
@@ -318,9 +302,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
                         child: Text(
                           AppLocalizations.of(context).translate('server_selection.free'),
                           style: TextStyle(
-                            color: _currentTab == 0 
-                                ? Colors.white 
-                                : Colors.white.withValues(alpha: 0.5),
+                            color: Colors.white,
                             fontSize: isSmallScreen ? 13 : 15,
                             fontWeight: FontWeight.w600,
                           ),
@@ -344,25 +326,19 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.all(4),
-                  padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 10 : 12),
+                  padding: EdgeInsets.symmetric(vertical: isSmallScreen ? 12 : 14),
                   decoration: BoxDecoration(
-                    gradient: _currentTab == 1
-                        ? const LinearGradient(
-                            colors: [Color(0xFF00D9FF), Color(0xFF00FFA3)],
-                          )
-                        : null,
-                    color: _currentTab == 1 ? null : Colors.transparent,
-                    borderRadius: BorderRadius.circular(10),
+                    color: _currentTab == 1
+                        ? Colors.white.withValues(alpha: 0.15)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(
                         Icons.workspace_premium,
-                        color: _currentTab == 1 
-                            ? Colors.white 
-                            : Colors.white.withValues(alpha: 0.5),
+                        color: Colors.white,
                         size: isSmallScreen ? 18 : 20,
                       ),
                       SizedBox(width: isSmallScreen ? 6 : 8),
@@ -370,9 +346,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
                         child: Text(
                           AppLocalizations.of(context).translate('server_selection.premium'),
                           style: TextStyle(
-                            color: _currentTab == 1 
-                                ? Colors.white 
-                                : Colors.white.withValues(alpha: 0.5),
+                            color: Colors.white,
                             fontSize: isSmallScreen ? 13 : 15,
                             fontWeight: FontWeight.w600,
                           ),
@@ -397,29 +371,25 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     
     return Padding(
       padding: EdgeInsets.fromLTRB(
-        isSmallScreen ? 12 : 16,
-        isSmallScreen ? 12 : 16,
-        isSmallScreen ? 12 : 16,
-        8,
+        isSmallScreen ? 16 : 20,
+        0,
+        isSmallScreen ? 16 : 20,
+        12,
       ),
       child: Row(
         children: [
           // Refresh button
           GestureDetector(
             onTap: _isRefreshing ? null : _refreshServers,
-            child: Container(
-              width: isSmallScreen ? 40 : 44,
-              height: isSmallScreen ? 40 : 44,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(12),
-              ),
+            child: ModernGlassCard(
+              padding: EdgeInsets.all(isSmallScreen ? 10 : 12),
+              borderRadius: BorderRadius.circular(14),
               child: RotationTransition(
                 turns: _refreshAnimController,
                 child: Icon(
                   Icons.refresh,
                   color: _isRefreshing 
-                      ? const Color(0xFF00D9FF) 
+                      ? Colors.white 
                       : Colors.white.withValues(alpha: 0.7),
                   size: isSmallScreen ? 20 : 22,
                 ),
@@ -428,49 +398,46 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           ),
           SizedBox(width: isSmallScreen ? 10 : 12),
           // Test Ping button
-          GestureDetector(
-            onTap: _isTesting ? null : _testAllServerPings,
-            child: Container(
-              height: isSmallScreen ? 40 : 44,
-              padding: EdgeInsets.symmetric(horizontal: isSmallScreen ? 14 : 16),
-              decoration: BoxDecoration(
-                gradient: _isTesting 
-                    ? LinearGradient(
-                        colors: [Colors.grey.shade600, Colors.grey.shade700],
+          Expanded(
+            child: GestureDetector(
+              onTap: _isTesting ? null : _testAllServerPings,
+              child: ModernGlassCard(
+                padding: EdgeInsets.symmetric(
+                  horizontal: isSmallScreen ? 14 : 16,
+                  vertical: isSmallScreen ? 10 : 12,
+                ),
+                borderRadius: BorderRadius.circular(14),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (_isTesting)
+                      SizedBox(
+                        width: isSmallScreen ? 14 : 16,
+                        height: isSmallScreen ? 14 : 16,
+                        child: const CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
                       )
-                    : const LinearGradient(
-                        colors: [Color(0xFF00FFA3), Color(0xFF00D9FF)],
+                    else
+                      Icon(Icons.speed, color: Colors.white, size: isSmallScreen ? 16 : 18),
+                    SizedBox(width: isSmallScreen ? 6 : 8),
+                    Flexible(
+                      child: Text(
+                        _isTesting 
+                            ? (_testStatusText.isNotEmpty ? _testStatusText : '...') 
+                            : AppLocalizations.of(context).translate('server_selection.test_ping'),
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isSmallScreen ? 12 : 14,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (_isTesting)
-                    SizedBox(
-                      width: isSmallScreen ? 14 : 16,
-                      height: isSmallScreen ? 14 : 16,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  else
-                    Icon(Icons.speed, color: Colors.white, size: isSmallScreen ? 16 : 18),
-                  SizedBox(width: isSmallScreen ? 6 : 8),
-                  Text(
-                    _isTesting 
-                        ? (_testStatusText.isNotEmpty ? _testStatusText : '...') 
-                        : AppLocalizations.of(context).translate('server_selection.test_ping'),
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: isSmallScreen ? 11 : 13,
-                      fontWeight: FontWeight.w600,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -505,38 +472,40 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              padding: const EdgeInsets.all(28),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    const Color(0xFFFFD700).withValues(alpha: 0.15),
-                    const Color(0xFFFFA500).withValues(alpha: 0.08),
-                  ],
-                ),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.workspace_premium,
-                size: 56,
-                color: Color(0xFFFFD700),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              AppLocalizations.of(context).translate('server_selection.premium'),
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              AppLocalizations.of(context).translate('server_selection.coming_soon'),
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.6),
-                fontSize: 15,
+            ModernGlassCard(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(24),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.workspace_premium,
+                      size: 56,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Text(
+                    AppLocalizations.of(context).translate('server_selection.premium'),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    AppLocalizations.of(context).translate('server_selection.coming_soon'),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.6),
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -551,7 +520,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     
     return ListView.builder(
       padding: EdgeInsets.symmetric(
-        horizontal: isSmallScreen ? 12 : 16,
+        horizontal: isSmallScreen ? 16 : 20,
         vertical: 8,
       ),
       physics: const BouncingScrollPhysics(),
@@ -572,105 +541,89 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     final isSelected = provider.wasUsingSmartConnect;
     final isConnected = provider.activeConfig != null;
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isSelected 
-              ? const Color(0xFF00D9FF).withValues(alpha: 0.5) 
-              : Colors.transparent,
-          width: 1.5,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            if (isConnected) {
-              _showDisconnectFirstDialog(context);
-            } else {
-              provider.selectConfig(V2RayConfig.smartConnect());
-              Navigator.pop(context);
-            }
-          },
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            child: Row(
-              children: [
-                // App icon as Smart Connect flag - same size as country flags
-                Container(
-                  width: 40,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF0a0a0a),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: const Color(0xFF00D9FF).withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(5),
-                    child: Image.asset(
-                      'assets/images/apk.png',
-                      width: 40,
-                      height: 28,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Center(
-                          child: Icon(
-                            Icons.public,
-                            color: Color(0xFF00D9FF),
-                            size: 18,
-                          ),
-                        );
-                      },
-                    ),
-                  ),
+    return ModernGlassCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      border: isSelected 
+          ? Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5)
+          : null,
+      child: InkWell(
+        onTap: () {
+          if (isConnected) {
+            _showDisconnectFirstDialog(context);
+          } else {
+            provider.selectConfig(V2RayConfig.smartConnect());
+            Navigator.pop(context);
+          }
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Row(
+          children: [
+            // App icon
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.2),
                 ),
-                const SizedBox(width: 14),
-                // Text - smaller like server names
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        AppLocalizations.of(context).translate('server_selection.smart_connect'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        AppLocalizations.of(context).translate('server_selection.smart_connect_description'),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.4),
-                          fontSize: 11,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(9),
+                child: Image.asset(
+                  'assets/images/apk.png',
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(
+                      Icons.flash_on,
+                      color: Colors.white,
+                      size: 24,
+                    );
+                  },
                 ),
-                // Arrow - RTL aware
-                Consumer<LanguageProvider>(
-                  builder: (context, langProvider, _) => Icon(
-                    langProvider.isRtl ? Icons.arrow_back_ios : Icons.arrow_forward_ios,
-                    color: Colors.white.withValues(alpha: 0.25),
-                    size: 14,
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+            const SizedBox(width: 14),
+            // Text
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    AppLocalizations.of(context).translate('server_selection.smart_connect'),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    AppLocalizations.of(context).translate('server_selection.smart_connect_description'),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.5),
+                      fontSize: 12,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            // Arrow
+            Consumer<LanguageProvider>(
+              builder: (context, langProvider, _) => Icon(
+                langProvider.isRtl ? Icons.arrow_back_ios : Icons.arrow_forward_ios,
+                color: Colors.white.withValues(alpha: 0.3),
+                size: 16,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -681,66 +634,54 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     final ping = _pingResults[config.id];
     final isConnected = provider.activeConfig != null;
     
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: isSelected 
-              ? const Color(0xFF00D9FF).withValues(alpha: 0.5) 
-              : Colors.transparent,
-          width: 1.5,
-        ),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: () {
-            if (isConnected) {
-              _showDisconnectFirstDialog(context);
-            } else {
-              provider.selectConfig(config);
-              Navigator.pop(context);
-            }
-          },
-          borderRadius: BorderRadius.circular(14),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            child: Row(
-              children: [
-                // Country Flag
-                _buildCountryFlag(countryCode),
-                const SizedBox(width: 14),
-                // Server Name
-                Expanded(
-                  child: Text(
-                    _cleanServerName(config.remark),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
+    return ModernGlassCard(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      border: isSelected 
+          ? Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1.5)
+          : null,
+      child: InkWell(
+        onTap: () {
+          if (isConnected) {
+            _showDisconnectFirstDialog(context);
+          } else {
+            provider.selectConfig(config);
+            Navigator.pop(context);
+          }
+        },
+        borderRadius: BorderRadius.circular(20),
+        child: Row(
+          children: [
+            // Country Flag
+            _buildCountryFlag(countryCode),
+            const SizedBox(width: 14),
+            // Server Name
+            Expanded(
+              child: Text(
+                _cleanServerName(config.remark),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
                 ),
-                // Ping indicator
-                if (ping != null) ...[
-                  _buildPingIndicator(ping),
-                  const SizedBox(width: 10),
-                ],
-                // Arrow - RTL aware
-                Consumer<LanguageProvider>(
-                  builder: (context, langProvider, _) => Icon(
-                    langProvider.isRtl ? Icons.arrow_back_ios : Icons.arrow_forward_ios,
-                    color: Colors.white.withValues(alpha: 0.25),
-                    size: 14,
-                  ),
-                ),
-              ],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-          ),
+            // Ping indicator
+            if (ping != null) ...[
+              _buildPingIndicator(ping),
+              const SizedBox(width: 10),
+            ],
+            // Arrow
+            Consumer<LanguageProvider>(
+              builder: (context, langProvider, _) => Icon(
+                langProvider.isRtl ? Icons.arrow_back_ios : Icons.arrow_forward_ios,
+                color: Colors.white.withValues(alpha: 0.3),
+                size: 16,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -813,23 +754,23 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
     
     if (ping >= 99999) {
       // Timeout - no response
-      pingColor = Colors.red;
+      pingColor = Colors.white.withValues(alpha: 0.3);
       pingText = 'Timeout';
     } else if (ping < 500) {
-      // 0-499ms: سبز (عالی)
-      pingColor = const Color(0xFF00FFA3);
+      // 0-499ms: Good
+      pingColor = Colors.white;
       pingText = '${ping}ms';
     } else if (ping < 1000) {
-      // 500-999ms: سبز روشن (خوب)
-      pingColor = const Color(0xFF00FFA3);
+      // 500-999ms: Good
+      pingColor = Colors.white.withValues(alpha: 0.8);
       pingText = '${ping}ms';
     } else if (ping < 2000) {
-      // 1000-1999ms: نارنجی (متوسط)
-      pingColor = Colors.orange;
+      // 1000-1999ms: Medium
+      pingColor = Colors.white.withValues(alpha: 0.6);
       pingText = '${ping}ms';
     } else {
-      // 2000ms+: قرمز (ضعیف)
-      pingColor = Colors.red;
+      // 2000ms+: Poor
+      pingColor = Colors.white.withValues(alpha: 0.4);
       pingText = '${ping}ms';
     }
     
@@ -837,7 +778,11 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: pingColor.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(6),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: pingColor.withValues(alpha: 0.3),
+          width: 1,
+        ),
       ),
       child: Text(
         pingText,
@@ -855,11 +800,11 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const CircularProgressIndicator(color: Color(0xFF00D9FF)),
+          const CircularProgressIndicator(color: Colors.white),
           const SizedBox(height: 16),
           Text(
             AppLocalizations.of(context).translate('common.loading_servers'),
-            style: const TextStyle(color: Colors.white54, fontSize: 14),
+            style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 14),
           ),
         ],
       ),
@@ -887,14 +832,8 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           const SizedBox(height: 20),
           GestureDetector(
             onTap: _refreshServers,
-            child: Container(
+            child: ModernGlassCard(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00FFA3), Color(0xFF00D9FF)],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
               child: const Text(
                 'Refresh',
                 style: TextStyle(

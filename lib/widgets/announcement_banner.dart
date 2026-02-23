@@ -186,20 +186,6 @@ class _AnnouncementBannerWidgetState extends State<AnnouncementBannerWidget>
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Icon indicator
-                  Container(
-                    padding: EdgeInsets.all(isSmallScreen ? 6 : 7),
-                    decoration: BoxDecoration(
-                      color: color.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      _getIcon(_banner!.type),
-                      color: color,
-                      size: isSmallScreen ? 16 : 18,
-                    ),
-                  ),
-                  SizedBox(width: isSmallScreen ? 10 : 12),
                   // Message text - centered and flexible
                   Expanded(
                     child: Column(
@@ -296,16 +282,4 @@ class _AnnouncementBannerWidgetState extends State<AnnouncementBannerWidget>
     );
   }
 
-  IconData _getIcon(String type) {
-    switch (type) {
-      case 'warning':
-        return Icons.warning_amber_rounded;
-      case 'error':
-        return Icons.error_outline_rounded;
-      case 'success':
-        return Icons.check_circle_outline_rounded;
-      default:
-        return Icons.info_outline_rounded;
-    }
-  }
 }

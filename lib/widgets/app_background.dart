@@ -18,37 +18,21 @@ class AppBackground extends StatelessWidget {
       return child;
     }
 
-    return Stack(
-      children: [
-        // Background image
-        Positioned.fill(
-          child: Container(
-            decoration: const BoxDecoration(
-              image: DecorationImage(
-                image: AssetImage('assets/images/back.png'),
-                fit: BoxFit.cover,
-              ),
-            ),
-          ),
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Color(0xFF0B0D1A),
+            Color(0xFF0A0C18),
+            Color(0xFF060812),
+            Color(0xFF0B0D1A),
+          ],
+          stops: [0.0, 0.3, 0.7, 1.0],
         ),
-        // Dark overlay for better text readability
-        Positioned.fill(
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.5),
-                  Colors.black.withValues(alpha: 0.7),
-                ],
-              ),
-            ),
-          ),
-        ),
-        // Content
-        child,
-      ],
+      ),
+      child: child,
     );
   }
 }

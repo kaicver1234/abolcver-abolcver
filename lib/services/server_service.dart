@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../models/v2ray_config.dart';
 import '../utils/country_flags.dart';
-import 'package:flutter_v2ray_client/flutter_v2ray.dart';
+import 'package:flutter_v2ray/flutter_v2ray.dart';
 
 class ServerService {
   // Default server URL for server configurations
@@ -142,7 +142,7 @@ class ServerService {
           uri.startsWith('ss://') ||
           uri.startsWith('trojan://')) {
         try {
-          V2RayURL parser = V2ray.parseFromURL(uri);
+          V2RayURL parser = FlutterV2ray.parseFromURL(uri);
           String configType = '';
 
           if (uri.startsWith('vmess://')) {

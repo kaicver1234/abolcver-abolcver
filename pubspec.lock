@@ -472,13 +472,13 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_v2ray_client:
+  flutter_v2ray:
     dependency: "direct main"
     description:
-      path: "local_packages/flutter_v2ray_client"
+      path: "local_packages/flutter_v2ray"
       relative: true
     source: path
-    version: "1.1.2"
+    version: "1.0.10"
   flutter_web_plugins:
     dependency: transitive
     description: flutter

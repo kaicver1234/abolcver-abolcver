@@ -4,7 +4,7 @@ import '../providers/language_provider.dart';
 import '../services/update_checker_service.dart';
 import '../widgets/update_dialog.dart';
 import '../models/app_update_info.dart';
-import 'home_screen.dart';
+import 'modern_home_screen.dart';
 
 class MainNavigationScreen extends StatefulWidget {
   const MainNavigationScreen({super.key});
@@ -58,7 +58,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       builder: (context, languageProvider, child) {
         return Directionality(
           textDirection: languageProvider.textDirection,
-          child: const HomeScreen(),
+          child: const ModernHomeScreen(),
         );
       },
     );

@@ -6,6 +6,7 @@ import '../models/app_language.dart';
 import '../providers/language_provider.dart';
 import '../widgets/error_snackbar.dart';
 import '../widgets/cyber_glow_background.dart';
+import '../widgets/app_background.dart';
 
 class LanguageSettingsScreen extends StatefulWidget {
   const LanguageSettingsScreen({super.key});
@@ -74,9 +75,11 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen>
 
         return Directionality(
           textDirection: languageProvider.textDirection,
-          child: CyberGlowBackground(
-            child: SafeArea(
-              child: Column(
+          child: AppBackground(
+            useSecondaryBackground: true,
+            child: CyberGlowBackground(
+              child: SafeArea(
+                child: Column(
                 children: [
                   // Custom App Bar
                   Container(
@@ -178,6 +181,7 @@ class _LanguageSettingsScreenState extends State<LanguageSettingsScreen>
                 ],
               ),
             ),
+          ),
           ),
         );
       },

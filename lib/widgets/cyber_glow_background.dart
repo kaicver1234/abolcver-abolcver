@@ -3,65 +3,95 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/theme_provider.dart';
 
-/// Cyber Glow Background - Theme-Aware Version
-/// High-performance background with minimal widget overhead
-/// Three layers: center dark, top aurora, bottom seamless glow
+/// Modern glassmorphism background with animated gradient orbs
 class CyberGlowBackground extends StatelessWidget {
   final Widget child;
   final bool showBottomGlow;
-  final bool enableBlur; // Option to enable blur (impacts performance)
+  final bool enableBlur;
 
   const CyberGlowBackground({
     super.key,
     required this.child,
     this.showBottomGlow = true,
-    this.enableBlur = false, // Disabled by default for performance
+    this.enableBlur = false,
   });
 
   @override
   Widget build(BuildContext context) {
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, _) {
-        final colors = themeProvider.colors;
-        final themeId = themeProvider.currentTheme.id;
-        final baseColor = Color(colors.backgroundColor);
-        
         return AnnotatedRegion<SystemUiOverlayStyle>(
           value: SystemUiOverlayStyle.light.copyWith(
             statusBarColor: Colors.transparent,
-            systemNavigationBarColor: baseColor,
+            systemNavigationBarColor: const Color(0xFF0B0D1A),
           ),
           child: Scaffold(
-            backgroundColor: baseColor,
+            backgroundColor: Colors.transparent,
             body: Stack(
               children: [
-                // Layer 1: Base background (pure black)
-                const ColoredBox(
-                  color: Color(0xFF000000),
-                  child: SizedBox.expand(),
-                ),
-                
-                // Layer 2: Bottom glow (theme-specific gradient from bottom)
+                // Top-left purple/blue orb
                 Positioned(
-                  bottom: 0,
+                  top: -120,
+                  left: -80,
+                  child: Container(
+                    width: 300,
+                    height: 300,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFF6C5CE7).withValues(alpha: 0.12),
+                          const Color(0xFF6C5CE7).withValues(alpha: 0.04),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.4, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                // Top-right cyan orb
+                Positioned(
+                  top: -60,
+                  right: -100,
+                  child: Container(
+                    width: 260,
+                    height: 260,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          const Color(0xFF00D9FF).withValues(alpha: 0.08),
+                          const Color(0xFF00D9FF).withValues(alpha: 0.02),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+                // Bottom-center green glow
+                Positioned(
+                  bottom: -140,
                   left: 0,
                   right: 0,
-                  child: _buildBottomGlow(context, colors, themeId),
+                  child: Center(
+                    child: Container(
+                      width: 400,
+                      height: 350,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: [
+                            const Color(0xFF00FFA3).withValues(alpha: 0.06),
+                            const Color(0xFF00D9FF).withValues(alpha: 0.03),
+                            Colors.transparent,
+                          ],
+                          stops: const [0.0, 0.4, 1.0],
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                
-                // Layer 3: Center fade (dark gradient to top)
-                Positioned.fill(
-                  child: _buildCenterFade(),
-                ),
-                
-                // Layer 4: Top dim (solid dark)
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: _buildTopDim(context),
-                ),
-                
                 // Content
                 child,
               ],
@@ -69,78 +99,6 @@ class CyberGlowBackground extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-
-  Widget _buildBottomGlow(BuildContext context, colors, String themeId) {
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final bottomHeight = screenHeight * 0.5;
-    
-    // Cyan theme gradient - subtle glow from bottom
-    const gradientColors = [
-      Color.fromRGBO(0, 217, 255, 0.12),  // Cyan glow
-      Color.fromRGBO(0, 217, 255, 0.10),
-      Color.fromRGBO(0, 217, 255, 0.08),
-      Color.fromRGBO(0, 217, 255, 0.06),
-      Color.fromRGBO(0, 217, 255, 0.04),
-      Color.fromRGBO(0, 217, 255, 0.02),
-      Color.fromRGBO(0, 217, 255, 0.01),
-      Colors.transparent,
-      Colors.transparent,
-    ];
-    
-    return Container(
-      height: bottomHeight,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: gradientColors,
-          stops: [0.0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCenterFade() {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [
-            Colors.transparent,
-            Colors.transparent,
-            Color.fromRGBO(0, 0, 0, 0.3),
-            Color.fromRGBO(0, 0, 0, 0.6),
-            Color.fromRGBO(0, 0, 0, 0.85),
-            Color.fromRGBO(0, 0, 0, 1),
-            Color.fromRGBO(0, 0, 0, 1),
-          ],
-          stops: [0.0, 0.4, 0.5, 0.6, 0.7, 0.8, 1.0],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTopDim(BuildContext context) {
-    final screenHeight = MediaQuery.sizeOf(context).height;
-    final topHeight = screenHeight * 0.3;
-    
-    return Container(
-      height: topHeight,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF000000),
-            Color(0xFF000000),
-            Colors.transparent,
-          ],
-          stops: [0.0, 0.6, 1.0],
-        ),
-      ),
     );
   }
 }
