@@ -402,9 +402,8 @@ class V2RayService extends ChangeNotifier {
       for (int attempt = 0; attempt < 3; attempt++) {
         try {
           // Check if VPN is actually running with timeout
-          final delay = await _flutterV2ray.getConnectedServerDelay(
-              url: 'https://www.google.com/generate_204'
-          ).timeout(const Duration(seconds: 5));
+          final delay = await _flutterV2ray.getConnectedServerDelay()
+              .timeout(const Duration(seconds: 5));
           
           if (delay >= 0 && delay < 10000) {
             successfulChecks++;
@@ -542,10 +541,7 @@ class V2RayService extends ChangeNotifier {
         }
 
         final delay = await _flutterV2ray
-            .getServerDelay(
-                config: parser.getFullConfiguration(),
-                url: 'https://www.google.com/generate_204'
-            )
+            .getServerDelay(config: parser.getFullConfiguration())
             .timeout(
               const Duration(seconds: 7),
               onTimeout: () {
@@ -620,10 +616,7 @@ class V2RayService extends ChangeNotifier {
       // Use V2Ray core's native ping method (similar to v2rayNG's measureOutboundDelay)
       // This is more accurate than TCP/ICMP ping as it tests the actual proxy connection
       final delay = await _flutterV2ray
-          .getServerDelay(
-              config: parser.getFullConfiguration(),
-              url: 'https://www.google.com/generate_204'
-          )
+          .getServerDelay(config: parser.getFullConfiguration())
           .timeout(
             const Duration(seconds: 5),
             onTimeout: () {
@@ -939,9 +932,8 @@ class V2RayService extends ChangeNotifier {
       // PRIORITY 1: Try delay check FIRST - this is the most reliable method
       // It actually tests if V2Ray core is running and can reach the server
       try {
-        final delay = await _flutterV2ray.getConnectedServerDelay(
-            url: 'https://www.google.com/generate_204'
-        ).timeout(const Duration(seconds: 3));
+        final delay = await _flutterV2ray.getConnectedServerDelay()
+            .timeout(const Duration(seconds: 3));
         
         if (delay >= 0 && delay < 10000) {
           debugPrint('✅ VPN connected (delay check: ${delay}ms)');
@@ -1329,9 +1321,8 @@ class V2RayService extends ChangeNotifier {
     try {
       // Method 1: Try to get connected server delay (most accurate for active connection)
       try {
-        final connectedDelay = await _flutterV2ray.getConnectedServerDelay(
-            url: 'https://www.google.com/generate_204'
-        ).timeout(const Duration(seconds: 3));
+        final connectedDelay = await _flutterV2ray.getConnectedServerDelay()
+            .timeout(const Duration(seconds: 3));
         
         if (connectedDelay >= 0 && connectedDelay < 10000) {
           return connectedDelay;
