@@ -64,7 +64,7 @@ class ResponsiveHelper {
   double get headerFontSize => scale(22).clamp(18.0, 28.0);
   
   /// Timer font size
-  double get timerFontSize => scale(20).clamp(16.0, 26.0);
+  double get timerFontSize => scale(26).clamp(22.0, 32.0);
   
   /// Stats value font size
   double get statsValueFontSize => scale(15).clamp(12.0, 20.0);
@@ -76,7 +76,7 @@ class ResponsiveHelper {
   double get statsIconSize => scale(14).clamp(11.0, 18.0);
   
   /// Server card icon size
-  double get serverIconSize => scale(54).clamp(44.0, 68.0);
+  double get serverIconSize => scale(34).clamp(28.0, 40.0);
   
   /// Server card padding
   double get serverCardPadding => scale(15).clamp(12.0, 20.0);

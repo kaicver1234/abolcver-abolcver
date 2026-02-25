@@ -146,10 +146,10 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
         children: [
           RichText(
             text: TextSpan(
-              style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700),
+              style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.w700, decoration: TextDecoration.none),
               children: const [
-                TextSpan(text: 'Tiksar', style: TextStyle(color: Colors.white)),
-                TextSpan(text: 'VPN', style: TextStyle(color: Color(0xFFa78bfa))),
+                TextSpan(text: 'Tiksar', style: TextStyle(color: Colors.white, decoration: TextDecoration.none)),
+                TextSpan(text: 'VPN', style: TextStyle(color: Color(0xFFa78bfa), decoration: TextDecoration.none)),
               ],
             ),
           ),
@@ -168,6 +168,7 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
                   color: Colors.white.withValues(alpha: 0.6),
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
+                  decoration: TextDecoration.none,
                 ),
               ),
             ),
@@ -229,6 +230,7 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
                 fontSize: 15,
                 color: Colors.white.withValues(alpha: 0.6),
                 height: 1.6,
+                decoration: TextDecoration.none,
               ),
             ),
             const SizedBox(height: 48),
@@ -262,7 +264,7 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
         children: [
           Icon(icon, color: color, size: 18),
           const SizedBox(width: 6),
-          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
+          Text(label, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
         ],
       ),
     );
@@ -291,7 +293,7 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
             const SizedBox(height: 8),
             Text(
               tr.translate('privacy_welcome.features_subtitle'),
-              style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.5)),
+              style: TextStyle(fontSize: 14, color: Colors.white.withValues(alpha: 0.5), decoration: TextDecoration.none),
             ),
             const SizedBox(height: 32),
             ...features.asMap().entries.map((entry) {
@@ -357,9 +359,9 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                Text(title, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600, decoration: TextDecoration.none)),
                 const SizedBox(height: 4),
-                Text(desc, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13, height: 1.4)),
+                Text(desc, style: TextStyle(color: Colors.white.withValues(alpha: 0.5), fontSize: 13, height: 1.4, decoration: TextDecoration.none)),
               ],
             ),
           ),
@@ -414,7 +416,7 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
             Text(
               tr.translate('privacy_welcome.one_tap_away'),
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 15, color: Colors.white.withValues(alpha: 0.6), height: 1.6),
+              style: TextStyle(fontSize: 15, color: Colors.white.withValues(alpha: 0.6), height: 1.6, decoration: TextDecoration.none),
             ),
             SizedBox(height: responsive.scale(48).clamp(32.0, 60.0)),
             GestureDetector(
@@ -454,7 +456,7 @@ class _PrivacyWelcomeScreenState extends State<PrivacyWelcomeScreen>
                     child: const Icon(Icons.check, color: Color(0xFF10b981), size: 14),
                   ),
                   const SizedBox(width: 8),
-                  Text(tr.translate('privacy_welcome.no_registration'), style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13)),
+                  Text(tr.translate('privacy_welcome.no_registration'), style: TextStyle(color: Colors.white.withValues(alpha: 0.6), fontSize: 13, decoration: TextDecoration.none)),
                 ],
               ),
             ),

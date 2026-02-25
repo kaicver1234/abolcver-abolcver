@@ -48,10 +48,10 @@ android {
     defaultConfig {
         // Application ID for Tiksar VPN
         applicationId = "com.tiksarvpn.app"
-        minSdk = 24
+        minSdk = 21
         targetSdk = flutter.targetSdkVersion
-        versionCode = 11
-        versionName = "1.1.4"
+        versionCode = 12
+        versionName = "1.1.5"
         multiDexEnabled = true
     }
 

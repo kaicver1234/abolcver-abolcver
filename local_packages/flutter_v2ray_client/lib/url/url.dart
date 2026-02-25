@@ -50,9 +50,7 @@ abstract class V2RayURL {
       'network': null
     },
     'sniffing': {
-      'enabled': true,
-      'destOverride': ['http', 'tls', 'quic'],
-      'metadataOnly': false,
+      'enabled': false,
     },
     'streamSettings': null,
     'allocate': null
@@ -123,10 +121,12 @@ abstract class V2RayURL {
     'servers': [
       '1.1.1.1',
       '8.8.8.8',
+      '8.8.4.4',
     ],
     'queryStrategy': 'UseIPv4',
     'disableCache': false,
     'disableFallback': false,
+    'disableFallbackIfMatch': false,
   };
 
   /// Routing configuration with optimized strategy.
@@ -137,9 +137,31 @@ abstract class V2RayURL {
     'balancers': []
   };
 
+  /// Policy configuration for optimized performance.
+  Map<String, dynamic> policy = {
+    'levels': {
+      '8': {
+        'handshakeSec': 4,
+        'connIdle': 300,
+        'uplinkOnly': 2,
+        'downlinkOnly': 5,
+        'bufferSize': 10240,
+        'statsUserUplink': false,
+        'statsUserDownlink': false,
+      }
+    },
+    'system': {
+      'statsInboundUplink': false,
+      'statsInboundDownlink': false,
+      'statsOutboundUplink': false,
+      'statsOutboundDownlink': false,
+    }
+  };
+
   /// Complete V2Ray configuration combining all settings.
   Map<String, dynamic> get fullConfiguration => {
         'log': log,
+        'policy': policy,
         'inbounds': [inbound],
         'outbounds': [outbound1, outbound2, outbound3],
         'dns': dns,
@@ -175,7 +197,9 @@ abstract class V2RayURL {
     'dsSettings': null,
     'sockopt': {
       'tcpFastOpen': true,
-      'tcpKeepAliveInterval': 0,
+      'tcpKeepAliveInterval': 30,
+      'tcpKeepAliveIdle': 100,
+      'tcpNoDelay': true,
     }
   };
 
@@ -246,12 +270,12 @@ abstract class V2RayURL {
     } else if (transport == 'kcp') {
       streamSetting['kcpSettings'] = {
         'mtu': 1350,
-        'tti': 50,
-        'uplinkCapacity': 12,
-        'downlinkCapacity': 100,
+        'tti': 20,
+        'uplinkCapacity': 100,
+        'downlinkCapacity': 1000,
         'congestion': false,
-        'readBufferSize': 2,
-        'writeBufferSize': 2,
+        'readBufferSize': 4,
+        'writeBufferSize': 4,
         'header': {
           'type': headerType ?? 'none',
         },

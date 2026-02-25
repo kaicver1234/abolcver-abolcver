@@ -80,7 +80,11 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
   }
 
   Future<void> _handleConnectionToggle() async {
-    if (_isConnecting) return;
+    if (_isConnecting) {
+      final provider = Provider.of<V2RayProvider>(context, listen: false);
+      provider.cancelConnect();
+      return;
+    }
 
     if (!mounted) return;
     setState(() => _isConnecting = true);
@@ -404,20 +408,20 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
 
             const AnnouncementBannerWidget(),
 
-            SizedBox(height: responsive.responsiveValue(small: 26, medium: 28, large: 32)),
+            SizedBox(height: responsive.responsiveValue(small: 16, medium: 20, large: 24)),
             
-            // Connection Button with Status
+            // Connection Timer (above button)
+            _buildConnectionTimer(provider),
+
+            SizedBox(height: responsive.responsiveValue(small: 12, medium: 14, large: 16)),
+            
+            // Connection Button
             _buildConnectionButtonWithStatus(provider),
             
-            SizedBox(height: responsive.responsiveValue(small: 32, medium: 36, large: 40)),
+            SizedBox(height: responsive.responsiveValue(small: 28, medium: 32, large: 36)),
             
             // Server Card
             _buildServerCard(provider),
-            
-            SizedBox(height: responsive.verticalSpacing),
-            
-            // Connection Timer
-            _buildConnectionTimer(provider),
             
             SizedBox(height: responsive.verticalSpacing),
             
@@ -436,43 +440,67 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     final isConnected = provider.activeConfig != null;
     final isConnecting = _isConnecting;
     
-    String statusText;
-    if (isConnecting) {
-      statusText = AppLocalizations.of(context).translate('common.connecting');
-    } else if (isConnected) {
-      statusText = AppLocalizations.of(context).translate('common.connected');
-    } else {
-      statusText = AppLocalizations.of(context).translate('common.disconnected');
-    }
-    
     final btnSize = responsive.connectionButtonSize;
-    return SizedBox(
-      key: const ValueKey('connection_button'),
-      width: btnSize * 1.15 + 4,
-      height: btnSize * 1.15 + 4,
-      child: Stack(
-        alignment: Alignment.center,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        ModernConnectionButton(
+          key: const ValueKey('connection_button'),
+          isConnected: isConnected,
+          isConnecting: isConnecting,
+          onTap: _handleConnectionToggle,
+          size: btnSize,
+        ),
+        const SizedBox(height: 14),
+        _buildStatusLabel(isConnected: isConnected, isConnecting: isConnecting),
+      ],
+    );
+  }
+
+  Widget _buildStatusLabel({required bool isConnected, required bool isConnecting}) {
+    final String text;
+    final Color color;
+    final IconData icon;
+
+    if (isConnecting) {
+      text = AppLocalizations.of(context).translate('home.connecting');
+      color = const Color(0xFF00D9FF);
+      icon = Icons.sync_rounded;
+    } else if (isConnected) {
+      text = AppLocalizations.of(context).translate('home.connected');
+      color = const Color(0xFF00FFA3);
+      icon = Icons.shield_rounded;
+    } else {
+      text = AppLocalizations.of(context).translate('home.disconnected');
+      color = Colors.white.withValues(alpha: 0.3);
+      icon = Icons.shield_outlined;
+    }
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      switchInCurve: Curves.easeOut,
+      switchOutCurve: Curves.easeIn,
+      transitionBuilder: (child, anim) => FadeTransition(
+        opacity: anim,
+        child: SlideTransition(
+          position: Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(anim),
+          child: child,
+        ),
+      ),
+      child: Row(
+        key: ValueKey(isConnecting ? 'connecting' : isConnected ? 'connected' : 'disconnected'),
+        mainAxisSize: MainAxisSize.min,
         children: [
-          ModernConnectionButton(
-            isConnected: isConnected,
-            isConnecting: isConnecting,
-            onTap: _handleConnectionToggle,
-            size: btnSize,
-          ),
-          Positioned(
-            bottom: btnSize * 0.17,
-            child: IgnorePointer(
-              child: Text(
-                statusText,
-                style: TextStyle(
-                  color: isConnected
-                      ? Colors.black.withValues(alpha: 0.55)
-                      : Colors.white.withValues(alpha: 0.45),
-                  fontSize: responsive.scale(9).clamp(8.0, 11.0),
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.8,
-                ),
-              ),
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.4,
+              decoration: TextDecoration.none,
             ),
           ),
         ],
@@ -562,14 +590,14 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
                             Colors.white.withValues(alpha: 0.06),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(10),
                         border: Border.all(
                           color: Colors.white.withValues(alpha: 0.15),
-                          width: 1.5,
+                          width: 1,
                         ),
                       ),
                       child: ClipRRect(
-                        borderRadius: BorderRadius.circular(14),
+                        borderRadius: BorderRadius.circular(10),
                         child: _buildServerIconContent(countryCode, isSmartConnect && provider.activeConfig == null),
                       ),
                     ),
@@ -976,7 +1004,7 @@ class _AboutPageViewState extends State<_AboutPageView>
                   ),
                 ),
                 child: Text(
-                  'Version 1.1.4',
+                  'Version 1.1.5',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.5),
                     fontSize: 11,

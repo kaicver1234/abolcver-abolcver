@@ -20,16 +20,13 @@ class SpeedTestProvider with ChangeNotifier {
   static const String _downloadUrl = '$_baseUrl/__down';
   static const String _uploadUrl = '$_baseUrl/__up';
 
-  // Measurement configuration like defyxVPN
   static const List<Map<String, dynamic>> _measurements = [
-    {'type': 'latency', 'numPackets': 1},
-    {'type': 'download', 'bytes': 100000, 'count': 1},
     {'type': 'latency', 'numPackets': 20},
-    {'type': 'download', 'bytes': 100000, 'count': 9},
-    {'type': 'download', 'bytes': 1000000, 'count': 8},
-    {'type': 'upload', 'bytes': 100000, 'count': 8},
-    {'type': 'upload', 'bytes': 1000000, 'count': 6},
-    {'type': 'download', 'bytes': 10000000, 'count': 6},
+    {'type': 'download', 'bytes': 100000,  'count': 3},
+    {'type': 'download', 'bytes': 1000000, 'count': 5},
+    {'type': 'download', 'bytes': 10000000,'count': 4},
+    {'type': 'upload',   'bytes': 100000,  'count': 3},
+    {'type': 'upload',   'bytes': 1000000, 'count': 5},
   ];
 
   String _measurementId = '';
@@ -106,64 +103,64 @@ class SpeedTestProvider with ChangeNotifier {
 
   Future<void> _runMeasurementSequence() async {
     String currentPhase = '';
-    int totalMeasurements = _measurements.length;
 
-    for (int i = 0; i < totalMeasurements; i++) {
-      if (_isCanceled) {
-        debugPrint('🛑 Measurement sequence canceled');
-        return;
-      }
+    // Count measurements by phase for accurate per-phase progress
+    final downloadMeasurements = _measurements.where((m) => m['type'] == 'download').toList();
+    final uploadMeasurements = _measurements.where((m) => m['type'] == 'upload').toList();
+    int downloadDone = 0;
+    int uploadDone = 0;
+
+    for (int i = 0; i < _measurements.length; i++) {
+      if (_isCanceled) return;
 
       final measurement = _measurements[i];
-      final progress = (i + 1) / totalMeasurements;
       final type = measurement['type'] as String;
 
-      bool needsPhaseChange = false;
-      SpeedTestStep? nextStep;
+      final bool phaseChanged = type != currentPhase;
+      if (phaseChanged) {
+        // Smooth transition between phases
+        if (currentPhase.isNotEmpty) {
+          _state = _state.copyWith(progress: 0.0, currentSpeed: 0);
+          notifyListeners();
+          await Future.delayed(const Duration(milliseconds: 600));
+          if (_isCanceled) return;
+        }
 
-      if (type == 'latency' && currentPhase != 'loading') {
-        needsPhaseChange = true;
-        nextStep = SpeedTestStep.loading;
-        currentPhase = 'loading';
-      } else if (type == 'download' && currentPhase != 'download') {
-        needsPhaseChange = true;
-        nextStep = SpeedTestStep.download;
-        currentPhase = 'download';
-      } else if (type == 'upload' && currentPhase != 'upload') {
-        needsPhaseChange = true;
-        nextStep = SpeedTestStep.upload;
-        currentPhase = 'upload';
-      }
-
-      // Reset progress when changing phase
-      if (needsPhaseChange && i > 0 && _state.progress > 0) {
-        _state = _state.copyWith(progress: 0.0);
-        notifyListeners();
-        await Future.delayed(const Duration(milliseconds: 1200));
-
-        if (_isCanceled) return;
-      }
-
-      if (needsPhaseChange && nextStep != null) {
+        currentPhase = type;
+        final nextStep = type == 'download'
+            ? SpeedTestStep.download
+            : type == 'upload'
+                ? SpeedTestStep.upload
+                : SpeedTestStep.loading;
         _state = _state.copyWith(step: nextStep);
         notifyListeners();
       }
 
-      debugPrint('📊 Running measurement ${i + 1}/$totalMeasurements: $type');
+      // Progress within current phase
+      double phaseProgress = 0.0;
+      if (type == 'download') {
+        phaseProgress = downloadDone / downloadMeasurements.length;
+      } else if (type == 'upload') {
+        phaseProgress = uploadDone / uploadMeasurements.length;
+      }
+
+      debugPrint('📊 Measurement $i: $type');
 
       switch (type) {
         case 'latency':
           await _runLatencyMeasurement(measurement);
           break;
         case 'download':
-          await _runDownloadMeasurement(measurement, progress);
+          await _runDownloadMeasurement(measurement, phaseProgress);
+          downloadDone++;
           break;
         case 'upload':
-          await _runUploadMeasurement(measurement, progress);
+          await _runUploadMeasurement(measurement, phaseProgress);
+          uploadDone++;
           break;
       }
 
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future.delayed(const Duration(milliseconds: 30));
     }
   }
 
@@ -396,11 +393,10 @@ class SpeedTestProvider with ChangeNotifier {
   Future<double> _measureUploadSpeed(int bytes) async {
     if (_isCanceled) return 0.0;
 
-    final data = Uint8List(bytes);
     final random = Random();
-    for (int i = 0; i < min(2048, bytes); i++) {
-      data[i] = random.nextInt(256);
-    }
+    final data = Uint8List.fromList(
+      List<int>.generate(bytes, (_) => random.nextInt(256)),
+    );
 
     final sw = Stopwatch()..start();
     DateTime? lastUpdateTime;
@@ -411,7 +407,11 @@ class SpeedTestProvider with ChangeNotifier {
         '$_uploadUrl?measId=$_measurementId&during=upload',
         data: data,
         options: Options(
-          headers: {'Content-Type': 'application/octet-stream'},
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'Cache-Control': 'no-cache, no-store',
+          },
+          sendTimeout: const Duration(seconds: 90),
         ),
         cancelToken: _cancelToken,
         onSendProgress: (sent, total) {

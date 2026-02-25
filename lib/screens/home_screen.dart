@@ -1071,7 +1071,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
                 Icon(Icons.verified, color: const Color(0xFF00D9FF), size: isSmallScreen ? 14 : 16),
                 SizedBox(width: isSmallScreen ? 5 : 6),
                 Text(
-                  'Version 1.1.4',
+                  'Version 1.1.5',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.8),
                     fontSize: isSmallScreen ? 12 : 13,

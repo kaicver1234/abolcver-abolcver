@@ -26,9 +26,17 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   String _errorMessage = '';
   V2RayConfig? _selectedConfig;
   bool _wasUsingSmartConnect = true; // Default to Smart Connect
+  bool _cancelRequested = false;
   
   // Getter for wasUsingSmartConnect
   bool get wasUsingSmartConnect => _wasUsingSmartConnect;
+  
+  void cancelConnect() {
+    if (_isConnecting) {
+      _cancelRequested = true;
+      debugPrint('🛑 Cancel requested by user');
+    }
+  }
   
   // Smart Connect: Find and connect to fastest server (tests first 15 servers)
   // Uses V2Ray core delay for accurate results
@@ -45,6 +53,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     _errorMessage = '';
     _wasUsingSmartConnect = true;
     _isConnecting = true;
+    _cancelRequested = false;
     notifyListeners();
     
     try {
@@ -158,6 +167,14 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       }
       
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      
+      if (_cancelRequested) {
+        debugPrint('🛑 Smart Connect cancelled by user after server selection');
+        _isConnecting = false;
+        _cancelRequested = false;
+        notifyListeners();
+        return;
+      }
       
       _selectedConfig = serverToConnect;
       // DON'T notify here - wait until connection is complete
@@ -1024,6 +1041,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     
     _isConnecting = true;
     _errorMessage = '';
+    _cancelRequested = false;
     notifyListeners();
 
     // Connection configuration
@@ -1058,8 +1076,24 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         }
       }
 
+      // STEP 2: Check if cancelled before connecting
+      if (_cancelRequested) {
+        debugPrint('🛑 Connection cancelled by user before attempt');
+        _isConnecting = false;
+        _cancelRequested = false;
+        notifyListeners();
+        return;
+      }
+
       // STEP 2: Try to connect with automatic retry
       for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+        if (_cancelRequested) {
+          debugPrint('🛑 Connection cancelled by user during retry loop');
+          _isConnecting = false;
+          _cancelRequested = false;
+          notifyListeners();
+          return;
+        }
         debugPrint('🔄 Connection attempt $attempt/$maxAttempts...');
         
         try {
