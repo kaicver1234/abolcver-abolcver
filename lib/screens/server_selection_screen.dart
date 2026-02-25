@@ -31,10 +31,17 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   int _totalCount = 0;
   int _batchSize = 10;
 
+  int _activeTabIndex = 0;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging && _activeTabIndex != _tabController.index) {
+        setState(() => _activeTabIndex = _tabController.index);
+      }
+    });
     _refreshAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1000),
@@ -139,7 +146,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
             children: [
               _buildHeader(context, responsive),
               _buildTabBar(responsive),
-              if (_tabController.index == 0)
+              if (_activeTabIndex == 0)
                 _buildActionButtons(responsive),
               Expanded(
                 child: TabBarView(
@@ -228,43 +235,31 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   Widget _buildTabBar(ResponsiveHelper responsive) {
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: responsive.horizontalPadding),
-      child: AnimatedBuilder(
-        animation: _tabController.animation!,
-        builder: (context, _) {
-          final index = _tabController.index;
-          return Container(
-            height: responsive.scale(46).clamp(40.0, 56.0),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      child: Container(
+        height: responsive.scale(46).clamp(40.0, 56.0),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.05),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          children: [
+            _buildTabButton(
+              label: AppLocalizations.of(context).translate('server_selection.free'),
+              icon: Icons.public_rounded,
+              isActive: _activeTabIndex == 0,
+              onTap: () => _tabController.animateTo(0),
+              responsive: responsive,
             ),
-            child: Row(
-              children: [
-                _buildTabButton(
-                  label: AppLocalizations.of(context).translate('server_selection.free'),
-                  icon: Icons.public_rounded,
-                  isActive: index == 0,
-                  onTap: () {
-                    setState(() {});
-                    _tabController.animateTo(0);
-                  },
-                  responsive: responsive,
-                ),
-                _buildTabButton(
-                  label: AppLocalizations.of(context).translate('server_selection.premium'),
-                  icon: Icons.workspace_premium_rounded,
-                  isActive: index == 1,
-                  onTap: () {
-                    setState(() {});
-                    _tabController.animateTo(1);
-                  },
-                  responsive: responsive,
-                ),
-              ],
+            _buildTabButton(
+              label: AppLocalizations.of(context).translate('server_selection.premium'),
+              icon: Icons.workspace_premium_rounded,
+              isActive: _activeTabIndex == 1,
+              onTap: () => _tabController.animateTo(1),
+              responsive: responsive,
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
@@ -282,6 +277,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           margin: const EdgeInsets.all(4),
+          height: double.infinity,
           decoration: BoxDecoration(
             gradient: isActive
                 ? const LinearGradient(
@@ -295,6 +291,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(
                 icon,
@@ -452,7 +449,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
             top: 8,
             bottom: 24,
           ),
-          physics: const BouncingScrollPhysics(),
+          physics: const ClampingScrollPhysics(),
           itemCount: configs.length,
           addRepaintBoundaries: true,
           itemBuilder: (context, index) {

@@ -177,7 +177,7 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
                     Expanded(
                       child: CustomScrollView(
                         controller: _scrollController,
-                        physics: const BouncingScrollPhysics(),
+                        physics: const ClampingScrollPhysics(),
                         slivers: [
                           SliverToBoxAdapter(child: _buildSearchSection(themeProvider.colors)),
                           SliverToBoxAdapter(child: _buildQuickAccessSection(themeProvider.colors)),

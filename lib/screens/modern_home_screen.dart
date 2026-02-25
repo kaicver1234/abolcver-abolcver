@@ -395,7 +395,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     final responsive = ResponsiveHelper(context);
     
     return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
+      physics: const ClampingScrollPhysics(),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: responsive.horizontalPadding),
         child: Column(
@@ -753,7 +753,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     ];
 
     return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
+      physics: const ClampingScrollPhysics(),
       padding: EdgeInsets.all(responsive.horizontalPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -941,7 +941,7 @@ class _AboutPageViewState extends State<_AboutPageView>
     final remoteConfig = widget.remoteConfig;
 
     return SingleChildScrollView(
-      physics: const BouncingScrollPhysics(),
+      physics: const ClampingScrollPhysics(),
       padding: EdgeInsets.symmetric(horizontal: responsive.horizontalPadding),
       child: Column(
         children: [

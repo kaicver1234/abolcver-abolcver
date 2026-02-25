@@ -84,7 +84,7 @@ class _AboutScreenState extends State<AboutScreen> with TickerProviderStateMixin
                     _buildHeader(context),
                     Expanded(
                       child: SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
+                        physics: const ClampingScrollPhysics(),
                         padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Column(
                           children: [
@@ -152,7 +152,8 @@ class _AboutScreenState extends State<AboutScreen> with TickerProviderStateMixin
   }
 
   Widget _buildLogoSection(BuildContext context) {
-    return ScaleTransition(
+    return RepaintBoundary(
+      child: ScaleTransition(
       scale: _logoAnimation,
       child: Column(
         children: [
@@ -224,6 +225,7 @@ class _AboutScreenState extends State<AboutScreen> with TickerProviderStateMixin
             ),
           ),
         ],
+      ),
       ),
     );
   }
@@ -297,14 +299,17 @@ class _AboutScreenState extends State<AboutScreen> with TickerProviderStateMixin
             style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 14),
           ),
           const SizedBox(width: 8),
-          AnimatedBuilder(
-            animation: _heartAnimation,
-            builder: (context, child) {
-              return Transform.scale(
-                scale: _heartAnimation.value,
-                child: const Icon(Icons.favorite_rounded, color: Color(0xFFf472b6), size: 20),
-              );
-            },
+          RepaintBoundary(
+            child: AnimatedBuilder(
+              animation: _heartAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _heartAnimation.value,
+                  child: child,
+                );
+              },
+              child: const Icon(Icons.favorite_rounded, color: Color(0xFFf472b6), size: 20),
+            ),
           ),
           const SizedBox(width: 8),
           Text(
