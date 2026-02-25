@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 class SplashLoadingScreen extends StatefulWidget {
@@ -14,290 +15,515 @@ class SplashLoadingScreen extends StatefulWidget {
 
 class _SplashLoadingScreenState extends State<SplashLoadingScreen>
     with TickerProviderStateMixin {
-  late AnimationController _zoomController;
-  late AnimationController _lettersController;
-  late AnimationController _waveController;
-  late AnimationController _versionController;
+  late AnimationController _bgController;
+  late AnimationController _shieldController;
+  late AnimationController _textController;
+  late AnimationController _progressController;
+  late AnimationController _pulseController;
+  late AnimationController _particleController;
 
-  late Animation<double> _zoomAnim;
-  late Animation<double> _versionAnim;
+  late Animation<double> _shieldScale;
+  late Animation<double> _shieldOpacity;
+  late Animation<double> _textOpacity;
+  late Animation<double> _textSlide;
+  late Animation<double> _taglineOpacity;
+  late Animation<double> _progressAnim;
+  late Animation<double> _pulseAnim;
 
-  final List<Animation<double>> _letterOpacityAnims = [];
-  final List<Animation<double>> _letterTranslateAnims = [];
+  static const Color _cyan = Color(0xFF00D9FF);
+  static const Color _green = Color(0xFF00FFA3);
+  static const Color _darkBg = Color(0xFF050A0F);
 
-  static const Color cyan = Color(0xFF00D9FF);
-  static const Color green = Color(0xFF00FFA3);
+  final List<_Particle> _particles = [];
+  final math.Random _random = math.Random(42);
 
   @override
   void initState() {
     super.initState();
+    _generateParticles();
     _setupAnimations();
-    _startAnimations();
+    _startSequence();
+  }
+
+  void _generateParticles() {
+    for (int i = 0; i < 28; i++) {
+      _particles.add(_Particle(
+        x: _random.nextDouble(),
+        y: _random.nextDouble(),
+        size: _random.nextDouble() * 2.5 + 0.5,
+        opacity: _random.nextDouble() * 0.4 + 0.1,
+        speed: _random.nextDouble() * 0.3 + 0.1,
+        phase: _random.nextDouble() * math.pi * 2,
+      ));
+    }
   }
 
   void _setupAnimations() {
-    // Main zoom animation (Netflix style)
-    _zoomController = AnimationController(
+    _bgController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1500),
-    );
-    _zoomAnim = Tween<double>(begin: 0.3, end: 1.0).animate(
-      CurvedAnimation(parent: _zoomController, curve: Curves.easeOut),
+      duration: const Duration(milliseconds: 3000),
     );
 
-    // Letters bounce animation
-    _lettersController = AnimationController(
+    _particleController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1300),
+      duration: const Duration(seconds: 6),
+    )..repeat();
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+    _pulseAnim = Tween<double>(begin: 0.95, end: 1.05).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
     );
 
-    // Letter timings: T(0.8s), I(0.85s), K(0.9s), S(0.95s), A(1s), R(1.05s), V(1.2s), P(1.25s), N(1.3s)
-    final letterDelays = [800, 850, 900, 950, 1000, 1050, 1200, 1250, 1300];
-    
-    for (int i = 0; i < 9; i++) {
-      final startMs = letterDelays[i];
-      final start = startMs / 1300.0;
-      final end = ((startMs + 600) / 1300.0).clamp(0.0, 1.0);
-      
-      _letterOpacityAnims.add(
-        Tween<double>(begin: 0, end: 1).animate(
-          CurvedAnimation(
-            parent: _lettersController,
-            curve: Interval(start, end, curve: Curves.easeOut),
-          ),
-        ),
-      );
-      
-      _letterTranslateAnims.add(
-        Tween<double>(begin: -30, end: 0).animate(
-          CurvedAnimation(
-            parent: _lettersController,
-            curve: Interval(start, end, curve: Curves.easeOut),
-          ),
-        ),
-      );
-    }
-
-    // Wave animation (infinite)
-    _waveController = AnimationController(
+    _shieldController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 900),
+    );
+    _shieldScale = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _shieldController, curve: Curves.elasticOut),
+    );
+    _shieldOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _shieldController,
+        curve: const Interval(0.0, 0.4, curve: Curves.easeOut),
+      ),
     );
 
-    // Version animation
-    _versionController = AnimationController(
+    _textController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 700),
     );
-    _versionAnim = CurvedAnimation(parent: _versionController, curve: Curves.easeOut);
+    _textOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _textController, curve: Curves.easeOut),
+    );
+    _textSlide = Tween<double>(begin: 20.0, end: 0.0).animate(
+      CurvedAnimation(parent: _textController, curve: Curves.easeOut),
+    );
+    _taglineOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(
+        parent: _textController,
+        curve: const Interval(0.4, 1.0, curve: Curves.easeOut),
+      ),
+    );
+
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    );
+    _progressAnim = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _progressController, curve: Curves.easeInOut),
+    );
   }
 
-  void _startAnimations() {
-    // Start zoom immediately
-    _zoomController.forward();
+  void _startSequence() {
+    _bgController.forward();
 
-    // Start letters at 800ms
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted) _lettersController.forward();
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) _shieldController.forward();
     });
 
-    // Start wave at 1800ms
-    Future.delayed(const Duration(milliseconds: 1800), () {
-      if (mounted) _waveController.repeat();
+    Future.delayed(const Duration(milliseconds: 900), () {
+      if (mounted) _textController.forward();
     });
 
-    // Start version at 2200ms
-    Future.delayed(const Duration(milliseconds: 2200), () {
-      if (mounted) _versionController.forward();
+    Future.delayed(const Duration(milliseconds: 1400), () {
+      if (mounted) _progressController.forward();
     });
 
-    // Navigate after 3500ms
-    Future.delayed(const Duration(milliseconds: 3500), () {
+    Future.delayed(const Duration(milliseconds: 3200), () {
       if (mounted) _navigateToNext();
     });
   }
 
   void _navigateToNext() {
-    _waveController.stop();
-    
     Navigator.pushReplacement(
       context,
       PageRouteBuilder(
-        pageBuilder: (context, animation, secondaryAnimation) => widget.nextScreen,
-        transitionsBuilder: (context, animation, secondaryAnimation, child) {
-          return FadeTransition(
-            opacity: animation,
-            child: child,
-          );
-        },
-        transitionDuration: const Duration(milliseconds: 600),
+        pageBuilder: (_, __, ___) => widget.nextScreen,
+        transitionsBuilder: (_, anim, __, child) =>
+            FadeTransition(opacity: anim, child: child),
+        transitionDuration: const Duration(milliseconds: 500),
       ),
     );
   }
 
   @override
   void dispose() {
-    _zoomController.dispose();
-    _lettersController.dispose();
-    _waveController.dispose();
-    _versionController.dispose();
+    _bgController.dispose();
+    _shieldController.dispose();
+    _textController.dispose();
+    _progressController.dispose();
+    _pulseController.dispose();
+    _particleController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final isSmallScreen = size.width < 400;
-    final isMediumScreen = size.width >= 400 && size.width < 600;
-    
-    // Responsive sizes - more moderate
-    final textSize = isSmallScreen ? 32.0 : (isMediumScreen ? 42.0 : 52.0);
-    final letterSpacing = isSmallScreen ? 2.0 : (isMediumScreen ? 3.0 : 6.0);
-    final waveBottom = isSmallScreen ? 80.0 : 100.0;
-    
+
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Scaffold(
-        backgroundColor: Colors.black,
+        backgroundColor: _darkBg,
         body: Stack(
           children: [
-            // Main content
-            Center(
-              child: AnimatedBuilder(
-                animation: _zoomController,
-                builder: (context, child) {
-                  return Opacity(
-                    opacity: _zoomAnim.value > 0.5 ? 1.0 : _zoomAnim.value * 2,
-                    child: Transform.scale(
-                      scale: _zoomAnim.value,
-                      child: child,
-                    ),
-                  );
-                },
-                child: _buildText(textSize, letterSpacing),
-              ),
-            ),
-            
-            // Sound wave at bottom
-            Positioned(
-              bottom: waveBottom,
-              left: 0,
-              right: 0,
-              child: AnimatedBuilder(
-                animation: _waveController,
-                builder: (context, _) {
-                  return Opacity(
-                    opacity: _waveController.status == AnimationStatus.forward ||
-                            _waveController.status == AnimationStatus.reverse
-                        ? 1.0
-                        : 0.0,
-                    child: _buildSoundWave(isSmallScreen),
-                  );
-                },
-              ),
-            ),
-            
-            // Version at bottom
-            Positioned(
-              bottom: 40,
-              left: 0,
-              right: 0,
-              child: AnimatedBuilder(
-                animation: _versionController,
-                builder: (context, _) {
-                  return Opacity(
-                    opacity: _versionAnim.value,
-                    child: const Text(
-                      'v1.1.4',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Color(0x40FFFFFF),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
+            _buildBackground(size),
+            _buildParticles(size),
+            _buildGlowOrbs(size),
+            _buildContent(size),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildText(double fontSize, double letterSpacing) {
-    const letters = ['T', 'I', 'K', 'S', 'A', 'R', ' ', 'V', 'P', 'N'];
-    
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: List.generate(letters.length, (i) {
-        if (letters[i] == ' ') {
-          return SizedBox(width: fontSize * 0.3);
-        }
-        
-        final isVPN = i >= 7;
-        final color = isVPN ? cyan : green;
-        final animIndex = i >= 7 ? i - 1 : i;
-        
-        return AnimatedBuilder(
-          animation: _lettersController,
-          builder: (context, _) {
-            return Transform.translate(
-              offset: Offset(0, _letterTranslateAnims[animIndex].value),
-              child: Opacity(
-                opacity: _letterOpacityAnims[animIndex].value,
-                child: Text(
-                  letters[i],
-                  style: TextStyle(
-                    fontSize: fontSize,
-                    fontWeight: FontWeight.w900,
-                    color: color,
-                    letterSpacing: letterSpacing,
-                  ),
-                ),
-              ),
-            );
-          },
+  Widget _buildBackground(Size size) {
+    return AnimatedBuilder(
+      animation: _bgController,
+      builder: (_, __) {
+        return Container(
+          width: size.width,
+          height: size.height,
+          decoration: BoxDecoration(
+            gradient: RadialGradient(
+              center: const Alignment(0, -0.3),
+              radius: 1.2,
+              colors: [
+                const Color(0xFF0A1628).withValues(alpha: _bgController.value),
+                _darkBg,
+              ],
+            ),
+          ),
         );
-      }),
+      },
     );
   }
 
-  Widget _buildSoundWave(bool isSmall) {
-    final barWidth = isSmall ? 3.0 : 4.0;
-    final barGap = isSmall ? 4.0 : 6.0;
-    final heights = isSmall 
-        ? [15.0, 22.0, 30.0, 26.0, 33.0, 22.0, 18.0]
-        : [20.0, 30.0, 40.0, 35.0, 45.0, 30.0, 25.0];
-    
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: List.generate(7, (i) {
-        return AnimatedBuilder(
-          animation: _waveController,
-          builder: (context, _) {
-            final delay = i * 0.1;
-            final value = (_waveController.value + delay) % 1.0;
-            final scale = value < 0.5 ? (value * 2) : (2 - value * 2);
-            final currentHeight = heights[i] * (1 + scale * 0.5);
-            
-            return Container(
-              width: barWidth,
-              height: currentHeight,
-              margin: EdgeInsets.symmetric(horizontal: barGap / 2),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [green, cyan],
-                ),
-                borderRadius: BorderRadius.circular(2),
-              ),
-            );
-          },
+  Widget _buildParticles(Size size) {
+    return AnimatedBuilder(
+      animation: _particleController,
+      builder: (_, __) {
+        return CustomPaint(
+          size: size,
+          painter: _ParticlePainter(
+            particles: _particles,
+            progress: _particleController.value,
+            cyan: _cyan,
+            green: _green,
+          ),
         );
-      }),
+      },
     );
   }
+
+  Widget _buildGlowOrbs(Size size) {
+    return Stack(
+      children: [
+        Positioned(
+          top: size.height * 0.12,
+          right: -60,
+          child: AnimatedBuilder(
+            animation: _pulseController,
+            builder: (_, __) => Transform.scale(
+              scale: _pulseAnim.value,
+              child: Container(
+                width: 200,
+                height: 200,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      _cyan.withValues(alpha: 0.06),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: size.height * 0.15,
+          left: -80,
+          child: AnimatedBuilder(
+            animation: _pulseController,
+            builder: (_, __) => Transform.scale(
+              scale: 2.0 - _pulseAnim.value,
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      _green.withValues(alpha: 0.05),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContent(Size size) {
+    return SafeArea(
+      child: Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _buildShieldLogo(),
+                  const SizedBox(height: 32),
+                  _buildAppName(),
+                  const SizedBox(height: 10),
+                  _buildTagline(),
+                ],
+              ),
+            ),
+          ),
+          _buildBottomSection(size),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShieldLogo() {
+    return AnimatedBuilder(
+      animation: _shieldController,
+      builder: (_, __) {
+        return Opacity(
+          opacity: _shieldOpacity.value,
+          child: Transform.scale(
+            scale: _shieldScale.value,
+            child: AnimatedBuilder(
+              animation: _pulseController,
+              builder: (_, child) => Transform.scale(
+                scale: _pulseAnim.value,
+                child: child,
+              ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Container(
+                    width: 130,
+                    height: 130,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          _cyan.withValues(alpha: 0.15),
+                          _green.withValues(alpha: 0.05),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    width: 96,
+                    height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [Color(0xFF0D2137), Color(0xFF081520)],
+                      ),
+                      border: Border.all(
+                        color: _cyan.withValues(alpha: 0.3),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _cyan.withValues(alpha: 0.25),
+                          blurRadius: 30,
+                          spreadRadius: 2,
+                        ),
+                        BoxShadow(
+                          color: _green.withValues(alpha: 0.15),
+                          blurRadius: 20,
+                          spreadRadius: 0,
+                          offset: const Offset(0, 8),
+                        ),
+                      ],
+                    ),
+                    child: ShaderMask(
+                      shaderCallback: (bounds) => const LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [_cyan, _green],
+                      ).createShader(bounds),
+                      child: const Icon(
+                        Icons.security_rounded,
+                        size: 46,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAppName() {
+    return AnimatedBuilder(
+      animation: _textController,
+      builder: (_, __) {
+        return Opacity(
+          opacity: _textOpacity.value,
+          child: Transform.translate(
+            offset: Offset(0, _textSlide.value),
+            child: ShaderMask(
+              shaderCallback: (bounds) => const LinearGradient(
+                colors: [_green, _cyan],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ).createShader(bounds),
+              child: const Text(
+                'TIKSAR VPN',
+                style: TextStyle(
+                  fontSize: 38,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: 4,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildTagline() {
+    return AnimatedBuilder(
+      animation: _textController,
+      builder: (_, __) {
+        return Opacity(
+          opacity: _taglineOpacity.value,
+          child: const Text(
+            'Fast · Secure · Free',
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6B8BA4),
+              letterSpacing: 2.5,
+              fontWeight: FontWeight.w400,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBottomSection(Size size) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 48, left: 48, right: 48),
+      child: Column(
+        children: [
+          AnimatedBuilder(
+            animation: _progressController,
+            builder: (_, __) {
+              return Column(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: _progressAnim.value,
+                      backgroundColor: const Color(0xFF0D2137),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        Color.lerp(_cyan, _green, _progressAnim.value)!,
+                      ),
+                      minHeight: 3,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Opacity(
+                    opacity: _progressAnim.value,
+                    child: const Text(
+                      'v1.1.4',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF3A5568),
+                        letterSpacing: 1,
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Particle {
+  final double x;
+  final double y;
+  final double size;
+  final double opacity;
+  final double speed;
+  final double phase;
+
+  const _Particle({
+    required this.x,
+    required this.y,
+    required this.size,
+    required this.opacity,
+    required this.speed,
+    required this.phase,
+  });
+}
+
+class _ParticlePainter extends CustomPainter {
+  final List<_Particle> particles;
+  final double progress;
+  final Color cyan;
+  final Color green;
+
+  _ParticlePainter({
+    required this.particles,
+    required this.progress,
+    required this.cyan,
+    required this.green,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (int i = 0; i < particles.length; i++) {
+      final p = particles[i];
+      final twinkle = (math.sin(progress * math.pi * 2 * p.speed + p.phase) + 1) / 2;
+      final opacity = p.opacity * (0.3 + twinkle * 0.7);
+      final color = i % 2 == 0 ? cyan : green;
+
+      final paint = Paint()
+        ..color = color.withValues(alpha: opacity)
+        ..style = PaintingStyle.fill;
+
+      final dy = (p.y + progress * p.speed * 0.08) % 1.0;
+
+      canvas.drawCircle(
+        Offset(p.x * size.width, dy * size.height),
+        p.size,
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(_ParticlePainter old) => true;
 }

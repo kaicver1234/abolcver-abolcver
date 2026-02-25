@@ -27,7 +27,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   late TabController _tabController;
 
   String _testStatusText = '';
-  int _testedCount = 0;
   int _totalCount = 0;
   int _batchSize = 10;
 
@@ -631,7 +630,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       _isTesting = true;
       _pingResults.clear();
       _sortedConfigs = null;
-      _testedCount = 0;
       _totalCount = 0;
       _testStatusText = '...';
     });
@@ -678,7 +676,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
 
           if (mounted) {
             setState(() {
-              _testedCount = completed;
               _testStatusText = '$completed / $_totalCount';
               _sortServersByPing(provider, _pingResults);
             });
@@ -697,10 +694,12 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
         const Color(0xFF00FFA3),
       );
     } catch (_) {
-      if (mounted) _showSnackBar(
-        AppLocalizations.of(context).translate('server_selection.error_updating'),
-        Colors.red,
-      );
+      if (mounted) {
+        _showSnackBar(
+          AppLocalizations.of(context).translate('server_selection.error_updating'),
+          Colors.red,
+        );
+      }
     } finally {
       if (mounted) setState(() { _isTesting = false; _testStatusText = ''; });
     }
