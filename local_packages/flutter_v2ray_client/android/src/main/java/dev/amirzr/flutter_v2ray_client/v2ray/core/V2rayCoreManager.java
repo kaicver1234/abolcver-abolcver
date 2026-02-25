@@ -34,7 +34,6 @@ import org.json.JSONObject;
 import libv2ray.CoreCallbackHandler;
 import libv2ray.CoreController;
 import libv2ray.Libv2ray;
-import libv2ray.V2RayProtector;
 
 public final class V2rayCoreManager {
 
@@ -124,16 +123,6 @@ public final class V2rayCoreManager {
             v2rayServicesListener = (V2rayServicesListener) targetService;
             Libv2ray.initCoreEnv(getUserAssetsPath(targetService.getApplicationContext()), "");
 
-            // Register Android VPN socket protector with libv2ray (Go)
-            Libv2ray.useProtector(new V2RayProtector() {
-                @Override
-                public boolean protect(long fd) {
-                    if (v2rayServicesListener != null) {
-                        return v2rayServicesListener.onProtect((int) fd);
-                    }
-                    return true;
-                }
-            });
             // Initialize controller with callback handler
             coreController = Libv2ray.newCoreController(new CoreCallbackHandler() {
                 @Override
@@ -206,13 +195,7 @@ public final class V2rayCoreManager {
                 Log.e(V2rayCoreManager.class.getSimpleName(), "startCore failed => coreController is null.");
                 return false;
             }
-            // Configure protector target server and IP family preference before starting core
-            try {
-                String server = v2rayConfig.CONNECTED_V2RAY_SERVER_ADDRESS + ":" + v2rayConfig.CONNECTED_V2RAY_SERVER_PORT;
-                Libv2ray.setProtectorServer(server, false);
-            } catch (Exception ignored) {
-            }
-            coreController.startLoop(v2rayConfig.V2RAY_FULL_JSON_CONFIG);
+            coreController.startLoop(v2rayConfig.V2RAY_FULL_JSON_CONFIG, v2rayConfig.LOCAL_SOCKS5_PORT);
             V2RAY_STATE = AppConfigs.V2RAY_STATES.V2RAY_CONNECTED;
             if (isV2rayCoreRunning()) {
                 showNotification(v2rayConfig);
