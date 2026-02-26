@@ -20,9 +20,7 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
 
-  static const Color _red   = Color(0xFFE50914);
-  static const Color _green = Color(0xFF00FFA3);
-  static const Color _darkBg = Color(0xFF000000);
+  static const Color _darkBg = Color(0xFF0A0A0A);
 
   static const List<_LanguageOption> _languages = [
     _LanguageOption(
@@ -30,16 +28,16 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
       flag: '🇺🇸',
       displayName: 'English',
       subtitle: 'Continue in English',
-      accentColor: _red,
-      bgColor: Color(0xFF1A0000),
+      accentColor: Colors.white,
+      bgColor: Color(0xFF181818),
     ),
     _LanguageOption(
       language: AppLanguage(name: 'فارسی', code: 'fa', flag: '🇮🇷', direction: 'rtl'),
       flag: '🇮🇷',
       displayName: 'فارسی',
       subtitle: 'ادامه به زبان فارسی',
-      accentColor: _green,
-      bgColor: Color(0xFF001A0D),
+      accentColor: Colors.white,
+      bgColor: Color(0xFF181818),
     ),
   ];
 
@@ -139,19 +137,13 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
           height: iconBoxSize,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFF1A0000),
+            color: const Color(0xFF161616),
             border: Border.all(
-              color: _red.withValues(alpha: 0.35),
+              color: Colors.white.withValues(alpha: 0.12),
               width: 1.5,
             ),
-            boxShadow: [
-              BoxShadow(
-                color: _red.withValues(alpha: 0.2),
-                blurRadius: 24,
-              ),
-            ],
           ),
-          child: Icon(Icons.language_rounded, size: iconSize, color: _red),
+          child: Icon(Icons.language_rounded, size: iconSize, color: Colors.white.withValues(alpha: 0.8)),
         ),
         SizedBox(height: h * 0.025),
         Text(
@@ -254,11 +246,11 @@ class _LanguageCard extends StatelessWidget {
         curve: Curves.easeOut,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(radius),
-          color: isSelected ? option.bgColor : const Color(0xFF0F0F0F),
+          color: isSelected ? option.bgColor : const Color(0xFF111111),
           border: Border.all(
             color: isSelected
-                ? option.accentColor.withValues(alpha: 0.5)
-                : Colors.white.withValues(alpha: 0.06),
+                ? Colors.white.withValues(alpha: 0.45)
+                : Colors.white.withValues(alpha: 0.07),
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
@@ -279,7 +271,7 @@ class _LanguageCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: nameSize,
                       fontWeight: FontWeight.w700,
-                      color: isSelected ? option.accentColor : Colors.white,
+                      color: Colors.white,
                       decoration: TextDecoration.none,
                     ),
                   ),
@@ -301,7 +293,7 @@ class _LanguageCard extends StatelessWidget {
                     width: checkSize,
                     height: checkSize,
                     child: CircularProgressIndicator(
-                      color: option.accentColor,
+                      color: Colors.white,
                       strokeWidth: 2,
                     ),
                   )
@@ -311,7 +303,7 @@ class _LanguageCard extends StatelessWidget {
                     height: checkSize,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isSelected ? option.accentColor : Colors.transparent,
+                      color: isSelected ? Colors.white : Colors.transparent,
                       border: isSelected
                           ? null
                           : Border.all(

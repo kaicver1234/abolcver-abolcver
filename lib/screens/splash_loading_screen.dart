@@ -9,8 +9,9 @@ class SplashLoadingScreen extends StatefulWidget {
 }
 
 class _SplashLoadingScreenState extends State<SplashLoadingScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _ctrl;
+  late AnimationController _dotsCtrl;
 
   late List<Animation<double>> _letterSlide;
   late List<Animation<double>> _letterFade;
@@ -19,11 +20,11 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
   late Animation<double> _vpnFade;
   late Animation<double> _tagSlide;
   late Animation<double> _tagFade;
-  late Animation<double> _progress;
   late Animation<double> _bottomFade;
 
-  static const _red = Color(0xFFE50914);
-  static const _bg  = Color(0xFF000000);
+  late List<Animation<double>> _dotOpacity;
+
+  static const _bg = Color(0xFF0A0A0A);
 
   @override
   void initState() {
@@ -32,6 +33,21 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
       vsync: this,
       duration: const Duration(milliseconds: 3200),
     );
+
+    _dotsCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat();
+
+    _dotOpacity = List.generate(3, (i) {
+      final start = i * 0.22;
+      return Tween<double>(begin: 0.15, end: 1.0).animate(
+        CurvedAnimation(
+          parent: _dotsCtrl,
+          curve: Interval(start, (start + 0.5).clamp(0.0, 1.0), curve: Curves.easeInOut),
+        ),
+      );
+    });
 
     final starts = [0.03, 0.06, 0.09, 0.12, 0.15, 0.18];
     _letterSlide = starts.map((s) => Tween<double>(begin: 40.0, end: 0.0).animate(
@@ -55,11 +71,8 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
       CurvedAnimation(parent: _ctrl, curve: const Interval(0.28, 0.42, curve: Curves.easeOut)),
     );
 
-    _progress = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: const Interval(0.32, 0.98, curve: Curves.easeInOut)),
-    );
     _bottomFade = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: const Interval(0.30, 0.38, curve: Curves.easeOut)),
+      CurvedAnimation(parent: _ctrl, curve: const Interval(0.30, 0.42, curve: Curves.easeOut)),
     );
 
     _ctrl.forward();
@@ -83,6 +96,7 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
   @override
   void dispose() {
     _ctrl.dispose();
+    _dotsCtrl.dispose();
     super.dispose();
   }
 
@@ -94,7 +108,6 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
     final size = MediaQuery.of(context).size;
     final w = size.width;
     final h = size.height;
-    final glowSize = _sw(300, w);
 
     return Directionality(
       textDirection: TextDirection.ltr,
@@ -105,23 +118,6 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
           builder: (_, __) {
             return Stack(
               children: [
-                Positioned(
-                  top: h * 0.5 - glowSize / 2,
-                  left: w * 0.5 - glowSize / 2,
-                  child: Container(
-                    width: glowSize,
-                    height: glowSize,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          _red.withValues(alpha: 0.07 * _tagFade.value),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
                 Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
@@ -198,20 +194,20 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: lineW, height: 1.5, color: _red.withValues(alpha: 0.5)),
+        Container(width: lineW, height: 1.0, color: Colors.white.withValues(alpha: 0.18)),
         SizedBox(width: _sw(10, w)),
         Text(
           'VPN',
           style: TextStyle(
             fontSize: fontSize,
             fontWeight: FontWeight.w700,
-            color: _red,
+            color: Colors.white.withValues(alpha: 0.7),
             letterSpacing: 5,
             decoration: TextDecoration.none,
           ),
         ),
         SizedBox(width: _sw(10, w)),
-        Container(width: lineW, height: 1.5, color: _red.withValues(alpha: 0.5)),
+        Container(width: lineW, height: 1.0, color: Colors.white.withValues(alpha: 0.18)),
       ],
     );
   }
@@ -221,7 +217,7 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
       'FAST  ·  SECURE  ·  FREE',
       style: TextStyle(
         fontSize: _sw(11, w),
-        color: Colors.white.withValues(alpha: 0.25),
+        color: Colors.white.withValues(alpha: 0.2),
         letterSpacing: 3,
         decoration: TextDecoration.none,
       ),
@@ -231,22 +227,35 @@ class _SplashLoadingScreenState extends State<SplashLoadingScreen>
   Widget _buildBottom(double h) {
     return SafeArea(
       child: Padding(
-        padding: EdgeInsets.only(bottom: _sh(44, h)),
+        padding: EdgeInsets.only(bottom: _sh(48, h)),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            LinearProgressIndicator(
-              value: _progress.value,
-              backgroundColor: Colors.white.withValues(alpha: 0.05),
-              valueColor: const AlwaysStoppedAnimation<Color>(_red),
-              minHeight: 2,
+            AnimatedBuilder(
+              animation: _dotsCtrl,
+              builder: (_, __) {
+                return Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(3, (i) {
+                    return Container(
+                      margin: EdgeInsets.symmetric(horizontal: _sw(4, h)),
+                      width: _sw(4.5, h),
+                      height: _sw(4.5, h),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: _dotOpacity[i].value),
+                      ),
+                    );
+                  }),
+                );
+              },
             ),
-            SizedBox(height: _sh(14, h)),
+            SizedBox(height: _sh(16, h)),
             Text(
               'v1.1.5',
               style: TextStyle(
                 fontSize: _sh(10, h),
-                color: Colors.white.withValues(alpha: 0.12),
+                color: Colors.white.withValues(alpha: 0.1),
                 letterSpacing: 1.5,
                 decoration: TextDecoration.none,
               ),
