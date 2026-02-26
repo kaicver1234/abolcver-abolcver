@@ -152,39 +152,26 @@ class V2RayService extends ChangeNotifier {
 
 
   void _handleStatusChange(V2RayStatus status) {
-    // Handle disconnection from notification
-    // Check for common disconnected status values using string matching
-    String statusString = status.toString().toLowerCase();
-    String stateString = status.state.toLowerCase();
-    
-    // Check if disconnected by multiple indicators
-    bool isDisconnected = statusString.contains('disconnect') ||
-        statusString.contains('stop') ||
-        statusString.contains('idle') ||
-        stateString.contains('disconnect') ||
-        stateString.contains('stopped') ||
-        stateString.contains('idle') ||
+    final String stateString = status.state.toLowerCase().trim();
+
+    // Only treat EXPLICIT disconnect states as disconnection.
+    // Empty state and "idle" are normal during traffic-stat updates while connected
+    // and must NOT trigger a disconnect.
+    final bool isExplicitDisconnect =
         stateString == 'disconnected' ||
-        stateString.isEmpty; // Empty state also means disconnected
-    
-    if (isDisconnected && _activeConfig != null) {
-      // Detected disconnection from notification
+        stateString == 'stopped' ||
+        stateString == 'stop';
+
+    if (isExplicitDisconnect && _activeConfig != null) {
       _activeConfig = null;
       _onDisconnected?.call();
-
-      // Save the disconnected state immediately
       _clearActiveConfig();
       notifyListeners();
     }
-    
-    // Also check if we're now connected when we weren't before
-    bool isConnected = stateString.contains('connect') ||
-        stateString == 'connected' ||
-        statusString.contains('connected');
-    
+
+    // Restore config when native reports connected but we have no record of it
+    final bool isConnected = stateString == 'connected';
     if (isConnected && _activeConfig == null) {
-      // VPN connected but we don't have active config
-      // Try to restore from saved config
       _tryRestoreActiveConfig().then((_) {
         notifyListeners();
       });
@@ -429,14 +416,17 @@ class V2RayService extends ChangeNotifier {
 
       if (isConnected == true) {
         debugPrint('✅ Background verification: VPN is running');
-      } else if (explicitFailures > 0) {
-        // Got explicit -1 from the VPN service: it is definitely not running.
-        // Clear the optimistically-restored state so the UI reflects reality.
-        debugPrint('❌ Background verification: VPN not running (explicit -1), clearing state');
+      } else if (explicitFailures >= 2 || (explicitFailures > 0 && !hadExceptions)) {
+        // Only clear state when VPN service CONSISTENTLY reports not connected:
+        // - 2+ explicit -1s out of 3 attempts, OR
+        // - even 1 explicit -1 when no exceptions occurred (clean environment).
+        // A single -1 mixed with exceptions is likely a transient network blip.
+        debugPrint('❌ Background verification: VPN not running ($explicitFailures explicit failures), clearing state');
         forceDisconnectedState();
       } else {
-        // Only exceptions/timeouts - likely a network issue, keep optimistic state
-        debugPrint('⚠️ Background verification: only exceptions (hadExceptions=$hadExceptions), keeping state');
+        // Ambiguous result (mostly exceptions/timeouts or single -1 with exceptions)
+        // Keep current state to avoid false disconnects on slow networks
+        debugPrint('⚠️ Background verification: ambiguous (failures=$explicitFailures, exceptions=$hadExceptions), keeping state');
       }
     } catch (e) {
       debugPrint('⚠️ Error during background verification: $e');
@@ -645,9 +635,14 @@ class V2RayService extends ChangeNotifier {
   Future<int> getConnectedServerDelayDirect() async {
     try {
       await initialize();
+      // Internal timeout is intentionally longer than the outer timeouts used by callers
+      // (provider uses 6–7 s). That way, when the server is slow the outer timeout fires
+      // first and returns the -2 sentinel (ambiguous) rather than this inner timeout
+      // returning -1 (explicit disconnect), which would wrongly clear VPN state.
+      // -1 here only means a genuine exception (VPN service not running).
       final delay = await _flutterV2ray.getConnectedServerDelay(
         url: 'https://www.google.com/generate_204'
-      ).timeout(const Duration(seconds: 3));
+      ).timeout(const Duration(seconds: 15));
       debugPrint('🔍 Connected server delay: ${delay}ms');
       return delay;
     } catch (e) {
@@ -976,10 +971,8 @@ class V2RayService extends ChangeNotifier {
       final currentState = _currentStatus?.state.toLowerCase() ?? '';
       debugPrint('🔎 Current V2Ray state: "$currentState"');
       
-      // If V2Ray says connected, trust it
-      if (currentState.contains('connect') || 
-          currentState == 'connected' ||
-          currentState == 'running') {
+      // If V2Ray says connected, trust it (do NOT use .contains — "disconnecting" also contains "connect")
+      if (currentState == 'connected' || currentState == 'running') {
         
         if (_activeConfig != null) {
           debugPrint('✅ VPN connected (V2Ray status + activeConfig)');

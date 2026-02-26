@@ -26,17 +26,22 @@ class _AboutScreenState extends State<AboutScreen> with TickerProviderStateMixin
     super.initState();
     _heartController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
-    )..repeat(reverse: true);
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
 
     _logoController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
     )..forward();
 
-    _heartAnimation = Tween<double>(begin: 0.9, end: 1.3).animate(
-      CurvedAnimation(parent: _heartController, curve: Curves.easeInOut),
-    );
+    // Realistic double-beat heartbeat: lub-dub then rest
+    _heartAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.35), weight: 12),
+      TweenSequenceItem(tween: Tween(begin: 1.35, end: 0.95), weight: 10),
+      TweenSequenceItem(tween: Tween(begin: 0.95, end: 1.28), weight: 10),
+      TweenSequenceItem(tween: Tween(begin: 1.28, end: 1.0), weight: 12),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.0), weight: 56),
+    ]).animate(_heartController);
 
     _logoAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _logoController, curve: Curves.elasticOut),
@@ -60,6 +65,27 @@ class _AboutScreenState extends State<AboutScreen> with TickerProviderStateMixin
           );
         }
       }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  Future<void> _launchTelegram(BuildContext context, String telegramUrl) async {
+    try {
+      final webUri = Uri.parse(telegramUrl);
+      final username = webUri.pathSegments.isNotEmpty ? webUri.pathSegments.last : '';
+      if (username.isNotEmpty) {
+        final tgUri = Uri.parse('tg://resolve?domain=$username');
+        if (await canLaunchUrl(tgUri)) {
+          await launchUrl(tgUri);
+          return;
+        }
+      }
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -366,7 +392,7 @@ class _AboutScreenState extends State<AboutScreen> with TickerProviderStateMixin
           title: AppLocalizations.of(context).translate('about.telegram'),
           subtitle: remoteConfig.telegramId,
           gradient: const [Color(0xFF0088CC), Color(0xFF00A8E8)],
-          onTap: () => _launchUrl(context, remoteConfig.telegramUrl),
+          onTap: () => _launchTelegram(context, remoteConfig.telegramUrl),
         ),
         const SizedBox(height: 10),
         _buildSocialItem(

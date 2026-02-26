@@ -921,10 +921,12 @@ class _AboutPageView extends StatefulWidget {
 }
 
 class _AboutPageViewState extends State<_AboutPageView>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   late AnimationController _controller;
   late List<Animation<double>> _fadeAnims;
   late List<Animation<Offset>> _slideAnims;
+  late AnimationController _heartController;
+  late Animation<double> _heartAnimation;
 
   static const _intervals = [
     [0.0, 0.35],
@@ -957,11 +959,25 @@ class _AboutPageViewState extends State<_AboutPageView>
     ))).toList();
 
     _controller.forward();
+
+    _heartController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat();
+
+    _heartAnimation = TweenSequence<double>([
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.35), weight: 12),
+      TweenSequenceItem(tween: Tween(begin: 1.35, end: 0.95), weight: 10),
+      TweenSequenceItem(tween: Tween(begin: 0.95, end: 1.28), weight: 10),
+      TweenSequenceItem(tween: Tween(begin: 1.28, end: 1.0), weight: 12),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.0), weight: 56),
+    ]).animate(_heartController);
   }
 
   @override
   void dispose() {
     _controller.dispose();
+    _heartController.dispose();
     super.dispose();
   }
 
@@ -1062,6 +1078,7 @@ class _AboutPageViewState extends State<_AboutPageView>
                 name: AppLocalizations.of(context).translate('about.telegram'),
                 title: remoteConfig.telegramId,
                 url: remoteConfig.telegramUrl,
+                isTelegram: true,
               ),
               const SizedBox(height: 10),
               _buildSocialLink(
@@ -1184,7 +1201,10 @@ class _AboutPageViewState extends State<_AboutPageView>
           ),
         ),
         const SizedBox(width: 8),
-        const Icon(Icons.favorite_rounded, color: Color(0xFFEF4444), size: 15),
+        ScaleTransition(
+          scale: _heartAnimation,
+          child: const Icon(Icons.favorite_rounded, color: Color(0xFFEF4444), size: 15),
+        ),
         const SizedBox(width: 8),
         Text(
           AppLocalizations.of(context).translate('about.developer'),
@@ -1204,11 +1224,23 @@ class _AboutPageViewState extends State<_AboutPageView>
     required String name,
     required String title,
     required String url,
+    bool isTelegram = false,
   }) {
     return GestureDetector(
       onTap: () async {
-        final uri = Uri.parse(url);
         try {
+          if (isTelegram) {
+            final webUri = Uri.parse(url);
+            final username = webUri.pathSegments.isNotEmpty ? webUri.pathSegments.last : '';
+            if (username.isNotEmpty) {
+              final tgUri = Uri.parse('tg://resolve?domain=$username');
+              if (await canLaunchUrl(tgUri)) {
+                await launchUrl(tgUri);
+                return;
+              }
+            }
+          }
+          final uri = Uri.parse(url);
           await launchUrl(uri, mode: LaunchMode.externalApplication);
         } catch (_) {}
       },

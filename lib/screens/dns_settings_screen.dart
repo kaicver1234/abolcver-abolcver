@@ -16,22 +16,19 @@ class DnsSettingsScreen extends StatefulWidget {
 }
 
 class _DnsSettingsScreenState extends State<DnsSettingsScreen> {
-  final _primaryCtrl   = TextEditingController();
-  final _secondaryCtrl = TextEditingController();
-  final _formKey       = GlobalKey<FormState>();
+  final _primaryCtrl = TextEditingController();
+  final _formKey     = GlobalKey<FormState>();
 
   @override
   void initState() {
     super.initState();
     final dns = Provider.of<DnsProvider>(context, listen: false);
-    _primaryCtrl.text   = dns.customPrimary;
-    _secondaryCtrl.text = dns.customSecondary;
+    _primaryCtrl.text = dns.customPrimary;
   }
 
   @override
   void dispose() {
     _primaryCtrl.dispose();
-    _secondaryCtrl.dispose();
     super.dispose();
   }
 
@@ -48,7 +45,7 @@ class _DnsSettingsScreenState extends State<DnsSettingsScreen> {
   Future<void> _saveCustomDns() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final dns = Provider.of<DnsProvider>(context, listen: false);
-    await dns.setCustomDns(_primaryCtrl.text, _secondaryCtrl.text);
+    await dns.setCustomDns(_primaryCtrl.text);
     await dns.selectPreset(DnsPreset.custom);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -160,17 +157,9 @@ class _DnsSettingsScreenState extends State<DnsSettingsScreen> {
                         children: [
                           _buildDnsField(
                             controller: _primaryCtrl,
-                            label: isRtl ? 'DNS اصلی' : 'Primary DNS',
+                            label: isRtl ? 'آدرس DNS' : 'DNS Address',
                             hint: '8.8.8.8',
                             isRtl: isRtl,
-                          ),
-                          const SizedBox(height: 10),
-                          _buildDnsField(
-                            controller: _secondaryCtrl,
-                            label: isRtl ? 'DNS ثانویه' : 'Secondary DNS',
-                            hint: '8.8.4.4',
-                            isRtl: isRtl,
-                            required: false,
                           ),
                           const SizedBox(height: 16),
                           SizedBox(
@@ -417,8 +406,8 @@ class _DnsSettingsScreenState extends State<DnsSettingsScreen> {
           Expanded(
             child: Text(
               isRtl
-                  ? 'DNS انتخاب شده هنگام اتصال به VPN اعمال می‌شود. DNS های ایرانی مانند Shecan و Electro ممکن است دسترسی به سایت‌های داخلی را بهبود دهند.'
-                  : 'The selected DNS will be applied when connecting to VPN. Iranian DNS options like Shecan and Electro may improve access to domestic sites.',
+                  ? 'DNS انتخاب شده هنگام اتصال به VPN اعمال می‌شود. برای DNS سفارشی، آدرس IP مورد نظر خود را وارد کنید.'
+                  : 'The selected DNS will be applied when connecting to VPN. For custom DNS, enter any DNS server IP address.',
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.4),
                 fontSize: 12.5,

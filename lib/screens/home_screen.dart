@@ -244,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
     final colors = themeProvider.colors;
     final languages = [
-      {'name': 'فارسی', 'code': 'fa', 'flag': '🇮🇷'},
+      {'name': 'پارسی', 'code': 'fa', 'flag': '🇮🇷'},
       {'name': 'English', 'code': 'en', 'flag': '🇺🇸'},
     ];
 

@@ -32,10 +32,10 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
       bgColor: Color(0xFF181818),
     ),
     _LanguageOption(
-      language: AppLanguage(name: 'فارسی', code: 'fa', flag: '🇮🇷', direction: 'rtl'),
+      language: AppLanguage(name: 'پارسی', code: 'fa', flag: '🇮🇷', direction: 'rtl'),
       flag: '🇮🇷',
-      displayName: 'فارسی',
-      subtitle: 'ادامه به زبان فارسی',
+      displayName: 'پارسی',
+      subtitle: 'ادامه به زبان پارسی',
       accentColor: Colors.white,
       bgColor: Color(0xFF181818),
     ),

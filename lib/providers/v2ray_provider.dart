@@ -387,6 +387,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           // Run async operation properly with error handling
           Future(() async {
             try {
+              // CRITICAL: Clear activeConfig so subsequent sync checks don't
+              // see a stale non-null activeConfig and think VPN is still running.
+              _v2rayService.forceDisconnectedState();
               for (var config in _configs) {
                 config.isConnected = false;
               }
@@ -395,7 +398,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
               debugPrint('✅ Configs updated after native disconnect event');
             } catch (e) {
               debugPrint('❌ Error updating configs after native disconnect: $e');
-              // Still notify to update UI
+              _v2rayService.forceDisconnectedState();
               notifyListeners();
             }
           });
@@ -423,12 +426,19 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('✅ V2Ray service initialized');
       
       // STEP 2: Check if VPN is actually connected using delay check
+      // Use -2 as timeout sentinel so we can distinguish timeout from explicit -1
       bool isVpnConnected = false;
+      bool initExplicitlyDisconnected = false;
       try {
         final delay = await _v2rayService.getConnectedServerDelayDirect()
-            .timeout(const Duration(seconds: 3), onTimeout: () => -1);
-        isVpnConnected = delay >= 0 && delay < 10000;
-        debugPrint('🔎 VPN delay check: ${delay}ms, connected: $isVpnConnected');
+            .timeout(const Duration(seconds: 6), onTimeout: () => -2);
+        if (delay >= 0 && delay < 10000) {
+          isVpnConnected = true;
+        } else if (delay == -1) {
+          initExplicitlyDisconnected = true;
+        }
+        // delay == -2 → timeout, ambiguous — don't clear state
+        debugPrint('🔎 VPN delay check: ${delay}ms, connected: $isVpnConnected, explicit disconnect: $initExplicitlyDisconnected');
       } catch (e) {
         debugPrint('⚠️ Delay check failed: $e');
       }
@@ -466,13 +476,17 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           
           debugPrint('✅ VPN is connected to: ${_selectedConfig?.remark}');
         }
-      } else {
-        // VPN is not connected - clear all connection states
+      } else if (initExplicitlyDisconnected || _v2rayService.activeConfig == null) {
+        // Only clear state when VPN explicitly reports not connected,
+        // or when there is no saved activeConfig.
+        // On timeout alone, keep whatever state was restored.
         _v2rayService.forceDisconnectedState();
         for (var config in _configs) {
           config.isConnected = false;
         }
-        debugPrint('❌ VPN is not connected');
+        debugPrint('❌ VPN is not connected (explicit=$initExplicitlyDisconnected)');
+      } else {
+        debugPrint('⚠️ Init delay check ambiguous (timeout), keeping restored state');
       }
       
       notifyListeners();
@@ -714,6 +728,18 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         
         // COMPLETELY REPLACE all configs - no merging, no duplicates
         _configs = servers;
+        
+        // Preserve connection state: if VPN is currently running, re-mark the connected config
+        final activeConfig = _v2rayService.activeConfig;
+        if (activeConfig != null) {
+          for (var config in _configs) {
+            config.isConnected =
+                config.id == activeConfig.id ||
+                config.fullConfig == activeConfig.fullConfig ||
+                (config.address == activeConfig.address && config.port == activeConfig.port);
+          }
+        }
+        
         await _v2rayService.saveConfigs(_configs);
         debugPrint('✅ Loaded ${_configs.length} servers from online');
       } else {
@@ -1492,25 +1518,34 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       // STEP 2: Check actual VPN connection status using delay check FIRST
       // This is the most reliable method - it actually tests if V2Ray is running
       bool isOurVpnConnected = false;
+      bool explicitlyDisconnected = false;
       V2RayConfig? activeConfig = _v2rayService.activeConfig;
       
       // Try delay check first - most reliable
+      // Use a longer timeout so slow servers don't cause false disconnects
       try {
         final delay = await _v2rayService.getConnectedServerDelayDirect()
-            .timeout(const Duration(seconds: 3), onTimeout: () => -1);
+            .timeout(const Duration(seconds: 7), onTimeout: () => -2);
         
         if (delay >= 0 && delay < 10000) {
           isOurVpnConnected = true;
           debugPrint('✅ VPN connected (delay: ${delay}ms)');
+        } else if (delay == -1) {
+          // V2Ray service explicitly says not connected
+          explicitlyDisconnected = true;
+          debugPrint('❌ Delay check: V2Ray explicitly not connected (-1)');
+        } else {
+          // delay == -2 = timeout — VPN might still be running
+          debugPrint('⏱️ Delay check timed out, will verify via status');
         }
       } catch (e) {
         debugPrint('⚠️ Delay check failed: $e');
       }
       
-      // If delay check failed, try isActuallyConnected
-      if (!isOurVpnConnected) {
+      // If delay check did not confirm, try isActuallyConnected
+      if (!isOurVpnConnected && !explicitlyDisconnected) {
         isOurVpnConnected = await _v2rayService.isActuallyConnected()
-            .timeout(const Duration(seconds: 2), onTimeout: () => false);
+            .timeout(const Duration(seconds: 4), onTimeout: () => false);
         
         if (isOurVpnConnected) {
           debugPrint('✅ isActuallyConnected returned true');
@@ -1557,10 +1592,13 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         
         // Ensure monitoring is active
         _v2rayService.ensureMonitoringActive();
-      } else {
-        debugPrint('❌ Our VPN is NOT connected, clearing states');
+      } else if (explicitlyDisconnected || _v2rayService.activeConfig == null) {
+        // Only clear state when VPN is EXPLICITLY reported as not running,
+        // or when there is no saved activeConfig at all.
+        // If both checks merely timed out, keep the current state to avoid
+        // false disconnects on slow networks.
+        debugPrint('❌ VPN not connected (explicit=$explicitlyDisconnected), clearing states');
         
-        // Clear service activeConfig so provider.activeConfig (used by UI) is also null
         _v2rayService.forceDisconnectedState();
 
         for (var config in _configs) {
@@ -1569,6 +1607,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
             stateChanged = true;
           }
         }
+      } else {
+        // Ambiguous result (all checks timed out) — keep current state
+        debugPrint('⚠️ Connection check ambiguous (timeouts only), keeping current state');
       }
       
       // Save and notify

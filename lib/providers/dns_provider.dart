@@ -22,7 +22,6 @@ class DnsOption {
 class DnsProvider with ChangeNotifier {
   static const String _presetKey = 'dns_preset_id';
   static const String _customPrimaryKey = 'dns_custom_primary';
-  static const String _customSecondaryKey = 'dns_custom_secondary';
 
   static const List<DnsOption> presets = [
     DnsOption(
@@ -55,23 +54,18 @@ class DnsProvider with ChangeNotifier {
 
   DnsPreset _selectedPreset = DnsPreset.google;
   String _customPrimary = '';
-  String _customSecondary = '';
 
   DnsPreset get selectedPreset => _selectedPreset;
   String get customPrimary => _customPrimary;
-  String get customSecondary => _customSecondary;
 
   DnsOption get selectedOption {
     if (_selectedPreset == DnsPreset.custom) {
       return DnsOption(
         preset: DnsPreset.custom,
         name: 'Custom',
-        description: _customPrimary.isNotEmpty
-            ? '$_customPrimary${_customSecondary.isNotEmpty ? ' · $_customSecondary' : ''}'
-            : 'Not configured',
+        description: _customPrimary.isNotEmpty ? _customPrimary : 'Not configured',
         servers: [
           if (_customPrimary.isNotEmpty) _customPrimary,
-          if (_customSecondary.isNotEmpty) _customSecondary,
         ],
       );
     }
@@ -98,7 +92,6 @@ class DnsProvider with ChangeNotifier {
       }
     }
     _customPrimary = prefs.getString(_customPrimaryKey) ?? '';
-    _customSecondary = prefs.getString(_customSecondaryKey) ?? '';
     notifyListeners();
   }
 
@@ -109,12 +102,10 @@ class DnsProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> setCustomDns(String primary, String secondary) async {
+  Future<void> setCustomDns(String primary) async {
     _customPrimary = primary.trim();
-    _customSecondary = secondary.trim();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_customPrimaryKey, _customPrimary);
-    await prefs.setString(_customSecondaryKey, _customSecondary);
     notifyListeners();
   }
 }
