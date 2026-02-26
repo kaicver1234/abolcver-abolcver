@@ -261,10 +261,8 @@ class _ModernConnectionButtonState extends State<ModernConnectionButton>
             child: ScaleTransition(scale: animation, child: child),
           ),
           child: Icon(
-            isConnecting
-                ? Icons.close_rounded
-                : Icons.power_settings_new_rounded,
-            key: ValueKey(isConnecting ? 'cancel' : isConnected ? 'connected' : 'off'),
+            Icons.power_settings_new_rounded,
+            key: ValueKey(isConnected ? 'connected' : 'off'),
             size: widget.size * 0.36,
             color: isConnected || isConnecting
                 ? Colors.black.withValues(alpha: 0.75)

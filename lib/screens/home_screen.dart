@@ -108,12 +108,17 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
   }
 
   Future<void> _handleConnectionToggle() async {
+    final provider = Provider.of<V2RayProvider>(context, listen: false);
+
+    if (provider.isConnecting) {
+      provider.cancelConnect();
+      return;
+    }
+
     if (_isConnecting) return;
 
     if (!mounted) return;
     setState(() => _isConnecting = true);
-
-    final provider = Provider.of<V2RayProvider>(context, listen: false);
 
     try {
       if (provider.activeConfig != null) {
@@ -551,7 +556,7 @@ class _HomeScreenState extends State<HomeScreen> with AutomaticKeepAliveClientMi
     }
     
     return GestureDetector(
-      onTap: _isConnecting ? null : _handleConnectionToggle,
+      onTap: _handleConnectionToggle,
       child: Stack(
         alignment: Alignment.center,
         children: [

@@ -20,9 +20,9 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
   late AnimationController _fadeController;
   late Animation<double> _fadeAnim;
 
-  static const Color _cyan = Color(0xFF00D9FF);
+  static const Color _red   = Color(0xFFE50914);
   static const Color _green = Color(0xFF00FFA3);
-  static const Color _darkBg = Color(0xFF0A0E1A);
+  static const Color _darkBg = Color(0xFF000000);
 
   static const List<_LanguageOption> _languages = [
     _LanguageOption(
@@ -30,16 +30,16 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
       flag: '🇺🇸',
       displayName: 'English',
       subtitle: 'Continue in English',
-      accentColor: Color(0xFF00D9FF),
-      bgColor: Color(0xFF0D1E2E),
+      accentColor: _red,
+      bgColor: Color(0xFF1A0000),
     ),
     _LanguageOption(
       language: AppLanguage(name: 'فارسی', code: 'fa', flag: '🇮🇷', direction: 'rtl'),
       flag: '🇮🇷',
       displayName: 'فارسی',
       subtitle: 'ادامه به زبان فارسی',
-      accentColor: Color(0xFF00FFA3),
-      bgColor: Color(0xFF0D1E18),
+      accentColor: _green,
+      bgColor: Color(0xFF001A0D),
     ),
   ];
 
@@ -95,6 +95,11 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final w = size.width;
+    final h = size.height;
+    final hPad = (w * 0.064).clamp(16.0, 40.0);
+
     return Directionality(
       textDirection: TextDirection.ltr,
       child: Scaffold(
@@ -103,14 +108,14 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
           opacity: _fadeAnim,
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: EdgeInsets.symmetric(horizontal: hPad),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const Spacer(flex: 2),
-                  _buildHeader(),
+                  _buildHeader(w, h),
                   const Spacer(flex: 2),
-                  _buildCards(),
+                  _buildCards(w, h),
                   const Spacer(flex: 3),
                 ],
               ),
@@ -121,58 +126,49 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(double w, double h) {
+    final iconBoxSize = (w * 0.192).clamp(56.0, 96.0);
+    final iconSize    = iconBoxSize * 0.44;
+    final titleSize   = (w * 0.069).clamp(20.0, 32.0);
+    final subtitleSize = (w * 0.042).clamp(13.0, 20.0);
+
     return Column(
       children: [
         Container(
-          width: 72,
-          height: 72,
+          width: iconBoxSize,
+          height: iconBoxSize,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: const Color(0xFF111827),
+            color: const Color(0xFF1A0000),
             border: Border.all(
-              color: _cyan.withValues(alpha: 0.2),
+              color: _red.withValues(alpha: 0.35),
               width: 1.5,
             ),
             boxShadow: [
               BoxShadow(
-                color: _cyan.withValues(alpha: 0.12),
-                blurRadius: 20,
+                color: _red.withValues(alpha: 0.2),
+                blurRadius: 24,
               ),
             ],
           ),
-          child: ShaderMask(
-            shaderCallback: (bounds) => const LinearGradient(
-              colors: [_cyan, _green],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ).createShader(bounds),
-            child: const Icon(Icons.language_rounded, size: 32, color: Colors.white),
+          child: Icon(Icons.language_rounded, size: iconSize, color: _red),
+        ),
+        SizedBox(height: h * 0.025),
+        Text(
+          'Choose Language',
+          style: TextStyle(
+            fontSize: titleSize,
+            fontWeight: FontWeight.w700,
+            color: Colors.white,
+            letterSpacing: -0.5,
+            decoration: TextDecoration.none,
           ),
         ),
-        const SizedBox(height: 20),
-        ShaderMask(
-          shaderCallback: (bounds) => const LinearGradient(
-            colors: [_green, _cyan],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ).createShader(bounds),
-          child: const Text(
-            'Choose Language',
-            style: TextStyle(
-              fontSize: 26,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              letterSpacing: -0.5,
-              decoration: TextDecoration.none,
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
+        SizedBox(height: h * 0.008),
         Text(
           'زبان خود را انتخاب کنید',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: subtitleSize,
             color: Colors.white.withValues(alpha: 0.4),
             decoration: TextDecoration.none,
           ),
@@ -181,20 +177,23 @@ class _LanguageSelectionScreenState extends State<LanguageSelectionScreen>
     );
   }
 
-  Widget _buildCards() {
+  Widget _buildCards(double w, double h) {
+    final gap = (h * 0.017).clamp(10.0, 20.0);
     return Column(
       children: _languages.asMap().entries.map((entry) {
         final i = entry.key;
         final opt = entry.value;
         final isSelected = _selectedLanguage == opt.language;
         return Padding(
-          padding: EdgeInsets.only(bottom: i < _languages.length - 1 ? 14 : 0),
+          padding: EdgeInsets.only(bottom: i < _languages.length - 1 ? gap : 0),
           child: _LanguageCard(
             key: ValueKey(opt.language.code),
             option: opt,
             isSelected: isSelected,
             isLoading: _isChangingLanguage && isSelected,
             onTap: () => _selectLanguage(opt.language),
+            screenW: w,
+            screenH: h,
           ),
         );
       }).toList(),
@@ -225,6 +224,8 @@ class _LanguageCard extends StatelessWidget {
   final bool isSelected;
   final bool isLoading;
   final VoidCallback onTap;
+  final double screenW;
+  final double screenH;
 
   const _LanguageCard({
     super.key,
@@ -232,18 +233,28 @@ class _LanguageCard extends StatelessWidget {
     required this.isSelected,
     required this.isLoading,
     required this.onTap,
+    required this.screenW,
+    required this.screenH,
   });
 
   @override
   Widget build(BuildContext context) {
+    final hPad       = (screenW * 0.053).clamp(16.0, 28.0);
+    final vPad       = (screenH * 0.022).clamp(14.0, 26.0);
+    final flagSize   = (screenW * 0.107).clamp(36.0, 52.0);
+    final nameSize   = (screenW * 0.048).clamp(15.0, 22.0);
+    final subSize    = (screenW * 0.032).clamp(11.0, 15.0);
+    final checkSize  = (screenW * 0.064).clamp(22.0, 32.0);
+    final radius     = (screenW * 0.048).clamp(14.0, 22.0);
+
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeOut,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          color: isSelected ? option.bgColor : const Color(0xFF0F1723),
+          borderRadius: BorderRadius.circular(radius),
+          color: isSelected ? option.bgColor : const Color(0xFF0F0F0F),
           border: Border.all(
             color: isSelected
                 ? option.accentColor.withValues(alpha: 0.5)
@@ -251,11 +262,14 @@ class _LanguageCard extends StatelessWidget {
             width: isSelected ? 1.5 : 1.0,
           ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         child: Row(
           children: [
-            Text(option.flag, style: const TextStyle(fontSize: 40, decoration: TextDecoration.none)),
-            const SizedBox(width: 16),
+            Text(
+              option.flag,
+              style: TextStyle(fontSize: flagSize, decoration: TextDecoration.none),
+            ),
+            SizedBox(width: screenW * 0.042),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,17 +277,17 @@ class _LanguageCard extends StatelessWidget {
                   Text(
                     option.displayName,
                     style: TextStyle(
-                      fontSize: 18,
+                      fontSize: nameSize,
                       fontWeight: FontWeight.w700,
                       color: isSelected ? option.accentColor : Colors.white,
                       decoration: TextDecoration.none,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  SizedBox(height: screenH * 0.004),
                   Text(
                     option.subtitle,
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: subSize,
                       color: Colors.white.withValues(alpha: 0.4),
                       decoration: TextDecoration.none,
                     ),
@@ -281,11 +295,11 @@ class _LanguageCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: screenW * 0.032),
             isLoading
                 ? SizedBox(
-                    width: 22,
-                    height: 22,
+                    width: checkSize,
+                    height: checkSize,
                     child: CircularProgressIndicator(
                       color: option.accentColor,
                       strokeWidth: 2,
@@ -293,8 +307,8 @@ class _LanguageCard extends StatelessWidget {
                   )
                 : AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    width: 24,
-                    height: 24,
+                    width: checkSize,
+                    height: checkSize,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isSelected ? option.accentColor : Colors.transparent,
@@ -306,7 +320,11 @@ class _LanguageCard extends StatelessWidget {
                             ),
                     ),
                     child: isSelected
-                        ? const Icon(Icons.check_rounded, color: Colors.black, size: 14)
+                        ? Icon(
+                            Icons.check_rounded,
+                            color: Colors.black,
+                            size: checkSize * 0.55,
+                          )
                         : null,
                   ),
           ],

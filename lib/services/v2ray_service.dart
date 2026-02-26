@@ -244,15 +244,10 @@ class V2RayService extends ChangeNotifier {
       // Start monitoring usage statistics
       _startUsageMonitoring();
 
-      // Fetch IP information after a 2-second delay to ensure connection is stable
       Future.delayed(const Duration(seconds: 2), () {
-        fetchIpInfo()
-            .then((ipInfo) {
-              // IP Info fetched after connection
-            })
-            .catchError((e) {
-              // Error fetching IP info after connection
-            });
+        if (activeConfig != null) {
+          fetchIpInfo().catchError((_) => IpInfo(ip: '', country: '', city: '', countryCode: '', success: false));
+        }
       });
 
       return true;
@@ -874,7 +869,8 @@ class V2RayService extends ChangeNotifier {
       while (retryCount < maxRetries) {
         try {
           // Fetching IP info attempt
-          final response = await http.get(Uri.parse(apiUrl));
+          final response = await http.get(Uri.parse(apiUrl))
+              .timeout(const Duration(seconds: 10));
 
           if (response.statusCode == 200) {
             final Map<String, dynamic> data = json.decode(response.body);

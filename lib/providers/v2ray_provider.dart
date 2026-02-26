@@ -34,7 +34,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   void cancelConnect() {
     if (_isConnecting) {
       _cancelRequested = true;
+      _isConnecting = false;
       debugPrint('🛑 Cancel requested by user');
+      notifyListeners();
     }
   }
   
@@ -500,8 +502,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         _wasUsingSmartConnect = true;
         debugPrint('✅ Default to Smart Connect');
       }
-      notifyListeners();
-
       debugPrint('✅ Initialization complete');
       notifyListeners();
     } catch (e) {
@@ -770,9 +770,14 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
 
   Future<void> removeConfig(V2RayConfig config) async {
     try {
+      if (_v2rayService.activeConfig?.id == config.id) {
+        await _v2rayService.disconnect().catchError((e) {
+          debugPrint('Error disconnecting before remove: $e');
+        });
+      }
+
       _configs.removeWhere((c) => c.id == config.id);
 
-      // Also remove from subscriptions if the config is part of any subscription
       for (int i = 0; i < _subscriptions.length; i++) {
         final subscription = _subscriptions[i];
         if (subscription.configIds.contains(config.id)) {
@@ -784,7 +789,6 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         }
       }
 
-      // If the deleted config was selected, clear the selection
       if (_selectedConfig?.id == config.id) {
         _selectedConfig = null;
       }
@@ -818,19 +822,14 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    // Remove listener from V2RayService
     _v2rayService.removeListener(_onV2RayServiceChanged);
-    // Cancel VPN status event subscription
     _vpnStatusSubscription?.cancel();
-    // Dispose the service to stop monitoring
-    _v2rayService.dispose();
-    // Disconnect if connected when disposing (fire and forget - no await in dispose)
     if (_v2rayService.activeConfig != null) {
-      // Fire and forget - dispose can't be async
       _v2rayService.disconnect().catchError((e) {
         debugPrint('Error disconnecting in dispose: $e');
       });
     }
+    _v2rayService.dispose();
     super.dispose();
   }
 

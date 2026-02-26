@@ -31,6 +31,8 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     with AutomaticKeepAliveClientMixin, WidgetsBindingObserver {
   bool _isConnecting = false;
   int _currentPage = 1; // Start from VPN tab (middle)
+  final Stream<int> _timerStream = Stream.periodic(const Duration(seconds: 1), (i) => i).asBroadcastStream();
+  final Stream<int> _statsStream = Stream.periodic(const Duration(milliseconds: 500), (i) => i).asBroadcastStream();
   
   @override
   bool get wantKeepAlive => true;
@@ -83,6 +85,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     if (_isConnecting) {
       final provider = Provider.of<V2RayProvider>(context, listen: false);
       provider.cancelConnect();
+      if (mounted) setState(() => _isConnecting = false);
       return;
     }
 
@@ -372,7 +375,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     final isConnected = provider.activeConfig != null;
     
     return StreamBuilder(
-      stream: Stream.periodic(const Duration(seconds: 1)),
+      stream: _timerStream,
       builder: (context, snapshot) {
         return Center(
           child: Text(
@@ -408,12 +411,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
 
             const AnnouncementBannerWidget(),
 
-            SizedBox(height: responsive.responsiveValue(small: 16, medium: 20, large: 24)),
-            
             // Connection Timer (above button)
             _buildConnectionTimer(provider),
 
-            SizedBox(height: responsive.responsiveValue(small: 12, medium: 14, large: 16)),
+            SizedBox(height: responsive.responsiveValue(small: 10, medium: 12, large: 14)),
             
             // Connection Button
             _buildConnectionButtonWithStatus(provider),
@@ -685,7 +686,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     final isConnected = provider.activeConfig != null;
     
     return StreamBuilder(
-      stream: Stream.periodic(const Duration(milliseconds: 500)),
+      stream: _statsStream,
       builder: (context, snapshot) {
         return Row(
           key: const ValueKey('stats'), // Prevent rebuild animation

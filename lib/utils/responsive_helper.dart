@@ -64,7 +64,7 @@ class ResponsiveHelper {
   double get headerFontSize => scale(22).clamp(18.0, 28.0);
   
   /// Timer font size
-  double get timerFontSize => scale(26).clamp(22.0, 32.0);
+  double get timerFontSize => scale(34).clamp(28.0, 42.0);
   
   /// Stats value font size
   double get statsValueFontSize => scale(15).clamp(12.0, 20.0);

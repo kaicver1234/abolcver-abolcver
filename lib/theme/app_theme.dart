@@ -35,6 +35,27 @@ class AppTheme {
     colors: [primaryDark, secondaryDark],
   );
 
+  static TextTheme _removeDecorations(TextTheme textTheme) {
+    const style = TextStyle(decoration: TextDecoration.none);
+    return textTheme.copyWith(
+      displayLarge: textTheme.displayLarge?.merge(style),
+      displayMedium: textTheme.displayMedium?.merge(style),
+      displaySmall: textTheme.displaySmall?.merge(style),
+      headlineLarge: textTheme.headlineLarge?.merge(style),
+      headlineMedium: textTheme.headlineMedium?.merge(style),
+      headlineSmall: textTheme.headlineSmall?.merge(style),
+      titleLarge: textTheme.titleLarge?.merge(style),
+      titleMedium: textTheme.titleMedium?.merge(style),
+      titleSmall: textTheme.titleSmall?.merge(style),
+      bodyLarge: textTheme.bodyLarge?.merge(style),
+      bodyMedium: textTheme.bodyMedium?.merge(style),
+      bodySmall: textTheme.bodySmall?.merge(style),
+      labelLarge: textTheme.labelLarge?.merge(style),
+      labelMedium: textTheme.labelMedium?.merge(style),
+      labelSmall: textTheme.labelSmall?.merge(style),
+    );
+  }
+
   // Dark Theme
   static ThemeData darkTheme([String languageCode = 'en']) {
     final isRtlLanguage = languageCode == 'fa' || languageCode == 'ar';
@@ -96,10 +117,10 @@ class AppTheme {
           textStyle: baseButtonTextStyle,
         ),
       ),
-      textTheme: baseTextTheme.apply(
+      textTheme: _removeDecorations(baseTextTheme.apply(
         bodyColor: textLight,
         displayColor: textLight,
-      ),
+      )),
       dividerTheme: const DividerThemeData(
         color: borderDark,
         thickness: 1,
