@@ -17,10 +17,10 @@
         android:fullBackupContent="false"
         tools:ignore="GoogleAppIndexingWarning">
         
-        <!-- Default notification icon -->
+        <!-- Default notification icon (must be monochrome / white-on-transparent) -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@drawable/ic_firebase_notification" />
+            android:resource="@drawable/ic_stat_notify" />
             
         <!-- Default notification color (applied as icon background) -->
         <meta-data

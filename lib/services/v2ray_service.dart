@@ -59,6 +59,11 @@ class V2RayService extends ChangeNotifier {
   Timer? _statusCheckTimer;
   DateTime? _lastConnectionTime;
 
+  /// Set only in-memory (never restored from prefs) when connect() succeeds.
+  /// Used to enforce a brief grace period inside _handleStatusChange to ignore
+  /// spurious "disconnected" callbacks that arrive right after connecting.
+  DateTime? _lastSuccessfulConnectTime;
+
   // IP Information
   IpInfo? _ipInfo;
   IpInfo? get ipInfo => _ipInfo;
@@ -163,6 +168,22 @@ class V2RayService extends ChangeNotifier {
         stateString == 'stop';
 
     if (isExplicitDisconnect && _activeConfig != null) {
+      // Grace period: ignore spurious disconnect callbacks that arrive within
+      // 10 seconds of THIS PROCESS's successful connect() call.
+      // NOTE: _lastSuccessfulConnectTime is intentionally NOT persisted to
+      // SharedPreferences, so on cold start it is always null and this check
+      // is skipped — legitimate "disconnected" events on app reopen are handled
+      // correctly even though _activeConfig was silently restored from prefs.
+      if (_lastSuccessfulConnectTime != null) {
+        final msSinceConnect =
+            DateTime.now().difference(_lastSuccessfulConnectTime!).inMilliseconds;
+        if (msSinceConnect < 10000) {
+          debugPrint(
+              '⏭️ Ignoring disconnect event – within 10 s grace period '
+              '(${msSinceConnect}ms since last in-process connect)');
+          return;
+        }
+      }
       _activeConfig = null;
       _onDisconnected?.call();
       _clearActiveConfig();
@@ -275,6 +296,9 @@ class V2RayService extends ChangeNotifier {
 
       _activeConfig = config;
       _lastConnectionTime = DateTime.now();
+      // Mark this as the most recent successful in-process connection so the
+      // grace period in _handleStatusChange can suppress spurious disconnects.
+      _lastSuccessfulConnectTime = DateTime.now();
       
       // Notify listeners immediately for UI update
       notifyListeners();
@@ -311,6 +335,7 @@ class V2RayService extends ChangeNotifier {
       // Clear active config and last connection time
       _activeConfig = null;
       _lastConnectionTime = null;
+      _lastSuccessfulConnectTime = null;
       
       // Notify listeners immediately for UI update
       notifyListeners();
@@ -373,8 +398,11 @@ class V2RayService extends ChangeNotifier {
         return;
       }
       
-      // OPTIMISTIC RESTORE: If we have a saved config, restore it immediately
-      // This ensures UI shows connected state right away
+      // SILENT RESTORE: Restore config without notifying UI yet.
+      // The provider's init flow (_initialize / _syncVpnStatusOnResume) will
+      // confirm the actual VPN state via native status, THEN call notifyListeners.
+      // This prevents a brief "connected" flash when the app is reopened after
+      // the user disconnected from the notification bar while the app was dead.
       debugPrint('✅ Found saved config: ${savedConfig.remark}');
       _activeConfig = savedConfig;
       
@@ -382,9 +410,7 @@ class V2RayService extends ChangeNotifier {
       await _restoreConnectionTime();
       _startUsageMonitoring();
       
-      // Notify listeners immediately so UI updates right away
-      notifyListeners();
-      debugPrint('✅ Active config restored optimistically for UI');
+      debugPrint('✅ Active config restored silently (UI will update after native status confirmed)');
       
       // Fetch IP info after restore (with delay to ensure VPN is stable)
       Future.delayed(const Duration(seconds: 1), () {
@@ -848,6 +874,7 @@ class V2RayService extends ChangeNotifier {
     _stopUsageMonitoring();
     _activeConfig = null;
     _lastConnectionTime = null;
+    _lastSuccessfulConnectTime = null;
     _clearActiveConfig();
     notifyListeners();
   }

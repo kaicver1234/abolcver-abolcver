@@ -67,7 +67,7 @@ class NotificationService {
 
   Future<void> _initializeLocalNotifications() async {
     const AndroidInitializationSettings androidSettings =
-        AndroidInitializationSettings('ic_firebase_notification');
+        AndroidInitializationSettings('ic_stat_notify');
 
     const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
       requestSoundPermission: true,
@@ -121,8 +121,8 @@ class NotificationService {
       channelDescription: _channelDesc,
       importance: Importance.high,
       priority: Priority.high,
-      color: const Color(0xFF1E293B),
-      icon: 'ic_firebase_notification',
+      color: const Color(0xFF00D9FF),
+      icon: 'ic_stat_notify',
       largeIcon: const DrawableResourceAndroidBitmap('ic_launcher'),
       styleInformation: BigTextStyleInformation(
         body,
