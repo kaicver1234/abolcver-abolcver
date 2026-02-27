@@ -27,27 +27,27 @@ class DnsProvider with ChangeNotifier {
     DnsOption(
       preset: DnsPreset.google,
       name: 'Google DNS',
-      description: '8.8.8.8 · 8.8.4.4',
-      servers: ['8.8.8.8', '8.8.4.4'],
+      description: '8.8.8.8',
+      servers: ['8.8.8.8'],
       badge: 'Default',
     ),
     DnsOption(
       preset: DnsPreset.cloudflare,
       name: 'Cloudflare',
-      description: '1.1.1.1 · 1.0.0.1',
-      servers: ['1.1.1.1', '1.0.0.1'],
+      description: '1.1.1.1',
+      servers: ['1.1.1.1'],
     ),
     DnsOption(
       preset: DnsPreset.openDns,
       name: 'OpenDNS',
-      description: '208.67.222.222 · 208.67.220.220',
-      servers: ['208.67.222.222', '208.67.220.220'],
+      description: '208.67.222.222',
+      servers: ['208.67.222.222'],
     ),
     DnsOption(
       preset: DnsPreset.quad9,
       name: 'Quad9',
-      description: '9.9.9.9 · 149.112.112.112',
-      servers: ['9.9.9.9', '149.112.112.112'],
+      description: '9.9.9.9',
+      servers: ['9.9.9.9'],
       badge: 'Secure',
     ),
   ];
@@ -74,7 +74,7 @@ class DnsProvider with ChangeNotifier {
 
   List<String> get activeServers {
     final servers = selectedOption.servers;
-    if (servers.isEmpty) return ['8.8.8.8', '8.8.4.4'];
+    if (servers.isEmpty) return ['8.8.8.8'];
     return servers;
   }
 

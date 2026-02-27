@@ -384,11 +384,11 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
                 ? provider.v2rayService.getFormattedConnectedTime()
                 : '00:00:00',
             key: const ValueKey('timer'), // Prevent rebuild animation
-            style: GoogleFonts.orbitron(
+            style: GoogleFonts.poppins(
               fontSize: responsive.timerFontSize,
               fontWeight: FontWeight.w700,
               color: Colors.white,
-              letterSpacing: 2.5,
+              letterSpacing: 2.0,
             ),
           ),
         );
@@ -744,11 +744,11 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         const SizedBox(height: 8),
         Text(
           value,
-          style: GoogleFonts.orbitron(
+          style: GoogleFonts.poppins(
             color: Colors.white,
             fontSize: responsive.statsValueFontSize,
             fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
+            letterSpacing: 0.3,
           ),
         ),
       ],

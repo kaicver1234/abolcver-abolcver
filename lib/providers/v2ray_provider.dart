@@ -425,42 +425,54 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       await _v2rayService.initialize();
       debugPrint('✅ V2Ray service initialized');
       
-      // STEP 2: Wait briefly for the native VPN service to deliver its current
-      // status via the onStatusChanged callback. On cold start the plugin binds
-      // to the Android VPN service asynchronously, so the first status event may
-      // not have arrived yet when we call getConnectedServerDelayDirect().
-      await Future.delayed(const Duration(milliseconds: 800));
-
-      // Check native status first — most reliable on cold start
-      final nativeStateOnInit = _v2rayService.currentStatus?.state.toLowerCase().trim() ?? '';
+      // STEP 2: Wait REACTIVELY for the native VPN status callback.
+      //
+      // On cold start the flutter_v2ray plugin binds to the Android VPN service
+      // asynchronously.  Instead of sleeping a fixed amount of time, we use a
+      // Completer-based helper that resolves as soon as onStatusChanged delivers
+      // a meaningful state — or falls back to a delay check after 5 s.
+      //
+      // This eliminates the previous fixed 1 500 ms delay and makes the init
+      // path respond in ~200–500 ms on most devices when VPN is running.
+      final nativeStateOnInit = await _v2rayService.waitForNativeStatus(
+        timeout: const Duration(seconds: 5),
+      );
       debugPrint('📡 Native VPN state on init: "$nativeStateOnInit"');
 
       bool isVpnConnected = false;
       bool initExplicitlyDisconnected = false;
 
       if (nativeStateOnInit == 'connected' || nativeStateOnInit == 'running') {
-        // Native side says VPN is up — trust it immediately without a delay check
+        // Native side confirmed VPN is up — no further checks needed.
         isVpnConnected = true;
         debugPrint('✅ Native status confirms VPN connected');
+      } else if (nativeStateOnInit == 'disconnected' ||
+          nativeStateOnInit == 'stopped' ||
+          nativeStateOnInit == 'stop') {
+        // Native side explicitly confirmed VPN is not running.
+        initExplicitlyDisconnected = true;
+        debugPrint('❌ Native status confirms VPN disconnected');
       } else {
-        // Native status is ambiguous or says disconnected — confirm with delay check
+        // Timeout or unknown state — do a one-shot delay check as fallback.
+        // We only set initExplicitlyDisconnected when the delay check returns
+        // -1 AND the native state now explicitly agrees; a timeout (-2) is
+        // treated as ambiguous to avoid wiping state on slow devices.
+        debugPrint('⏱️ Native status ambiguous ("$nativeStateOnInit"), falling back to delay check...');
         try {
           final delay = await _v2rayService.getConnectedServerDelayDirect()
               .timeout(const Duration(seconds: 6), onTimeout: () => -2);
           if (delay >= 0 && delay < 10000) {
             isVpnConnected = true;
           } else if (delay == -1) {
-            // Only treat as explicit disconnect if native also agrees
-            final nativeState = _v2rayService.currentStatus?.state.toLowerCase().trim() ?? '';
-            if (nativeState == 'disconnected' || nativeState == 'stopped' ||
-                nativeState == 'stop' || nativeState.isEmpty) {
+            final lateState = _v2rayService.currentStatus?.state.toLowerCase().trim() ?? '';
+            if (lateState == 'disconnected' || lateState == 'stopped' || lateState == 'stop') {
               initExplicitlyDisconnected = true;
             }
           }
-          // delay == -2 → timeout or exception — ambiguous, don't clear state
-          debugPrint('🔎 VPN delay check: ${delay}ms, connected: $isVpnConnected, explicit disconnect: $initExplicitlyDisconnected');
+          // delay == -2 → timeout → leave both flags false (keep restored state)
+          debugPrint('🔎 Fallback delay check: ${delay}ms, connected: $isVpnConnected, explicitDisconnect: $initExplicitlyDisconnected');
         } catch (e) {
-          debugPrint('⚠️ Delay check failed: $e');
+          debugPrint('⚠️ Fallback delay check failed: $e');
         }
       }
       
@@ -497,17 +509,27 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           
           debugPrint('✅ VPN is connected to: ${_selectedConfig?.remark}');
         }
-      } else if (initExplicitlyDisconnected || _v2rayService.activeConfig == null) {
-        // Only clear state when VPN explicitly reports not connected,
-        // or when there is no saved activeConfig.
-        // On timeout alone, keep whatever state was restored.
+      } else if (initExplicitlyDisconnected) {
+        // VPN explicitly reported as not running — safe to clear all state.
+        // forceDisconnectedState() also clears SharedPreferences, so only call
+        // it when we are CERTAIN the VPN is not running.
         _v2rayService.forceDisconnectedState();
         for (var config in _configs) {
           config.isConnected = false;
         }
-        debugPrint('❌ VPN is not connected (explicit=$initExplicitlyDisconnected)');
+        debugPrint('❌ VPN explicitly disconnected');
+      } else if (_v2rayService.activeConfig == null) {
+        // No saved active config — user was not previously connected.
+        // Only clear in-memory flags; nothing to erase from SharedPreferences.
+        for (var config in _configs) {
+          config.isConnected = false;
+        }
+        debugPrint('❌ No active config — not previously connected');
       } else {
-        debugPrint('⚠️ Init delay check ambiguous (timeout), keeping restored state');
+        // Ambiguous (timeout or empty native state) — keep the optimistically
+        // restored state. _enhancedSyncWithVpnServiceState() below will do the
+        // final authoritative check and correct the UI if needed.
+        debugPrint('⚠️ Init delay check ambiguous (timeout/empty), keeping restored state');
       }
       
       notifyListeners();
@@ -1533,44 +1555,50 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     try {
       debugPrint('🔄 Syncing VPN status on app resume...');
       
-      // STEP 1: Re-initialize service to restore saved state
+      // STEP 1: Re-initialize service (restores activeConfig from SharedPreferences)
       await _v2rayService.initialize();
-      
-      // STEP 2: Check actual VPN connection status using delay check FIRST
-      // This is the most reliable method - it actually tests if V2Ray is running
+
+      // STEP 2: Determine VPN state — use native status first (reactive),
+      // fall back to delay check only when status is ambiguous.
       bool isOurVpnConnected = false;
       bool explicitlyDisconnected = false;
       V2RayConfig? activeConfig = _v2rayService.activeConfig;
-      
-      // Try delay check first - most reliable
-      // Use a longer timeout so slow servers don't cause false disconnects
-      try {
-        final delay = await _v2rayService.getConnectedServerDelayDirect()
-            .timeout(const Duration(seconds: 7), onTimeout: () => -2);
-        
-        if (delay >= 0 && delay < 10000) {
-          isOurVpnConnected = true;
-          debugPrint('✅ VPN connected (delay: ${delay}ms)');
-        } else if (delay == -1) {
-          // V2Ray service explicitly says not connected
-          explicitlyDisconnected = true;
-          debugPrint('❌ Delay check: V2Ray explicitly not connected (-1)');
-        } else {
-          // delay == -2 = timeout — VPN might still be running
-          debugPrint('⏱️ Delay check timed out, will verify via status');
-        }
-      } catch (e) {
-        debugPrint('⚠️ Delay check failed: $e');
-      }
-      
-      // If delay check did not confirm, try isActuallyConnected
-      if (!isOurVpnConnected && !explicitlyDisconnected) {
-        isOurVpnConnected = await _v2rayService.isActuallyConnected()
-            .timeout(const Duration(seconds: 4), onTimeout: () => false);
-        
-        if (isOurVpnConnected) {
-          debugPrint('✅ isActuallyConnected returned true');
-          activeConfig = _v2rayService.activeConfig;
+
+      // waitForNativeStatus returns immediately on resume because the singleton
+      // already holds the latest _currentStatus from while the app was paused.
+      final resumeNativeState = await _v2rayService.waitForNativeStatus(
+        timeout: const Duration(seconds: 3),
+      );
+      debugPrint('📡 Native VPN state on resume: "$resumeNativeState"');
+
+      if (resumeNativeState == 'connected' || resumeNativeState == 'running') {
+        isOurVpnConnected = true;
+        activeConfig = _v2rayService.activeConfig;
+        debugPrint('✅ Native confirms VPN connected on resume');
+      } else if (resumeNativeState == 'disconnected' ||
+          resumeNativeState == 'stopped' ||
+          resumeNativeState == 'stop') {
+        explicitlyDisconnected = true;
+        debugPrint('❌ Native confirms VPN disconnected on resume');
+      } else {
+        // Ambiguous — fall back to delay check
+        debugPrint('⏱️ Native status ambiguous on resume, falling back to delay check...');
+        try {
+          final delay = await _v2rayService.getConnectedServerDelayDirect()
+              .timeout(const Duration(seconds: 7), onTimeout: () => -2);
+
+          if (delay >= 0 && delay < 10000) {
+            isOurVpnConnected = true;
+            activeConfig = _v2rayService.activeConfig;
+            debugPrint('✅ VPN connected on resume (delay: ${delay}ms)');
+          } else if (delay == -1) {
+            explicitlyDisconnected = true;
+            debugPrint('❌ Delay check: VPN explicitly not connected (-1)');
+          } else {
+            debugPrint('⏱️ Delay check timed out on resume — keeping current state');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Delay check failed on resume: $e');
         }
       }
       

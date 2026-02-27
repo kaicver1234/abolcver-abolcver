@@ -170,13 +170,55 @@ class V2RayService extends ChangeNotifier {
     }
 
     // Restore config when native reports connected but we have no record of it
-    final bool isConnected = stateString == 'connected';
+    final bool isConnected = stateString == 'connected' || stateString == 'running';
     if (isConnected && _activeConfig == null) {
       _tryRestoreActiveConfig().then((_) {
         notifyListeners();
       });
     }
+
+    // Resolve any pending waitForNativeStatus() calls
+    _resolveStatusWaiters(stateString);
   }
+
+  // ── Reactive status waiting ────────────────────────────────────────────────
+  // Completers waiting for a meaningful native status on cold start.
+  final List<Completer<String>> _statusWaiters = [];
+
+  void _resolveStatusWaiters(String state) {
+    if (state.isEmpty) return;
+    for (final c in _statusWaiters) {
+      if (!c.isCompleted) c.complete(state);
+    }
+    _statusWaiters.clear();
+  }
+
+  /// Wait reactively for the native VPN status callback.
+  ///
+  /// Returns immediately if a meaningful status is already known.
+  /// Otherwise waits until [onStatusChanged] fires with a non-empty state,
+  /// or [timeout] elapses (returns '' on timeout).
+  ///
+  /// Meaningful states: 'connected' | 'running' | 'disconnected' | 'stopped' | 'stop'
+  Future<String> waitForNativeStatus({
+    Duration timeout = const Duration(seconds: 5),
+  }) async {
+    final current = _currentStatus?.state.toLowerCase().trim() ?? '';
+    if (current.isNotEmpty) return current;
+
+    final completer = Completer<String>();
+    _statusWaiters.add(completer);
+    try {
+      return await completer.future.timeout(timeout, onTimeout: () {
+        _statusWaiters.remove(completer);
+        return _currentStatus?.state.toLowerCase().trim() ?? '';
+      });
+    } catch (_) {
+      _statusWaiters.remove(completer);
+      return '';
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   Future<void> initialize() async {
     if (!_isInitialized) {
@@ -353,9 +395,15 @@ class V2RayService extends ChangeNotifier {
         });
       });
       
-      // Now verify in background (non-blocking)
-      // This happens asynchronously and won't delay UI display
-      _verifyConnectionInBackground();
+      // Background verification is intentionally NOT called here.
+      // Doing so caused a race condition on cold start: the plugin had not yet
+      // bound to the Android VPN service, so all delay checks returned -1 and
+      // forceDisconnectedState() wiped SharedPreferences before _initialize()
+      // could use the saved config.
+      //
+      // The authoritative connection check is done by
+      // V2RayProvider._enhancedSyncWithVpnServiceState() at the end of init,
+      // and by V2RayProvider._syncVpnStatusOnResume() on app resume.
       
     } catch (e) {
       debugPrint('❌ Error restoring active config: $e');
@@ -383,55 +431,6 @@ class V2RayService extends ChangeNotifier {
     }
   }
   
-  // Verify connection in background without blocking UI
-  void _verifyConnectionInBackground() async {
-    try {
-      debugPrint('🔎 Verifying connection in background...');
-
-      bool? isConnected;
-      int explicitFailures = 0; // delay == -1: VPN service explicitly says not connected
-      bool hadExceptions = false; // timeout/exception: might be network issue
-
-      for (int attempt = 0; attempt < 3; attempt++) {
-        try {
-          final delay = await _flutterV2ray.getConnectedServerDelay()
-              .timeout(const Duration(seconds: 5));
-
-          if (delay >= 0 && delay < 10000) {
-            isConnected = true;
-            debugPrint('🔎 Background check: ${delay}ms, connected');
-            break;
-          } else {
-            explicitFailures++;
-            debugPrint('🔎 Background check: delay=$delay (explicit not-connected)');
-          }
-        } catch (e) {
-          hadExceptions = true;
-          debugPrint('⚠️ Background check attempt ${attempt + 1} exception: $e');
-          if (attempt < 2) {
-            await Future.delayed(const Duration(milliseconds: 500));
-          }
-        }
-      }
-
-      if (isConnected == true) {
-        debugPrint('✅ Background verification: VPN is running');
-      } else if (explicitFailures >= 2 || (explicitFailures > 0 && !hadExceptions)) {
-        // Only clear state when VPN service CONSISTENTLY reports not connected:
-        // - 2+ explicit -1s out of 3 attempts, OR
-        // - even 1 explicit -1 when no exceptions occurred (clean environment).
-        // A single -1 mixed with exceptions is likely a transient network blip.
-        debugPrint('❌ Background verification: VPN not running ($explicitFailures explicit failures), clearing state');
-        forceDisconnectedState();
-      } else {
-        // Ambiguous result (mostly exceptions/timeouts or single -1 with exceptions)
-        // Keep current state to avoid false disconnects on slow networks
-        debugPrint('⚠️ Background verification: ambiguous (failures=$explicitFailures, exceptions=$hadExceptions), keeping state');
-      }
-    } catch (e) {
-      debugPrint('⚠️ Error during background verification: $e');
-    }
-  }
 
   Future<void> _restoreConnectionTime() async {
     final prefs = await SharedPreferences.getInstance();
@@ -946,7 +945,7 @@ class V2RayService extends ChangeNotifier {
       // It actually tests if V2Ray core is running and can reach the server
       try {
         final delay = await _flutterV2ray.getConnectedServerDelay()
-            .timeout(const Duration(seconds: 3));
+            .timeout(const Duration(seconds: 5));
         
         if (delay >= 0 && delay < 10000) {
           debugPrint('✅ VPN connected (delay check: ${delay}ms)');
