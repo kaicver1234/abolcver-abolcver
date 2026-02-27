@@ -14,9 +14,49 @@ import 'screens/splash_loading_screen.dart';
 import 'services/notification_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'firebase_options.dart';
 import 'theme/app_theme.dart';
 import 'services/remote_config_service.dart';
+
+// Must be a top-level function — called when app is in background or terminated.
+// For notification messages (sent from Firebase Console with title/body),
+// Android displays them automatically via the system tray.
+// For data-only messages we show a local notification manually.
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  if (message.notification == null && message.data.isNotEmpty) {
+    final FlutterLocalNotificationsPlugin plugin =
+        FlutterLocalNotificationsPlugin();
+    const InitializationSettings initSettings = InitializationSettings(
+      android: AndroidInitializationSettings('ic_stat_notify'),
+    );
+    await plugin.initialize(initSettings);
+
+    final String title = message.data['title'] as String? ?? 'Tiksar VPN';
+    final String body = message.data['body'] as String? ?? '';
+
+    await plugin.show(
+      message.hashCode.abs() % 100000,
+      title,
+      body,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'tiksar_vpn_main',
+          'Tiksar VPN',
+          channelDescription: 'اطلاعیه‌های Tiksar VPN',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: 'ic_stat_notify',
+          color: Color(0xFF00D9FF),
+          autoCancel: true,
+        ),
+      ),
+    );
+  }
+}
 
 
 void main() async {
@@ -33,6 +73,10 @@ void main() async {
   } catch (e) {
     debugPrint('⚠️ Firebase skipped: $e');
   }
+
+  // Register background message handler BEFORE runApp() — Firebase requires
+  // this to be set up as early as possible (ideally right after initializeApp).
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   
   // Initialize services in background
   _initializeServices();

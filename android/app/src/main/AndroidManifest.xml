@@ -26,6 +26,13 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_color" />
+
+        <!-- Default notification channel — REQUIRED on Android 8+ so FCM
+             background messages are shown in the correct channel.
+             Must match the channel ID created in NotificationService. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="tiksar_vpn_main" />
             
         <!-- VPN notification icon -->
         <meta-data

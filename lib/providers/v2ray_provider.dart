@@ -482,6 +482,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       
       // STEP 4: Sync connection state based on actual VPN status
       if (isVpnConnected) {
+        // Native confirmed VPN is live — release the confirmation gate so
+        // the service starts the monitoring timer and allows UI redraws.
+        _v2rayService.confirmRestoredConnection();
+
         final activeConfig = _v2rayService.activeConfig;
         if (activeConfig != null) {
           // Mark the active config as connected
@@ -595,6 +599,8 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       
       if (isActuallyConnected) {
         debugPrint('✅ VPN is running, synchronizing config states...');
+        // Release the restoration gate so the monitoring timer starts and UI redraws are allowed.
+        _v2rayService.confirmRestoredConnection();
         
         // VPN is actually running, synchronizing config states
         final activeConfigFromService = _v2rayService.activeConfig;
@@ -1639,7 +1645,8 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           debugPrint('➕ Added active config to list: ${config.remark}');
         }
         
-        // Ensure monitoring is active
+        // Confirm restoration so the service starts monitoring and allows UI updates.
+        _v2rayService.confirmRestoredConnection();
         _v2rayService.ensureMonitoringActive();
       } else if (explicitlyDisconnected || _v2rayService.activeConfig == null) {
         // Only clear state when VPN is EXPLICITLY reported as not running,

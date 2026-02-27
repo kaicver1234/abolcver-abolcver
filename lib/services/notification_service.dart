@@ -2,7 +2,6 @@ import 'dart:io';
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
@@ -44,7 +43,8 @@ class NotificationService {
         debugPrint('🧪 Subscribed to dev_test topic');
 
         FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-        FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+        // NOTE: onBackgroundMessage is registered in main.dart BEFORE runApp()
+        // to meet Firebase's requirement. Do NOT register it here again.
       }
       debugPrint('✅ Notification service initialized');
     } catch (e) {
@@ -174,7 +174,4 @@ class NotificationService {
   }
 }
 
-// Must be top-level
-Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
-  await Firebase.initializeApp();
-}
+

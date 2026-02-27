@@ -64,6 +64,14 @@ class V2RayService extends ChangeNotifier {
   /// spurious "disconnected" callbacks that arrive right after connecting.
   DateTime? _lastSuccessfulConnectTime;
 
+  /// True while a restored config is waiting for native VPN status confirmation.
+  /// During this window:
+  ///  - notifyListeners() in onStatusChanged is suppressed (to avoid "connected"
+  ///    flash before the actual VPN state is known)
+  ///  - the usage-monitoring timer is NOT started
+  /// Cleared by confirmRestoredConnection() or forceDisconnectedState().
+  bool _isAwaitingConfirmation = false;
+
   // IP Information
   IpInfo? _ipInfo;
   IpInfo? get ipInfo => _ipInfo;
@@ -147,7 +155,12 @@ class V2RayService extends ChangeNotifier {
       onStatusChanged: (status) {
         _currentStatus = status;
         _handleStatusChange(status);
-        notifyListeners(); // Notify listeners when status changes
+        // Suppress UI notifications while we are waiting for native confirmation
+        // of a restored config (cold-start after notification-bar disconnect).
+        // _handleStatusChange itself still fires and will resolve waiters / clear
+        // state as needed — we just don't want traffic-stat redraws to make the
+        // UI show "connected" before the real state is known.
+        if (!_isAwaitingConfirmation) notifyListeners();
       },
     );
 
@@ -249,12 +262,17 @@ class V2RayService extends ChangeNotifier {
       );
       _isInitialized = true;
 
-      // Try to restore active config if VPN is still running
-      await _tryRestoreActiveConfig();
+      // Restore config silently — awaitConfirmation:true means:
+      //  • _isAwaitingConfirmation is set to true
+      //  • the usage-monitoring timer is NOT started yet
+      //  • notifyListeners() in onStatusChanged is suppressed
+      // The provider will call confirmRestoredConnection() or forceDisconnectedState()
+      // after checking the actual native VPN state.
+      await _tryRestoreActiveConfig(awaitConfirmation: true);
     } else {
-      // Already initialized, but still try to restore config on re-entry
-      // This helps when app is reopened after being in background
-      await _tryRestoreActiveConfig();
+      // Already initialized (app resumed from background).
+      // Same silent-restore logic applies.
+      await _tryRestoreActiveConfig(awaitConfirmation: true);
     }
   }
 
@@ -294,6 +312,7 @@ class V2RayService extends ChangeNotifier {
         notificationDisconnectButtonName: "DISCONNECT",
       );
 
+      _isAwaitingConfirmation = false;
       _activeConfig = config;
       _lastConnectionTime = DateTime.now();
       // Mark this as the most recent successful in-process connection so the
@@ -332,7 +351,8 @@ class V2RayService extends ChangeNotifier {
 
       await _flutterV2ray.stopV2Ray();
 
-      // Clear active config and last connection time
+      // Clear active config and all related state
+      _isAwaitingConfirmation = false;
       _activeConfig = null;
       _lastConnectionTime = null;
       _lastSuccessfulConnectTime = null;
@@ -387,7 +407,10 @@ class V2RayService extends ChangeNotifier {
     return V2RayConfig.fromJson(jsonDecode(configJson));
   }
 
-  Future<void> _tryRestoreActiveConfig() async {
+  /// Whether this call is from initialize() and must wait for native confirmation.
+  /// When true: set _isAwaitingConfirmation, skip monitoring start.
+  /// When false (called from _handleStatusChange on a "connected" event): proceed normally.
+  Future<void> _tryRestoreActiveConfig({bool awaitConfirmation = false}) async {
     try {
       // First, try to load saved config
       final savedConfig = await _loadActiveConfig();
@@ -405,12 +428,21 @@ class V2RayService extends ChangeNotifier {
       // the user disconnected from the notification bar while the app was dead.
       debugPrint('✅ Found saved config: ${savedConfig.remark}');
       _activeConfig = savedConfig;
-      
-      // Restore connection time and start monitoring immediately
-      await _restoreConnectionTime();
-      _startUsageMonitoring();
-      
-      debugPrint('✅ Active config restored silently (UI will update after native status confirmed)');
+
+      if (awaitConfirmation) {
+        // Mark that we need native confirmation before showing connected UI.
+        // Also do NOT start the usage-monitoring timer yet — it fires notifyListeners()
+        // every second and would make the UI show "connected" prematurely.
+        _isAwaitingConfirmation = true;
+        await _restoreConnectionTime();
+        debugPrint('⏳ Awaiting native confirmation before showing connected UI');
+      } else {
+        // Native already told us "connected" (called from _handleStatusChange),
+        // so safe to start monitoring and let the caller notify.
+        await _restoreConnectionTime();
+        _startUsageMonitoring();
+        debugPrint('✅ Active config restored (native confirmed connected)');
+      }
       
       // Fetch IP info after restore (with delay to ensure VPN is stable)
       Future.delayed(const Duration(seconds: 1), () {
@@ -866,9 +898,22 @@ class V2RayService extends ChangeNotifier {
     // _startStatusMonitoring();
   }
 
+  /// Called by the provider once native VPN status confirms the restored
+  /// connection is actually live.  Starts the monitoring timer and notifies UI.
+  void confirmRestoredConnection() {
+    if (!_isAwaitingConfirmation) return;
+    _isAwaitingConfirmation = false;
+    _startUsageMonitoring();
+    notifyListeners();
+    debugPrint('✅ Restored connection confirmed by native — UI updated');
+  }
+
   /// Clears the active config and all related state when VPN is confirmed disconnected.
   /// Call this whenever we are certain the VPN is NOT running.
   void forceDisconnectedState() {
+    // Cancel pending-confirmation state even if _activeConfig is already null
+    // (e.g. provider calls this before service finishes restore).
+    _isAwaitingConfirmation = false;
     if (_activeConfig == null) return;
     debugPrint('🔄 forceDisconnectedState: clearing activeConfig');
     _stopUsageMonitoring();
