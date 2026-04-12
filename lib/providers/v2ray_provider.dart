@@ -547,7 +547,23 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   Future<bool> _confirmVpnConnectionState() async {
     debugPrint('🔒 Running authoritative VPN connection check...');
 
-    // Wait for the first meaningful native status callback.
+    // PRIORITY 1: Check system VPN state first (fastest and most reliable)
+    try {
+      final systemVpnActive = await isSystemVpnActive();
+      debugPrint('🔍 System VPN active: $systemVpnActive');
+      
+      if (!systemVpnActive) {
+        debugPrint('❌ System confirms VPN is NOT active');
+        return false;
+      }
+      
+      debugPrint('✅ System confirms VPN is active');
+      // Continue to verify with V2Ray core for details
+    } catch (e) {
+      debugPrint('⚠️ System check failed: $e, falling back to native check');
+    }
+
+    // PRIORITY 2: Wait for the first meaningful native status callback.
     final nativeState = await _v2rayService.waitForNativeStatus(
       timeout: const Duration(seconds: 4),
     );
@@ -1161,6 +1177,12 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         notifyListeners();
         return;
       }
+      
+      // CRITICAL: Set grace period BEFORE attempting connection
+      // This prevents native disconnect events during connection handshake from resetting UI
+      _lastSuccessfulConnection = DateTime.now();
+      _saveConnectionTimestamp();
+      debugPrint('🛡️ Pre-connection grace period activated');
 
       // STEP 2: Try to connect with automatic retry
       for (int attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -1226,10 +1248,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         try {
           debugPrint('✅ VPN connection successful, updating UI state...');
           
-          // CRITICAL PHASE 1: Establish grace period FIRST
-          // This MUST be the very first thing to prevent race conditions
+          // CRITICAL PHASE 1: Refresh grace period (was set before connection)
           _lastSuccessfulConnection = DateTime.now();
-          debugPrint('🛡️ Grace period activated for 120 seconds (2 minutes)');
+          debugPrint('🛡️ Grace period refreshed for 120 seconds (2 minutes)');
           debugPrint('🛡️ Start time: ${_lastSuccessfulConnection!.toIso8601String()}');
           
           // Save timestamp to SharedPreferences for persistence across app restarts
@@ -1327,6 +1348,12 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         // Connection failed after all attempts
         debugPrint('💔 Connection failed after $maxAttempts attempts');
         debugPrint('💔 Last error: $lastError');
+        
+        // Clear grace period since connection failed
+        _lastSuccessfulConnection = null;
+        _clearConnectionTimestamp();
+        debugPrint('🗑️ Cleared grace period after connection failure');
+        
         _setError(
           'Failed to connect to ${config.remark} after $maxAttempts attempts: $lastError',
         );
@@ -1336,13 +1363,18 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('❌ FATAL: Unexpected error in connection process');
       debugPrint('❌ Error: $e');
       debugPrint('❌ Stack trace: ${StackTrace.current}');
+      
+      // Clear grace period on error
+      _lastSuccessfulConnection = null;
+      _clearConnectionTimestamp();
+      
       _setError('Unexpected error connecting to ${config.remark}: $e');
     } finally {
       debugPrint('🏁 Entering finally block...');
       debugPrint('🏁 Success: $success');
       debugPrint('🏁 _isConnecting: $_isConnecting');
       
-      _isConnecting = false;
+      // DON'T set _isConnecting = false yet! Keep it true to block native events
       
       // CRITICAL SAFETY CHECK: Verify connection state integrity
       if (success && _v2rayService.activeConfig != null) {
@@ -1398,7 +1430,17 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       } else if (success && _v2rayService.activeConfig == null) {
         debugPrint('🚨 WARNING: Success but no activeConfig!');
         debugPrint('   This indicates a serious problem');
+      } else if (!success) {
+        debugPrint('❌ Connection failed, clearing grace period');
+        // Make sure grace period is cleared on failure
+        _lastSuccessfulConnection = null;
+        _clearConnectionTimestamp();
       }
+      
+      // NOW it's safe to set _isConnecting = false (after all state is verified)
+      // But add a small delay to ensure all state changes are processed
+      await Future.delayed(const Duration(milliseconds: 500));
+      _isConnecting = false;
       
       // Always notify UI at the end to ensure latest state
       notifyListeners();
@@ -1555,11 +1597,18 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       debugPrint('📱 App resumed, checking VPN status immediately...');
       
-      // SUPER FAST: Check system VPN state first (instant response)
-      _quickSystemVpnCheck();
+      // STEP 1: Show last known state immediately (no delay)
+      notifyListeners();
       
-      // Then do full sync in background
-      _syncVpnStatusOnResume();
+      // STEP 2: Quick system check (runs in background, updates UI when ready)
+      _quickSystemVpnCheck().then((_) {
+        debugPrint('✅ Quick check completed');
+      });
+      
+      // STEP 3: Full sync in background (for detailed info)
+      Future.delayed(const Duration(milliseconds: 100), () {
+        _syncVpnStatusOnResume();
+      });
       
     } else if (state == AppLifecycleState.paused) {
       // App is paused, VPN status will be maintained in background
@@ -1574,54 +1623,79 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   /// Quick system VPN check - updates UI instantly based on system state
   Future<void> _quickSystemVpnCheck() async {
     try {
+      debugPrint('⚡ Quick system VPN check starting...');
+      
       final systemVpnActive = await isSystemVpnActive();
+      debugPrint('⚡ System VPN active: $systemVpnActive');
+      
       final hasConnectedConfig = _configs.any((c) => c.isConnected);
+      debugPrint('⚡ UI shows connected: $hasConnectedConfig');
       
       // If system says VPN is active but UI shows disconnected
       if (systemVpnActive && !hasConnectedConfig) {
-        debugPrint('⚡ QUICK FIX: System VPN active, updating UI immediately');
+        debugPrint('⚡ MISMATCH: System active but UI disconnected - fixing...');
         
-        // Try to restore from saved config
-        final activeConfig = _v2rayService.activeConfig;
+        // First, try to restore activeConfig from service
+        var activeConfig = _v2rayService.activeConfig;
+        
+        // If not in service, try to load from SharedPreferences
+        if (activeConfig == null) {
+          debugPrint('⚡ No activeConfig in service, loading from SharedPreferences...');
+          await _v2rayService.restoreActiveConfig();
+          activeConfig = _v2rayService.activeConfig;
+        }
+        
         if (activeConfig != null) {
+          debugPrint('⚡ Found activeConfig: ${activeConfig.remark}');
+          
+          // If configs list is empty, wait a bit for it to load
+          if (_configs.isEmpty) {
+            debugPrint('⚡ Configs empty, waiting for load...');
+            await Future.delayed(const Duration(milliseconds: 200));
+          }
+          
+          // Try to find matching config in list
+          bool foundMatch = false;
           for (var config in _configs) {
             if (config.id == activeConfig.id || 
                 config.fullConfig == activeConfig.fullConfig ||
                 (config.address == activeConfig.address && config.port == activeConfig.port)) {
               config.isConnected = true;
               _selectedConfig = config;
-              debugPrint('⚡ Restored: ${config.remark}');
+              _wasUsingSmartConnect = false;
+              foundMatch = true;
+              debugPrint('⚡ Matched config: ${config.remark}');
               break;
             }
           }
-        } else {
-          // No active config, try to load from SharedPreferences
-          await _v2rayService.restoreActiveConfig();
-          final restoredConfig = _v2rayService.activeConfig;
-          if (restoredConfig != null) {
-            for (var config in _configs) {
-              if (config.id == restoredConfig.id || 
-                  config.fullConfig == restoredConfig.fullConfig) {
-                config.isConnected = true;
-                _selectedConfig = config;
-                debugPrint('⚡ Restored from prefs: ${config.remark}');
-                break;
-              }
+          
+          // If no match found, add the activeConfig to list
+          if (!foundMatch && activeConfig != null) {
+            debugPrint('⚡ No match found, adding activeConfig to list');
+            activeConfig.isConnected = true;
+            if (!_configs.any((c) => c.id == activeConfig!.id)) {
+              _configs.insert(0, activeConfig);
             }
+            _selectedConfig = activeConfig;
+            _wasUsingSmartConnect = false;
           }
+          
+          // Update UI immediately
+          notifyListeners();
+          debugPrint('⚡ UI updated to CONNECTED');
+        } else {
+          debugPrint('⚡ No activeConfig found anywhere');
         }
-        
-        // Update UI immediately
-        notifyListeners();
       }
       // If system says VPN is NOT active but UI shows connected
       else if (!systemVpnActive && hasConnectedConfig) {
-        debugPrint('⚡ QUICK FIX: System VPN inactive, updating UI immediately');
+        debugPrint('⚡ MISMATCH: System inactive but UI connected - fixing...');
         _v2rayService.forceDisconnectedState();
         for (var config in _configs) {
           config.isConnected = false;
         }
         notifyListeners();
+        debugPrint('⚡ UI updated to DISCONNECTED');
       }
       else {
         debugPrint('⚡ System and UI already in sync');
