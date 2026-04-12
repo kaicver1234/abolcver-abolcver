@@ -3,7 +3,7 @@
 A powerful tool for accessing free internet. Break through restrictions and enjoy unlimited access with complete privacy.
 
 ## Version
-1.1.4
+1.1.5
 
 ## Developer
 Developed with ❤ by Abolfazl Jahani

@@ -25,6 +25,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   bool _isLoadingServers = false;
   bool _isInitializing = true; // Track initialization state
   DateTime? _lastSuccessfulConnection; // Track last successful connection time
+  Timer? _stateValidationTimer; // Periodic state validator
   
   // Missing private variables
   bool _isConnecting = false;
@@ -234,6 +235,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   // Method channel for VPN control
   static const platform = MethodChannel('com.tiksarvpn.app/vpn_control');
   
+  // Method channel for checking system VPN state
+  static const vpnStateChannel = MethodChannel('com.tiksarvpn.app/vpn_state');
+  
   // Event channel for receiving VPN status updates from native side
   static const EventChannel _vpnStatusEventChannel = EventChannel('com.tiksarvpn.app/vpn_status_events');
   StreamSubscription? _vpnStatusSubscription;
@@ -318,9 +322,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     // Using milliseconds to catch events that arrive within first second
     if (_lastSuccessfulConnection != null) {
       final timeSinceConnection = DateTime.now().difference(_lastSuccessfulConnection!);
-      if (timeSinceConnection.inMilliseconds < 8000) {
-        debugPrint('⏭️ Ignoring ALL native events (within 8s grace period after connection)');
-        debugPrint('⏭️ Time since connection: ${timeSinceConnection.inMilliseconds}ms');
+      if (timeSinceConnection.inSeconds < 120) { // Extended to 120 seconds (2 minutes)
+        debugPrint('⏭️ Ignoring ALL native events (within 120s grace period after connection)');
+        debugPrint('⏭️ Time since connection: ${timeSinceConnection.inSeconds}s');
         return;
       }
     }
@@ -363,9 +367,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         // be extremely cautious about disconnect events
         if (_lastSuccessfulConnection != null) {
           final timeSinceConnection = DateTime.now().difference(_lastSuccessfulConnection!);
-          if (timeSinceConnection.inMilliseconds < 10000) {
-            debugPrint('⏭️ SAFETY: Ignoring disconnect within 10s of successful connection');
-            debugPrint('⏭️ Time since connection: ${timeSinceConnection.inMilliseconds}ms');
+          if (timeSinceConnection.inSeconds < 120) { // Extended to 120 seconds
+            debugPrint('⏭️ SAFETY: Ignoring disconnect within 120s of successful connection');
+            debugPrint('⏭️ Time since connection: ${timeSinceConnection.inSeconds}s');
             break;
           }
         }
@@ -424,6 +428,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     
     try {
       debugPrint('🚀 Starting app initialization...');
+      
+      // STEP 0: Load connection timestamp for grace period protection
+      await _loadConnectionTimestamp();
       
       // STEP 1: Initialize V2Ray plugin (no config restoration yet).
       await _v2rayService.initialize();
@@ -506,6 +513,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         _selectedConfig = _configs.firstWhere((c) => c.isConnected);
         _wasUsingSmartConnect = false;
         debugPrint('✅ Keeping connected server: ${_selectedConfig?.remark}');
+        
+        // Start periodic validator if connected
+        _startStateValidator();
       } else if (_selectedConfig == null) {
         _wasUsingSmartConnect = true;
         debugPrint('✅ Default to Smart Connect');
@@ -891,6 +901,7 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _v2rayService.removeListener(_onV2RayServiceChanged);
     _vpnStatusSubscription?.cancel();
+    _stateValidationTimer?.cancel(); // Cancel periodic validator
     if (_v2rayService.activeConfig != null) {
       _v2rayService.disconnect().catchError((e) {
         debugPrint('Error disconnecting in dispose: $e');
@@ -1218,8 +1229,14 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           // CRITICAL PHASE 1: Establish grace period FIRST
           // This MUST be the very first thing to prevent race conditions
           _lastSuccessfulConnection = DateTime.now();
-          debugPrint('🛡️ Grace period activated for 8 seconds');
+          debugPrint('🛡️ Grace period activated for 120 seconds (2 minutes)');
           debugPrint('🛡️ Start time: ${_lastSuccessfulConnection!.toIso8601String()}');
+          
+          // Save timestamp to SharedPreferences for persistence across app restarts
+          _saveConnectionTimestamp();
+          
+          // Start periodic state validator
+          _startStateValidator();
           
           // CRITICAL PHASE 2: Update internal state IMMEDIATELY
           _errorMessage = '';
@@ -1414,8 +1431,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       await _v2rayService.disconnect();
       statusPingOnly = false;
       
-      // Clear the grace period timer
+      // Clear the grace period timer and timestamp
       _lastSuccessfulConnection = null;
+      _clearConnectionTimestamp();
+      _stopStateValidator();
       
       // Update config status
       for (int i = 0; i < _configs.length; i++) {
@@ -1514,6 +1533,19 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       notifyListeners();
     }
   }
+  
+  /// Check if VPN is active at system level (most reliable method)
+  /// This directly checks Android's network capabilities
+  Future<bool> isSystemVpnActive() async {
+    try {
+      final bool isActive = await vpnStateChannel.invokeMethod('isVpnActive');
+      debugPrint('🔍 System VPN active: $isActive');
+      return isActive;
+    } catch (e) {
+      debugPrint('⚠️ Error checking system VPN state: $e');
+      return false;
+    }
+  }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
@@ -1523,11 +1555,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     if (state == AppLifecycleState.resumed) {
       debugPrint('📱 App resumed, checking VPN status immediately...');
       
-      // CRITICAL: Notify listeners FIRST to show last known state immediately
-      notifyListeners();
+      // SUPER FAST: Check system VPN state first (instant response)
+      _quickSystemVpnCheck();
       
-      // CRITICAL: Like defyxVPN, check status IMMEDIATELY without delays
-      // This ensures UI is synced with actual VPN state right away
+      // Then do full sync in background
       _syncVpnStatusOnResume();
       
     } else if (state == AppLifecycleState.paused) {
@@ -1537,6 +1568,66 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('📱 App inactive');
     } else if (state == AppLifecycleState.detached) {
       debugPrint('📱 App detached');
+    }
+  }
+  
+  /// Quick system VPN check - updates UI instantly based on system state
+  Future<void> _quickSystemVpnCheck() async {
+    try {
+      final systemVpnActive = await isSystemVpnActive();
+      final hasConnectedConfig = _configs.any((c) => c.isConnected);
+      
+      // If system says VPN is active but UI shows disconnected
+      if (systemVpnActive && !hasConnectedConfig) {
+        debugPrint('⚡ QUICK FIX: System VPN active, updating UI immediately');
+        
+        // Try to restore from saved config
+        final activeConfig = _v2rayService.activeConfig;
+        if (activeConfig != null) {
+          for (var config in _configs) {
+            if (config.id == activeConfig.id || 
+                config.fullConfig == activeConfig.fullConfig ||
+                (config.address == activeConfig.address && config.port == activeConfig.port)) {
+              config.isConnected = true;
+              _selectedConfig = config;
+              debugPrint('⚡ Restored: ${config.remark}');
+              break;
+            }
+          }
+        } else {
+          // No active config, try to load from SharedPreferences
+          await _v2rayService.restoreActiveConfig();
+          final restoredConfig = _v2rayService.activeConfig;
+          if (restoredConfig != null) {
+            for (var config in _configs) {
+              if (config.id == restoredConfig.id || 
+                  config.fullConfig == restoredConfig.fullConfig) {
+                config.isConnected = true;
+                _selectedConfig = config;
+                debugPrint('⚡ Restored from prefs: ${config.remark}');
+                break;
+              }
+            }
+          }
+        }
+        
+        // Update UI immediately
+        notifyListeners();
+      }
+      // If system says VPN is NOT active but UI shows connected
+      else if (!systemVpnActive && hasConnectedConfig) {
+        debugPrint('⚡ QUICK FIX: System VPN inactive, updating UI immediately');
+        _v2rayService.forceDisconnectedState();
+        for (var config in _configs) {
+          config.isConnected = false;
+        }
+        notifyListeners();
+      }
+      else {
+        debugPrint('⚡ System and UI already in sync');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Quick check error: $e');
     }
   }
   
@@ -1800,5 +1891,99 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('❌ Error checking connection status: $e');
       notifyListeners();
     }
+  }
+  
+  /// Save connection timestamp to SharedPreferences
+  Future<void> _saveConnectionTimestamp() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('vpn_connection_timestamp', DateTime.now().millisecondsSinceEpoch);
+      debugPrint('💾 Connection timestamp saved');
+    } catch (e) {
+      debugPrint('⚠️ Error saving timestamp: $e');
+    }
+  }
+  
+  /// Load connection timestamp from SharedPreferences
+  Future<void> _loadConnectionTimestamp() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final timestamp = prefs.getInt('vpn_connection_timestamp');
+      if (timestamp != null) {
+        _lastSuccessfulConnection = DateTime.fromMillisecondsSinceEpoch(timestamp);
+        final elapsed = DateTime.now().difference(_lastSuccessfulConnection!);
+        debugPrint('📂 Loaded connection timestamp: ${elapsed.inSeconds}s ago');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Error loading timestamp: $e');
+    }
+  }
+  
+  /// Clear connection timestamp
+  Future<void> _clearConnectionTimestamp() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('vpn_connection_timestamp');
+      debugPrint('🗑️ Connection timestamp cleared');
+    } catch (e) {
+      debugPrint('⚠️ Error clearing timestamp: $e');
+    }
+  }
+  
+  /// Start periodic state validator (runs every 15 seconds)
+  void _startStateValidator() {
+    _stateValidationTimer?.cancel();
+    
+    if (_v2rayService.activeConfig == null) {
+      debugPrint('⏭️ Not starting validator - no active connection');
+      return;
+    }
+    
+    debugPrint('🔄 Starting periodic state validator (every 15s)');
+    _stateValidationTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (timer) async {
+        if (_isInitializing || _isConnecting) return;
+        
+        try {
+          debugPrint('🔍 Periodic validation...');
+          
+          // PRIORITY 1: Check system VPN state (fastest and most reliable)
+          final systemVpnActive = await isSystemVpnActive();
+          final hasConnectedConfig = _configs.any((c) => c.isConnected);
+          
+          // UI shows connected but system VPN is disconnected
+          if (hasConnectedConfig && !systemVpnActive) {
+            debugPrint('⚠️ System VPN inactive but UI shows connected! Fixing...');
+            _v2rayService.forceDisconnectedState();
+            for (var config in _configs) {
+              config.isConnected = false;
+            }
+            await _v2rayService.saveConfigs(_configs);
+            notifyListeners();
+            debugPrint('✅ UI corrected to disconnected');
+          }
+          // UI shows disconnected but system VPN is active
+          else if (!hasConnectedConfig && systemVpnActive) {
+            debugPrint('⚠️ System VPN active but UI shows disconnected! Fixing...');
+            await _enhancedSyncWithVpnServiceState();
+            notifyListeners();
+            debugPrint('✅ UI corrected to connected');
+          }
+          else {
+            debugPrint('✅ UI and system VPN in sync');
+          }
+        } catch (e) {
+          debugPrint('⚠️ Validation error: $e');
+        }
+      },
+    );
+  }
+  
+  /// Stop periodic state validator
+  void _stopStateValidator() {
+    _stateValidationTimer?.cancel();
+    _stateValidationTimer = null;
+    debugPrint('🛑 Stopped state validator');
   }
 }
