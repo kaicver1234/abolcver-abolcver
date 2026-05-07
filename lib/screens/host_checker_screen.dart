@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -78,7 +77,7 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
     AnalyticsService().logScreenView(screenName: 'Safheh_Baresi_Host');
     _radarController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1800),
+      duration: const Duration(milliseconds: 1000),
     );
     _pulseController = AnimationController(
       vsync: this,
@@ -500,116 +499,74 @@ class _ScanningState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Modern loading animation
-          RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: radarCtrl,
-              builder: (_, __) {
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Outer pulsing circle
-                    AnimatedBuilder(
-                      animation: pulseCtrl,
-                      builder: (_, __) {
-                        final scale = 1.0 + (pulseCtrl.value * 0.3);
-                        final opacity = 0.3 - (pulseCtrl.value * 0.2);
-                        return Transform.scale(
-                          scale: scale,
-                          child: Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: _kCyan.withValues(alpha: opacity),
-                                width: 2,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                    
-                    // Middle circle
-                    Container(
-                      width: 80,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: _kCyan.withValues(alpha: 0.08),
-                        border: Border.all(
-                          color: _kCyan.withValues(alpha: 0.2),
-                          width: 1.5,
-                        ),
-                      ),
-                    ),
-                    
-                    // Rotating dots
-                    SizedBox(
-                      width: 80,
-                      height: 80,
-                      child: Stack(
-                        children: List.generate(3, (index) {
-                          final angle = (radarCtrl.value * 2 * math.pi) + (index * 2 * math.pi / 3);
-                          final x = 30 * math.cos(angle);
-                          final y = 30 * math.sin(angle);
-                          
-                          return Transform.translate(
-                            offset: Offset(x + 40, y + 40),
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: _kCyan,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: _kCyan.withValues(alpha: 0.5),
-                                    blurRadius: 8,
-                                    spreadRadius: 2,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                    
-                    // Center icon
-                    const Icon(
-                      Icons.wifi_find_rounded,
-                      color: _kCyan,
-                      size: 32,
-                    ),
-                  ],
-                );
-              },
-            ),
-          ),
+          // Wave loading animation (3 bars)
+          _buildWaveLoading(),
           
           const SizedBox(height: 28),
           
-          // Animated text
-          AnimatedBuilder(
-            animation: pulseCtrl,
-            builder: (_, __) {
-              final opacity = 0.6 + (pulseCtrl.value * 0.4);
-              return Text(
-                'SCANNING...',
-                style: GoogleFonts.robotoMono(
-                  fontSize: 13,
-                  color: _kCyan.withValues(alpha: opacity),
-                  letterSpacing: 3,
-                  fontWeight: FontWeight.w600,
-                  decoration: TextDecoration.none,
-                ),
-              );
-            },
+          // Simple text
+          Text(
+            'Checking...',
+            style: GoogleFonts.robotoMono(
+              fontSize: 13,
+              color: Colors.white.withValues(alpha: 0.6),
+              letterSpacing: 1,
+              fontWeight: FontWeight.w500,
+              decoration: TextDecoration.none,
+            ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildWaveLoading() {
+    return AnimatedBuilder(
+      animation: radarCtrl,
+      builder: (context, child) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (index) {
+            // Calculate wave animation with delay for each bar
+            final delay = index * 0.2;
+            final progress = (radarCtrl.value + delay) % 1.0;
+            
+            // Calculate vertical offset (bounce up and down)
+            final offset = progress < 0.5
+                ? -20.0 * (progress * 2)
+                : -20.0 * (2 - progress * 2);
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Transform.translate(
+                offset: Offset(0, offset),
+                child: Container(
+                  width: 5,
+                  height: 35,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0xFF5A5A5A),
+                        Color(0xFF3A3A3A),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(2.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4A4A4A).withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }
@@ -713,58 +670,73 @@ class _ScanningListTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: _kCard,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kCyan.withValues(alpha: 0.3)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
-          // Simple rotating icon instead of radar
-          RepaintBoundary(
-            child: AnimatedBuilder(
-              animation: radarCtrl,
-              builder: (_, __) {
-                return Transform.rotate(
-                  angle: radarCtrl.value * 2 * math.pi,
-                  child: Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _kCyan.withValues(alpha: 0.1),
-                      border: Border.all(
-                        color: _kCyan.withValues(alpha: 0.3),
-                        width: 2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.wifi_find_rounded,
-                      color: _kCyan,
-                      size: 16,
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
+          // Wave loading animation (3 bars - smaller)
+          _buildSmallWaveLoading(),
           const SizedBox(width: 14),
           Text(
-            'Scanning...',
+            'Checking...',
             style: GoogleFonts.robotoMono(
               fontSize: 13,
-              color: _kCyan,
+              color: Colors.white.withValues(alpha: 0.6),
               decoration: TextDecoration.none,
-            ),
-          ),
-          const Spacer(),
-          const SizedBox(
-            width: 16,
-            height: 16,
-            child: CircularProgressIndicator(
-              color: _kCyan,
-              strokeWidth: 1.5,
             ),
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildSmallWaveLoading() {
+    return AnimatedBuilder(
+      animation: radarCtrl,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (index) {
+            // Calculate wave animation with delay for each bar
+            final delay = index * 0.2;
+            final progress = (radarCtrl.value + delay) % 1.0;
+            
+            // Calculate vertical offset (bounce up and down)
+            final offset = progress < 0.5
+                ? -10.0 * (progress * 2)
+                : -10.0 * (2 - progress * 2);
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: Transform.translate(
+                offset: Offset(0, offset),
+                child: Container(
+                  width: 3,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0xFF5A5A5A),
+                        Color(0xFF3A3A3A),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4A4A4A).withValues(alpha: 0.3),
+                        blurRadius: 6,
+                        spreadRadius: 0.5,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 }

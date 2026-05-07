@@ -15,7 +15,7 @@ class IpInfoScreen extends StatefulWidget {
 }
 
 class _IpInfoScreenState extends State<IpInfoScreen>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   bool _isLoading = true;
   Map<String, dynamic>? _ipData;
   String? _errorMessage;
@@ -24,6 +24,7 @@ class _IpInfoScreenState extends State<IpInfoScreen>
   late AnimationController _animController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _slideAnimation;
+  late AnimationController _waveController;
 
   @override
   void initState() {
@@ -32,6 +33,11 @@ class _IpInfoScreenState extends State<IpInfoScreen>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     );
+    
+    _waveController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    )..repeat();
     
     _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _animController, curve: Curves.easeOut),
@@ -48,6 +54,7 @@ class _IpInfoScreenState extends State<IpInfoScreen>
   @override
   void dispose() {
     _animController.dispose();
+    _waveController.dispose();
     super.dispose();
   }
 
@@ -220,48 +227,8 @@ class _IpInfoScreenState extends State<IpInfoScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Animated loading circle
-          TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 1500),
-            builder: (context, value, child) {
-              return Transform.rotate(
-                angle: value * 6.28,
-                child: Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: const Color(0xFF00D9FF).withValues(alpha: 0.3),
-                      width: 3,
-                    ),
-                  ),
-                  child: Stack(
-                    children: [
-                      Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          height: 3,
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF00D9FF),
-                            borderRadius: BorderRadius.circular(2),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-            onEnd: () {
-              if (mounted && _isLoading) {
-                setState(() {});
-              }
-            },
-          ),
+          // Wave loading animation (3 bars)
+          _buildWaveLoading(),
           
           const SizedBox(height: 24),
           
@@ -275,6 +242,56 @@ class _IpInfoScreenState extends State<IpInfoScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildWaveLoading() {
+    return AnimatedBuilder(
+      animation: _waveController,
+      builder: (context, child) {
+        return Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(3, (index) {
+            // Calculate wave animation with delay for each bar
+            final delay = index * 0.2;
+            final progress = (_waveController.value + delay) % 1.0;
+            
+            // Calculate vertical offset (bounce up and down)
+            final offset = progress < 0.5
+                ? -20.0 * (progress * 2)
+                : -20.0 * (2 - progress * 2);
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Transform.translate(
+                offset: Offset(0, offset),
+                child: Container(
+                  width: 5,
+                  height: 35,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color(0xFF5A5A5A),
+                        Color(0xFF3A3A3A),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(2.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF4A4A4A).withValues(alpha: 0.3),
+                        blurRadius: 10,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }),
+        );
+      },
     );
   }
 

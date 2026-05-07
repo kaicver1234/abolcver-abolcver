@@ -73,7 +73,7 @@ class _SplashScreenState extends State<SplashScreen>
             end: Alignment.bottomCenter,
             colors: [
               const Color(0xFF0A0A0A),
-              const Color(0xFF1A0A2E).withValues(alpha: 0.8),
+              const Color(0xFF1A1A1A).withValues(alpha: 0.8),
             ],
           ),
         ),
@@ -88,7 +88,7 @@ class _SplashScreenState extends State<SplashScreen>
                       center: const Alignment(0, -0.2),
                       radius: 1.0,
                       colors: [
-                        const Color(0xFF6366F1).withValues(alpha: 0.15),
+                        const Color(0xFF2A2A2A).withValues(alpha: 0.3),
                         Colors.transparent,
                       ],
                     ),
@@ -138,7 +138,7 @@ class _SplashScreenState extends State<SplashScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // "Tiksar" - Large text with glow
+                // "TIKSAR VPN" - Large text with glow
                 ShaderMask(
                   shaderCallback: (bounds) => const LinearGradient(
                     colors: [Colors.white, Colors.white],
@@ -154,24 +154,24 @@ class _SplashScreenState extends State<SplashScreen>
                         decoration: BoxDecoration(
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF6366F1).withValues(alpha: glowIntensity * 0.5),
+                              color: const Color(0xFF4A4A4A).withValues(alpha: glowIntensity * 0.4),
                               blurRadius: 40,
                               spreadRadius: 10,
                             ),
                             BoxShadow(
-                              color: const Color(0xFF8B5CF6).withValues(alpha: glowIntensity * 0.3),
+                              color: const Color(0xFF5A5A5A).withValues(alpha: glowIntensity * 0.2),
                               blurRadius: 60,
                               spreadRadius: 20,
                             ),
                           ],
                         ),
                         child: const Text(
-                          'Tiksar',
+                          'TIKSAR VPN',
                           style: TextStyle(
-                            fontSize: 56,
+                            fontSize: 48,
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
-                            letterSpacing: -1,
+                            letterSpacing: 2,
                             height: 1,
                           ),
                         ),
@@ -180,16 +180,16 @@ class _SplashScreenState extends State<SplashScreen>
                   ),
                 ),
                 
-                const SizedBox(height: 8),
+                const SizedBox(height: 12),
                 
-                // "VPN" - Small text
+                // Features text - Small text
                 Text(
-                  'VPN',
+                  'Fast, Secure, Private',
                   style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w300,
-                    color: Colors.white.withValues(alpha: 0.5),
-                    letterSpacing: 4,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white.withValues(alpha: 0.6),
+                    letterSpacing: 1.5,
                     height: 1,
                   ),
                 ),
@@ -262,14 +262,14 @@ class _SplashScreenState extends State<SplashScreen>
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Color(0xFF8B5CF6),
-                        Color(0xFF6366F1),
+                        Color(0xFF5A5A5A),
+                        Color(0xFF3A3A3A),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(2),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF8B5CF6).withValues(alpha: 0.4),
+                        color: const Color(0xFF4A4A4A).withValues(alpha: 0.3),
                         blurRadius: 10,
                         spreadRadius: 1,
                       ),
