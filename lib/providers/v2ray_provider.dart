@@ -504,6 +504,9 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
             _wasUsingSmartConnect = false;
           }
           debugPrint('✅ VPN is connected to: ${_selectedConfig?.remark}');
+          
+          // CRITICAL: Notify listeners immediately after setting connected state
+          notifyListeners();
         }
       } else {
         debugPrint('❌ VPN not connected, clearing state...');
@@ -513,9 +516,10 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
           config.isConnected = false;
         }
         debugPrint('❌ VPN not connected — UI showing disconnected');
+        
+        // CRITICAL: Notify listeners immediately after clearing state
+        notifyListeners();
       }
-
-      notifyListeners();
       
       // STEP 7: Default selection.
       final hasConnectedConfig = _configs.any((c) => c.isConnected);

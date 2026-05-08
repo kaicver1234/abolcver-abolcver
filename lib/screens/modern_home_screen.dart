@@ -46,7 +46,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     WidgetsBinding.instance.addObserver(this);
     
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _syncVpnStatus();
       _loadServers();
       AnalyticsService().logScreenView(screenName: 'Safheh_Asli');
     });
@@ -56,11 +55,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     if (!mounted) return;
     final provider = Provider.of<V2RayProvider>(context, listen: false);
     await provider.forceSyncVpnStatus();
-    await Future.delayed(const Duration(milliseconds: 500));
-    if (mounted) {
-      await provider.forceSyncVpnStatus();
-      setState(() {});
-    }
   }
   
   Future<void> _loadServers() async {
