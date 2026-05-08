@@ -4,7 +4,6 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../utils/app_localizations.dart';
 import '../utils/responsive_helper.dart';
-import '../widgets/app_background.dart';
 import '../widgets/modern_glass_card.dart';
 import '../providers/language_provider.dart';
 import 'package:provider/provider.dart';
@@ -175,10 +174,13 @@ class _DonationScreenState extends State<DonationScreen> with TickerProviderStat
     final responsive = ResponsiveHelper(context);
     final languageProvider = Provider.of<LanguageProvider>(context);
 
-    return AppBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: SafeArea(
+    return Scaffold(
+      backgroundColor: const Color(0xFF000000), // Black background
+      body: Container(
+        decoration: const BoxDecoration(
+          color: Color(0xFF000000),
+        ),
+        child: SafeArea(
           child: Column(
             children: [
               // Header
