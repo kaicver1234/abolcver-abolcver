@@ -19,6 +19,7 @@ import '../screens/ip_info_screen.dart';
 import '../screens/speedtest_screen.dart';
 import '../screens/host_checker_screen.dart';
 import '../screens/dns_settings_screen.dart';
+import '../screens/donation_screen.dart';
 import '../services/remote_config_service.dart';
 import '../services/analytics_service.dart';
 
@@ -1101,6 +1102,11 @@ class _AboutPageViewState extends State<_AboutPageView>
             ],
           )),
 
+          SizedBox(height: responsive.scale(28).clamp(20.0, 38.0)),
+
+          // Donation Button
+          _animated(4, _buildDonationButton(context, responsive)),
+
           SizedBox(height: responsive.scale(48).clamp(36.0, 60.0)),
 
           // Copyright
@@ -1317,5 +1323,60 @@ class _AboutPageViewState extends State<_AboutPageView>
       ),
     );
   }
-}
 
+  Widget _buildDonationButton(BuildContext context, ResponsiveHelper responsive) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const DonationScreen()),
+        );
+      },
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.symmetric(
+          vertical: responsive.scale(18),
+          horizontal: responsive.scale(24),
+        ),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFFFD700),
+              Color(0xFFFFA500),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFFFFD700).withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.volunteer_activism_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
+            const SizedBox(width: 12),
+            Text(
+              AppLocalizations.of(context).translate('donation.title'),
+              style: GoogleFonts.poppins(
+                fontSize: responsive.scale(16).clamp(14.0, 18.0),
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+                letterSpacing: 0.3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

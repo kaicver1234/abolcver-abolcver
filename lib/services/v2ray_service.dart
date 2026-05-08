@@ -155,6 +155,17 @@ class V2RayService extends ChangeNotifier {
     _loadUsageStats();
   }
 
+  /// Get current VPN connection state from native
+  /// Returns: "V2RAY_CONNECTED", "V2RAY_DISCONNECTED", "V2RAY_CONNECTING"
+  Future<String> getConnectionState() async {
+    try {
+      return await _flutterV2ray.getConnectionState();
+    } catch (e) {
+      debugPrint('❌ Error getting connection state: $e');
+      return 'V2RAY_DISCONNECTED';
+    }
+  }
+
 
   void _handleStatusChange(V2RayStatus status) {
     final String stateString = status.state.toLowerCase().trim();

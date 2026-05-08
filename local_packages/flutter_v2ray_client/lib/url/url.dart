@@ -50,10 +50,7 @@ abstract class V2RayURL {
       'network': null
     },
     'sniffing': {
-      'enabled': true,
-      'destOverride': ['http', 'tls', 'quic'],
-      'metadataOnly': false,
-      'routeOnly': false,
+      'enabled': false,
     },
     'streamSettings': null,
     'allocate': null
@@ -123,7 +120,6 @@ abstract class V2RayURL {
   Map<String, dynamic> dns = {
     'servers': [
       '1.1.1.1',
-      '1.0.0.1',
       '8.8.8.8',
       '8.8.4.4',
     ],
@@ -131,12 +127,11 @@ abstract class V2RayURL {
     'disableCache': false,
     'disableFallback': false,
     'disableFallbackIfMatch': false,
-    'tag': 'dns_inbound',
   };
 
   /// Routing configuration with optimized strategy.
   Map<String, dynamic> routing = {
-    'domainStrategy': 'IPIfNonMatch',
+    'domainStrategy': 'AsIs',
     'domainMatcher': 'hybrid',
     'rules': [],
     'balancers': []
@@ -146,11 +141,11 @@ abstract class V2RayURL {
   Map<String, dynamic> policy = {
     'levels': {
       '8': {
-        'handshakeSec': 8,
-        'connIdle': 600,
-        'uplinkOnly': 1,
-        'downlinkOnly': 3,
-        'bufferSize': 524288,
+        'handshakeSec': 4,
+        'connIdle': 300,
+        'uplinkOnly': 2,
+        'downlinkOnly': 5,
+        'bufferSize': 10240,
         'statsUserUplink': false,
         'statsUserDownlink': false,
       }
@@ -202,13 +197,9 @@ abstract class V2RayURL {
     'dsSettings': null,
     'sockopt': {
       'tcpFastOpen': true,
-      'tcpKeepAliveInterval': 15,
-      'tcpKeepAliveIdle': 60,
+      'tcpKeepAliveInterval': 30,
+      'tcpKeepAliveIdle': 100,
       'tcpNoDelay': true,
-      'tcpCongestion': 'bbr',
-      'tcpWindowClamp': 600,
-      'tcpUserTimeout': 10000,
-      'mark': 255,
     }
   };
 

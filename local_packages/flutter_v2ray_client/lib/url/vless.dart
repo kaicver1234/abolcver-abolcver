@@ -133,10 +133,8 @@ class VlessURL extends V2RayURL {
         'proxySettings': null,
         'sendThrough': null,
         'mux': {
-          'enabled': true,
-          'concurrency': 16,
-          'xudpConcurrency': 16,
-          'xudpProxyUDP443': 'reject',
+          'enabled': false,
+          'concurrency': -1,
         },
       };
 }
