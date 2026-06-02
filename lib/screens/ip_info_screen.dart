@@ -415,14 +415,7 @@ class _IpInfoScreenState extends State<IpInfoScreen>
     final ip = _ipData!['query'] ?? 'Unknown';
     final city = _ipData!['city'] ?? '';
     final country = _ipData!['country'] ?? '';
-    final countryCode = (_ipData!['countryCode'] ?? '').toString().toUpperCase();
-
-    String flagEmoji = '';
-    if (countryCode.length == 2) {
-      flagEmoji = countryCode.split('').map((c) {
-        return String.fromCharCode(c.codeUnitAt(0) + 127397);
-      }).join();
-    }
+    final countryCode = (_ipData!['countryCode'] ?? '').toString().toLowerCase();
 
     return Container(
       width: double.infinity,
@@ -472,11 +465,59 @@ class _IpInfoScreenState extends State<IpInfoScreen>
                 ),
               ),
               
-              // Flag
-              if (flagEmoji.isNotEmpty)
-                Text(
-                  flagEmoji,
-                  style: const TextStyle(fontSize: 36),
+              // Flag from API
+              if (countryCode.isNotEmpty && countryCode.length == 2)
+                Container(
+                  width: 50,
+                  height: 50,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.1),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.2),
+                        blurRadius: 8,
+                        spreadRadius: 0,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10.5),
+                    child: Image.network(
+                      'https://flagcdn.com/w80/$countryCode.png',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        // Fallback to emoji if image fails to load
+                        final flagEmoji = countryCode.toUpperCase().split('').map((c) {
+                          return String.fromCharCode(c.codeUnitAt(0) + 127397);
+                        }).join();
+                        return Center(
+                          child: Text(
+                            flagEmoji,
+                            style: const TextStyle(fontSize: 30),
+                          ),
+                        );
+                      },
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(
+                                Colors.white.withValues(alpha: 0.3),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
                 ),
             ],
           ),

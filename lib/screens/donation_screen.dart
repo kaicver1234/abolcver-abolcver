@@ -5,6 +5,8 @@ import 'package:url_launcher/url_launcher.dart';
 import '../utils/app_localizations.dart';
 import '../utils/responsive_helper.dart';
 import '../widgets/modern_glass_card.dart';
+import '../widgets/cyber_glow_background.dart';
+import '../widgets/app_background.dart';
 import '../providers/language_provider.dart';
 import 'package:provider/provider.dart';
 
@@ -172,107 +174,110 @@ class _DonationScreenState extends State<DonationScreen> with TickerProviderStat
   @override
   Widget build(BuildContext context) {
     final responsive = ResponsiveHelper(context);
-    final languageProvider = Provider.of<LanguageProvider>(context);
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF000000), // Black background
-      body: Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF000000),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // Header
-              _buildHeader(context, responsive, languageProvider),
-              
-              // Content
-              Expanded(
-                child: SingleChildScrollView(
-                  physics: const BouncingScrollPhysics(),
-                  padding: EdgeInsets.symmetric(horizontal: responsive.horizontalPadding),
-                  child: Column(
-                    children: [
-                      SizedBox(height: responsive.scale(32)),
+    return Consumer<LanguageProvider>(
+      builder: (context, languageProvider, child) {
+        return Directionality(
+          textDirection: languageProvider.textDirection,
+          child: AppBackground(
+            useSecondaryBackground: true,
+            child: CyberGlowBackground(
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    // Header
+                    _buildHeader(context, responsive, languageProvider),
+                    
+                    // Content
+                    Expanded(
+                      child: SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        padding: EdgeInsets.symmetric(horizontal: responsive.horizontalPadding),
+                        child: Column(
+                          children: [
+                            SizedBox(height: responsive.scale(32)),
 
-                      // Icon with animated glow
-                      _animated(0, _buildDonationIcon(responsive)),
+                            // Icon with animated glow
+                            _animated(0, _buildDonationIcon(responsive)),
 
-                      SizedBox(height: responsive.scale(28)),
+                            SizedBox(height: responsive.scale(28)),
 
-                      // Title
-                      _animated(1, Text(
-                        AppLocalizations.of(context).translate('donation.title'),
-                        style: GoogleFonts.poppins(
-                          fontSize: responsive.scale(28).clamp(24.0, 34.0),
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                          letterSpacing: -0.5,
-                          height: 1.2,
-                        ),
-                        textAlign: TextAlign.center,
-                      )),
+                            // Title
+                            _animated(1, Text(
+                              AppLocalizations.of(context).translate('donation.title'),
+                              style: GoogleFonts.poppins(
+                                fontSize: responsive.scale(28).clamp(24.0, 34.0),
+                                fontWeight: FontWeight.w800,
+                                color: Colors.white,
+                                letterSpacing: -0.5,
+                                height: 1.2,
+                              ),
+                              textAlign: TextAlign.center,
+                            )),
 
-                      SizedBox(height: responsive.scale(12)),
+                            SizedBox(height: responsive.scale(12)),
 
-                      // Description
-                      _animated(2, Padding(
-                        padding: EdgeInsets.symmetric(horizontal: responsive.scale(8)),
-                        child: Text(
-                          AppLocalizations.of(context).translate('donation.description'),
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.65),
-                            fontSize: responsive.scale(14).clamp(12.0, 16.0),
-                            height: 1.8,
-                            fontWeight: FontWeight.w400,
-                          ),
-                        ),
-                      )),
+                            // Description
+                            _animated(2, Padding(
+                              padding: EdgeInsets.symmetric(horizontal: responsive.scale(8)),
+                              child: Text(
+                                AppLocalizations.of(context).translate('donation.description'),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.65),
+                                  fontSize: responsive.scale(14).clamp(12.0, 16.0),
+                                  height: 1.8,
+                                  fontWeight: FontWeight.w400,
+                                ),
+                              ),
+                            )),
 
-                      SizedBox(height: responsive.scale(36)),
+                            SizedBox(height: responsive.scale(36)),
 
-                      // Wallet addresses
-                      ..._wallets.entries.map((entry) {
-                        final index = _wallets.keys.toList().indexOf(entry.key);
-                        return _animated(
-                          index + 3,
-                          Padding(
-                            padding: EdgeInsets.only(bottom: responsive.scale(14)),
-                            child: _buildWalletCard(
-                              cryptoName: entry.key,
-                              address: entry.value,
-                              responsive: responsive,
+                            // Wallet addresses
+                            ..._wallets.entries.map((entry) {
+                              final index = _wallets.keys.toList().indexOf(entry.key);
+                              return _animated(
+                                index + 3,
+                                Padding(
+                                  padding: EdgeInsets.only(bottom: responsive.scale(14)),
+                                  child: _buildWalletCard(
+                                    cryptoName: entry.key,
+                                    address: entry.value,
+                                    responsive: responsive,
+                                  ),
+                                ),
+                              );
+                            }),
+
+                            SizedBox(height: responsive.scale(20)),
+
+                            // Open Trust Wallet Button
+                            _animated(
+                              _wallets.length + 3,
+                              _buildTrustWalletButton(responsive),
                             ),
-                          ),
-                        );
-                      }),
 
-                      SizedBox(height: responsive.scale(20)),
+                            SizedBox(height: responsive.scale(28)),
 
-                      // Open Trust Wallet Button
-                      _animated(
-                        _wallets.length + 3,
-                        _buildTrustWalletButton(responsive),
+                            // Thank you message
+                            _animated(
+                              _wallets.length + 4,
+                              _buildThankYouCard(responsive),
+                            ),
+
+                            const SizedBox(height: 40),
+                          ],
+                        ),
                       ),
-
-                      SizedBox(height: responsive.scale(28)),
-
-                      // Thank you message
-                      _animated(
-                        _wallets.length + 4,
-                        _buildThankYouCard(responsive),
-                      ),
-
-                      const SizedBox(height: 40),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

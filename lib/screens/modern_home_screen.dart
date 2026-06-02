@@ -1333,29 +1333,33 @@ class _AboutPageViewState extends State<_AboutPageView>
           horizontal: responsive.scale(24),
         ),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
+          gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFFFD700),
-              Color(0xFFFFA500),
+              Colors.white.withValues(alpha: 0.12),
+              Colors.white.withValues(alpha: 0.06),
             ],
           ),
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Colors.white.withValues(alpha: 0.15),
+            width: 1.5,
+          ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFFFFD700).withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(
+            Icon(
               Icons.volunteer_activism_rounded,
-              color: Colors.white,
+              color: Colors.white.withValues(alpha: 0.9),
               size: 24,
             ),
             const SizedBox(width: 12),
