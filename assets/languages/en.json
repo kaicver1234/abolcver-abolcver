@@ -183,8 +183,9 @@
         "view": "View"
     },
     "donation": {
-        "header": "Support Us",
-        "title": "Support Our Project",
+        "header": "Support Tiksar VPN",
+        "button": "Support",
+        "title": "Support Tiksar VPN",
         "description": "Developing and maintaining this free app requires time and resources. Your support helps us keep this project alive and add new features. Thank you for your generosity! 💙",
         "address_copied": "{crypto} address copied",
         "open_trust_wallet": "Open Trust Wallet",

@@ -670,19 +670,26 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
 
   Widget _buildServerIconContent(String? countryCode, bool isSmartConnect) {
     if (countryCode != null && CountryFlags.isValidCountryCode(countryCode)) {
-      return CachedNetworkImage(
-        imageUrl: CountryFlags.getFlagUrl(countryCode),
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Container(
-          color: Colors.white.withValues(alpha: 0.1),
-        ),
-        errorWidget: (context, url, error) => Container(
-          color: Colors.white.withValues(alpha: 0.1),
-          child: const Icon(Icons.public, color: Colors.white, size: 24),
+      return Container(
+        color: Colors.white.withValues(alpha: 0.04),
+        padding: const EdgeInsets.all(4),
+        child: CachedNetworkImage(
+          imageUrl: CountryFlags.getFlagUrl(countryCode),
+          // contain (not cover) so the entire flag stays visible inside
+          // the square server-icon container. cover was cutting off the
+          // sides of wide flags (US, UK, AU, NP...).
+          fit: BoxFit.contain,
+          placeholder: (context, url) => Container(
+            color: Colors.white.withValues(alpha: 0.1),
+          ),
+          errorWidget: (context, url, error) => Container(
+            color: Colors.white.withValues(alpha: 0.1),
+            child: const Icon(Icons.public, color: Colors.white, size: 24),
+          ),
         ),
       );
     }
-    
+
     return Icon(
       isSmartConnect ? Icons.flash_on : Icons.language,
       color: Colors.white,
@@ -1369,13 +1376,13 @@ class _AboutPageViewState extends State<_AboutPageView>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
-              Icons.volunteer_activism_rounded,
-              color: Colors.white.withValues(alpha: 0.9),
+              Icons.favorite_rounded,
+              color: const Color(0xFFFF4D6D),
               size: 24,
             ),
             const SizedBox(width: 12),
             Text(
-              AppLocalizations.of(context).translate('donation.title'),
+              AppLocalizations.of(context).translate('donation.button'),
               style: GoogleFonts.poppins(
                 fontSize: responsive.scale(16).clamp(14.0, 18.0),
                 fontWeight: FontWeight.w700,

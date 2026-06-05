@@ -1,5 +1,6 @@
 package com.tiksarvpn.app
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -47,33 +48,66 @@ class MainActivity : FlutterActivity() {
     }
     
     /**
-     * Check if VPN is currently active by checking system network capabilities
-     * This is the most reliable way to detect VPN state
+     * Check if **OUR** VPN is currently active.
+     *
+     * The previous implementation checked only `TRANSPORT_VPN`, which is
+     * true whenever ANY VPN app on the device has an active tunnel — so if
+     * the user paused our app, switched to another VPN, then reopened our
+     * app, the UI would falsely show "connected" because the foreign VPN
+     * was active.
+     *
+     * The fix combines two signals:
+     *   1. The OS reports a VPN tunnel is up (TRANSPORT_VPN).
+     *   2. OUR own V2rayVPNService is currently running in our process.
+     * Both must be true for us to claim "connected".
      */
     private fun isVpnActive(): Boolean {
         return try {
+            // Signal 1: is there ANY VPN tunnel up on the device?
             val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-            
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val anyVpnUp = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 val activeNetwork: Network? = connectivityManager.activeNetwork
-                if (activeNetwork != null) {
-                    val networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-                    // Check if the active network has VPN transport
-                    networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
-                } else {
-                    false
-                }
+                activeNetwork != null &&
+                    connectivityManager.getNetworkCapabilities(activeNetwork)
+                        ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
             } else {
-                // For older Android versions, check all networks
                 @Suppress("DEPRECATION")
-                val allNetworks = connectivityManager.allNetworks
-                allNetworks.any { network ->
-                    val networkCapabilities = connectivityManager.getNetworkCapabilities(network)
-                    networkCapabilities?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
+                connectivityManager.allNetworks.any { network ->
+                    connectivityManager.getNetworkCapabilities(network)
+                        ?.hasTransport(NetworkCapabilities.TRANSPORT_VPN) == true
                 }
             }
+
+            if (!anyVpnUp) return false
+
+            // Signal 2: is OUR VpnService running? If a foreign VPN is the
+            // one holding the tunnel, our service will not be in the list.
+            isOurVpnServiceRunning()
         } catch (e: Exception) {
             android.util.Log.e("MainActivity", "Error checking VPN state: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Returns true if our V2rayVPNService is currently running in our
+     * process. getRunningServices() is deprecated on O+ for inspecting
+     * OTHER apps, but it still returns services from the caller's own
+     * package, which is exactly what we need.
+     */
+    @Suppress("DEPRECATION")
+    private fun isOurVpnServiceRunning(): Boolean {
+        return try {
+            val am = getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
+            val ourPkg = packageName
+            am.getRunningServices(Int.MAX_VALUE).any { svc ->
+                svc.service.packageName == ourPkg &&
+                    svc.service.className.endsWith("V2rayVPNService")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("MainActivity", "Error checking our service: ${e.message}")
+            // If we can't tell, be conservative and say no — better to show
+            // "disconnected" wrongly than claim a foreign VPN as ours.
             false
         }
     }

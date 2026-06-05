@@ -103,20 +103,25 @@ class _ServerListItemState extends State<ServerListItem> {
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(5),
-                        child: CachedNetworkImage(
-                          imageUrl: 'https://flagcdn.com/w80/${widget.config.countryCode!.toLowerCase()}.png',
-                          fit: BoxFit.cover,
-                          memCacheWidth: 80,
-                          memCacheHeight: 60,
-                          maxWidthDiskCache: 80,
-                          maxHeightDiskCache: 60,
-                          placeholder: (context, url) => Container(
-                            color: Colors.grey.withValues(alpha: 0.2),
-                          ),
-                          errorWidget: (context, url, error) => const Icon(
-                            Icons.public,
-                            color: Colors.grey,
-                            size: 24,
+                        child: Container(
+                          color: Colors.white.withValues(alpha: 0.04),
+                          child: CachedNetworkImage(
+                            imageUrl: 'https://flagcdn.com/w160/${widget.config.countryCode!.toLowerCase()}.png',
+                            // contain keeps the whole flag visible regardless
+                            // of its native aspect ratio — cover was cropping
+                            // flags whose key elements sit near the edges
+                            // (Nepal, US, UK, Australia, etc.).
+                            fit: BoxFit.contain,
+                            memCacheWidth: 160,
+                            maxWidthDiskCache: 160,
+                            placeholder: (context, url) => Container(
+                              color: Colors.grey.withValues(alpha: 0.2),
+                            ),
+                            errorWidget: (context, url, error) => const Icon(
+                              Icons.public,
+                              color: Colors.grey,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ),

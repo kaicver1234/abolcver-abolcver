@@ -470,10 +470,10 @@ class _IpInfoScreenState extends State<IpInfoScreen>
               // Flag from API
               if (countryCode.isNotEmpty && countryCode.length == 2)
                 Container(
-                  width: 50,
-                  height: 50,
+                  width: 64,
+                  height: 48,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: Colors.white.withValues(alpha: 0.1),
                       width: 1.5,
@@ -487,10 +487,12 @@ class _IpInfoScreenState extends State<IpInfoScreen>
                     ],
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10.5),
+                    borderRadius: BorderRadius.circular(6.5),
                     child: Image.network(
-                      'https://flagcdn.com/w80/$countryCode.png',
-                      fit: BoxFit.cover,
+                      'https://flagcdn.com/w160/$countryCode.png',
+                      // 4:3 box + contain shows the whole flag without
+                      // cropping the edges (US stars, UK union jack, etc.).
+                      fit: BoxFit.contain,
                       errorBuilder: (context, error, stackTrace) {
                         // Fallback to emoji if image fails to load
                         final flagEmoji = countryCode.toUpperCase().split('').map((c) {
