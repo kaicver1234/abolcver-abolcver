@@ -106,8 +106,8 @@ class VmessURL extends V2RayURL {
         'proxySettings': null,
         'sendThrough': null,
         'mux': {
-          'enabled': true,
-          'concurrency': 8,
+          'enabled': false,
+          'concurrency': -1,
         }
       };
 }

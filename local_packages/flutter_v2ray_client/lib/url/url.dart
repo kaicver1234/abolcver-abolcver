@@ -142,10 +142,10 @@ abstract class V2RayURL {
     'levels': {
       '8': {
         'handshakeSec': 4,
-        'connIdle': 300,
+        'connIdle': 600,
         'uplinkOnly': 2,
         'downlinkOnly': 5,
-        'bufferSize': 10240,
+        'bufferSize': 4096,
         'statsUserUplink': false,
         'statsUserDownlink': false,
       }
@@ -271,11 +271,11 @@ abstract class V2RayURL {
       streamSetting['kcpSettings'] = {
         'mtu': 1350,
         'tti': 20,
-        'uplinkCapacity': 100,
-        'downlinkCapacity': 1000,
-        'congestion': false,
-        'readBufferSize': 4,
-        'writeBufferSize': 4,
+        'uplinkCapacity': 50,
+        'downlinkCapacity': 200,
+        'congestion': true,
+        'readBufferSize': 8,
+        'writeBufferSize': 8,
         'header': {
           'type': headerType ?? 'none',
         },
@@ -365,7 +365,7 @@ abstract class V2RayURL {
         'fingerprint': fingerprint,
         'certificates': null,
         'disableSystemRoot': null,
-        'enableSessionResumption': null,
+        'enableSessionResumption': true,
         'show': false,
       };
     } else if (streamSecurity == 'reality') {

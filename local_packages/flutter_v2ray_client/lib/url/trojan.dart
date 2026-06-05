@@ -111,6 +111,6 @@ class TrojanURL extends V2RayURL {
         'streamSettings': streamSetting,
         'proxySettings': null,
         'sendThrough': null,
-        'mux': {'enabled': true, 'concurrency': 8}
+        'mux': {'enabled': false, 'concurrency': -1}
       };
 }
