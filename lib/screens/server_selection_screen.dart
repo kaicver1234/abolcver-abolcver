@@ -63,8 +63,8 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   Future<void> _loadBatchSize() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getInt('ping_batch_size') ?? 15;
-      if (mounted) setState(() => _batchSize = saved.clamp(1, 30));
+      final saved = prefs.getInt('ping_batch_size') ?? 8;
+      if (mounted) setState(() => _batchSize = saved.clamp(1, 16));
     } catch (_) {}
   }
 
@@ -328,7 +328,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   }
 
   Widget _buildActionToolbar(ResponsiveHelper responsive) {
-    final hasPingResults = _pingResults.isNotEmpty;
     return Padding(
       padding: EdgeInsets.fromLTRB(
         responsive.horizontalPadding,
@@ -340,17 +339,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
         children: [
           // Primary action: Test Ping
           Expanded(child: _buildPingActionBtn(responsive)),
-          const SizedBox(width: 8),
-          // Sort by best (enabled after a ping run)
-          _ToolbarIconButton(
-            icon: Icons.sort_rounded,
-            tooltip: AppLocalizations.of(context)
-                .translate('server_selection.sort_by_best'),
-            color: const Color(0xFF00FFA3),
-            enabled: hasPingResults && !_isTesting,
-            onTap: hasPingResults && !_isTesting ? _sortByBest : null,
-            responsive: responsive,
-          ),
           const SizedBox(width: 8),
           // Refresh server list
           _ToolbarIconButton(
@@ -366,15 +354,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           ),
         ],
       ),
-    );
-  }
-
-  void _sortByBest() {
-    final provider = Provider.of<V2RayProvider>(context, listen: false);
-    setState(() => _sortServersByPing(provider, _pingResults));
-    _showSnackBar(
-      AppLocalizations.of(context).translate('server_selection.sorted_by_best'),
-      const Color(0xFF00FFA3),
     );
   }
 
@@ -802,7 +781,7 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
 
       if (!mounted) return;
 
-      _sortServersByPing(provider, _pingResults);
+      setState(() => _sortServersByPing(provider, _pingResults));
       _showSnackBar(
         '${AppLocalizations.of(context).translate('server_selection.servers_updated')} ($successCount/${configs.length})',
         const Color(0xFF00FFA3),

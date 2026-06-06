@@ -420,30 +420,30 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
 
             const AnnouncementBannerWidget(),
 
-            SizedBox(height: responsive.responsiveValue(small: 12, medium: 16, large: 20)),
-
-            // Status pill (minimal)
-            _buildStatusPill(provider),
-
             SizedBox(height: responsive.responsiveValue(small: 24, medium: 30, large: 36)),
 
             // Connection button (centerpiece)
             _buildConnectionButtonWithStatus(provider),
 
-            SizedBox(height: responsive.responsiveValue(small: 20, medium: 24, large: 28)),
+            SizedBox(height: responsive.responsiveValue(small: 14, medium: 18, large: 22)),
 
-            // Timer below button
+            // Status pill (connect text) - below button
+            _buildStatusPill(provider),
+
+            SizedBox(height: responsive.responsiveValue(small: 16, medium: 20, large: 24)),
+
+            // Timer below status
             _buildConnectionTimer(provider),
 
             SizedBox(height: responsive.responsiveValue(small: 28, medium: 34, large: 40)),
 
-            // Minimal stats row
-            _buildStatsGrid(provider),
-
-            SizedBox(height: responsive.responsiveValue(small: 18, medium: 22, large: 26)),
-
-            // Server card (minimal)
+            // Server card (minimal) - above stats
             _buildServerCard(provider),
+
+            SizedBox(height: responsive.responsiveValue(small: 22, medium: 28, large: 34)),
+
+            // Minimal stats (no card, simple)
+            _buildSimpleStats(provider),
 
             SizedBox(height: responsive.scale(100).clamp(70.0, 130.0)),
           ],
@@ -651,6 +651,77 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
       isSmartConnect ? Icons.bolt_rounded : Icons.language_rounded,
       color: Colors.white.withValues(alpha: 0.85),
       size: 22,
+    );
+  }
+
+  Widget _buildSimpleStats(V2RayProvider provider) {
+    final v2rayService = provider.v2rayService;
+    final isConnected = provider.activeConfig != null;
+
+    return StreamBuilder(
+      stream: _statsStream,
+      builder: (context, snapshot) {
+        return Row(
+          children: [
+            Expanded(
+              child: _buildSimpleStatItem(
+                icon: Icons.arrow_downward_rounded,
+                label: AppLocalizations.of(context).translate('home.download'),
+                value: isConnected ? v2rayService.getFormattedDownload() : '0 B',
+                color: const Color(0xFF00FFA3),
+              ),
+            ),
+            Expanded(
+              child: _buildSimpleStatItem(
+                icon: Icons.arrow_upward_rounded,
+                label: AppLocalizations.of(context).translate('home.upload'),
+                value: isConnected ? v2rayService.getFormattedUpload() : '0 B',
+                color: const Color(0xFF00D9FF),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSimpleStatItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    final responsive = ResponsiveHelper(context);
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: GoogleFonts.poppins(
+            color: Colors.white.withValues(alpha: 0.6),
+            fontSize: responsive.scale(12).clamp(10.5, 14.0),
+            fontWeight: FontWeight.w500,
+            letterSpacing: 0.3,
+          ),
+        ),
+        SizedBox(height: responsive.scale(4)),
+        Icon(
+          icon,
+          color: color,
+          size: responsive.scale(18).clamp(14.0, 22.0),
+        ),
+        SizedBox(height: responsive.scale(4)),
+        Text(
+          value,
+          style: GoogleFonts.poppins(
+            color: Colors.white,
+            fontSize: responsive.scale(13.5).clamp(11.5, 16.0),
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ],
     );
   }
 
