@@ -382,21 +382,21 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
   Widget _buildConnectionTimer(V2RayProvider provider) {
     final responsive = ResponsiveHelper(context);
     final isConnected = provider.activeConfig != null;
-    
+
     return StreamBuilder(
       stream: _timerStream,
       builder: (context, snapshot) {
         return Center(
           child: Text(
-            isConnected 
+            isConnected
                 ? provider.v2rayService.getFormattedConnectedTime()
                 : '00:00:00',
-            key: const ValueKey('timer'), // Prevent rebuild animation
-            style: GoogleFonts.poppins(
-              fontSize: responsive.timerFontSize,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              letterSpacing: 2.0,
+            key: const ValueKey('timer'),
+            style: GoogleFonts.jetBrainsMono(
+              fontSize: responsive.timerFontSize * 0.85,
+              fontWeight: FontWeight.w300,
+              color: Colors.white.withValues(alpha: isConnected ? 0.95 : 0.3),
+              letterSpacing: 3.0,
             ),
           ),
         );
@@ -406,39 +406,104 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
 
 
 
-  // VPN Page - Main connection page
+  // VPN Page - Main connection page (minimal & modern)
   Widget _buildVPNPage(V2RayProvider provider) {
     final responsive = ResponsiveHelper(context);
-    
+
     return SingleChildScrollView(
       physics: const ClampingScrollPhysics(),
       child: Padding(
         padding: EdgeInsets.symmetric(horizontal: responsive.horizontalPadding),
         child: Column(
           children: [
-            SizedBox(height: responsive.responsiveValue(small: 20, medium: 24, large: 28)),
+            SizedBox(height: responsive.responsiveValue(small: 8, medium: 12, large: 16)),
 
             const AnnouncementBannerWidget(),
 
-            // Connection Timer (above button)
+            SizedBox(height: responsive.responsiveValue(small: 12, medium: 16, large: 20)),
+
+            // Status pill (minimal)
+            _buildStatusPill(provider),
+
+            SizedBox(height: responsive.responsiveValue(small: 24, medium: 30, large: 36)),
+
+            // Connection button (centerpiece)
+            _buildConnectionButtonWithStatus(provider),
+
+            SizedBox(height: responsive.responsiveValue(small: 20, medium: 24, large: 28)),
+
+            // Timer below button
             _buildConnectionTimer(provider),
 
-            SizedBox(height: responsive.responsiveValue(small: 10, medium: 12, large: 14)),
-            
-            // Connection Button
-            _buildConnectionButtonWithStatus(provider),
-            
-            SizedBox(height: responsive.responsiveValue(small: 28, medium: 32, large: 36)),
-            
-            // Server Card
-            _buildServerCard(provider),
-            
-            SizedBox(height: responsive.verticalSpacing),
-            
-            // Stats Grid
+            SizedBox(height: responsive.responsiveValue(small: 28, medium: 34, large: 40)),
+
+            // Minimal stats row
             _buildStatsGrid(provider),
-            
-            SizedBox(height: responsive.scale(100).clamp(70.0, 130.0)), // Space for bottom nav
+
+            SizedBox(height: responsive.responsiveValue(small: 18, medium: 22, large: 26)),
+
+            // Server card (minimal)
+            _buildServerCard(provider),
+
+            SizedBox(height: responsive.scale(100).clamp(70.0, 130.0)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatusPill(V2RayProvider provider) {
+    final isConnected = provider.activeConfig != null;
+    final isConnecting = _isConnecting;
+
+    final String text;
+    final Color color;
+
+    if (isConnecting) {
+      text = AppLocalizations.of(context).translate('home.connecting');
+      color = const Color(0xFF00D9FF);
+    } else if (isConnected) {
+      text = AppLocalizations.of(context).translate('home.connected');
+      color = const Color(0xFF00FFA3);
+    } else {
+      text = AppLocalizations.of(context).translate('home.disconnected');
+      color = Colors.white.withValues(alpha: 0.5);
+    }
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 300),
+      child: Container(
+        key: ValueKey(isConnecting ? 'c' : isConnected ? 'on' : 'off'),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(100),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: color,
+                boxShadow: [
+                  BoxShadow(color: color.withValues(alpha: 0.55), blurRadius: 8, spreadRadius: 0.5),
+                ],
+              ),
+            ),
+            const SizedBox(width: 9),
+            Text(
+              text,
+              style: GoogleFonts.poppins(
+                color: Colors.white.withValues(alpha: 0.85),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.4,
+              ),
+            ),
           ],
         ),
       ),
@@ -449,72 +514,14 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     final responsive = ResponsiveHelper(context);
     final isConnected = provider.activeConfig != null;
     final isConnecting = _isConnecting;
-    
+
     final btnSize = responsive.connectionButtonSize;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        ModernConnectionButton(
-          key: const ValueKey('connection_button'),
-          isConnected: isConnected,
-          isConnecting: isConnecting,
-          onTap: _handleConnectionToggle,
-          size: btnSize,
-        ),
-        const SizedBox(height: 14),
-        _buildStatusLabel(isConnected: isConnected, isConnecting: isConnecting),
-      ],
-    );
-  }
-
-  Widget _buildStatusLabel({required bool isConnected, required bool isConnecting}) {
-    final String text;
-    final Color color;
-    final IconData icon;
-
-    if (isConnecting) {
-      text = AppLocalizations.of(context).translate('home.connecting');
-      color = const Color(0xFF00D9FF);
-      icon = Icons.sync_rounded;
-    } else if (isConnected) {
-      text = AppLocalizations.of(context).translate('home.connected');
-      color = const Color(0xFF00FFA3);
-      icon = Icons.shield_rounded;
-    } else {
-      text = AppLocalizations.of(context).translate('home.disconnected');
-      color = Colors.white.withValues(alpha: 0.3);
-      icon = Icons.shield_outlined;
-    }
-
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 300),
-      switchInCurve: Curves.easeOut,
-      switchOutCurve: Curves.easeIn,
-      transitionBuilder: (child, anim) => FadeTransition(
-        opacity: anim,
-        child: SlideTransition(
-          position: Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(anim),
-          child: child,
-        ),
-      ),
-      child: Row(
-        key: ValueKey(isConnecting ? 'connecting' : isConnected ? 'connected' : 'disconnected'),
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 13, color: color),
-          const SizedBox(width: 5),
-          Text(
-            text,
-            style: TextStyle(
-              color: color,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              letterSpacing: 0.4,
-              decoration: TextDecoration.none,
-            ),
-          ),
-        ],
-      ),
+    return ModernConnectionButton(
+      key: const ValueKey('connection_button'),
+      isConnected: isConnected,
+      isConnecting: isConnecting,
+      onTap: _handleConnectionToggle,
+      size: btnSize,
     );
   }
 
@@ -522,10 +529,10 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     final responsive = ResponsiveHelper(context);
     final isSmartConnect = provider.wasUsingSmartConnect;
     final selectedConfig = provider.selectedConfig ?? provider.activeConfig;
-    
+
     String serverName;
     String? countryCode;
-    
+
     if (provider.activeConfig != null) {
       serverName = _cleanServerName(provider.activeConfig!.remark);
       countryCode = provider.activeConfig!.countryCode;
@@ -537,132 +544,87 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     } else {
       serverName = AppLocalizations.of(context).translate('server_selection.select_server');
     }
-    
-    return GestureDetector(
-      onTap: () => Navigator.push(
-        context,
-        MaterialPageRoute(builder: (context) => const ServerSelectionScreen()),
-      ),
-      child: Container(
-        key: const ValueKey('server_card'), // Prevent rebuild animation
-        padding: EdgeInsets.all(responsive.serverCardPadding),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Colors.white.withValues(alpha: 0.05),
-              Colors.white.withValues(alpha: 0.02),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.1),
-            width: 1,
-          ),
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (context) => const ServerSelectionScreen()),
         ),
-        child: Stack(
-          children: [
-            // Left accent line
-            Positioned(
-              left: -responsive.serverCardPadding,
-              top: 0,
-              bottom: 0,
-              child: Container(
-                width: 3,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          key: const ValueKey('server_card'),
+          padding: EdgeInsets.symmetric(
+            horizontal: responsive.scale(16).clamp(12.0, 22.0),
+            vertical: responsive.scale(14).clamp(10.0, 18.0),
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.035),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.07),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Flag / icon
+              Container(
+                width: responsive.serverIconSize * 0.85,
+                height: responsive.serverIconSize * 0.85,
                 decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Colors.white.withValues(alpha: 0.3),
-                      Colors.white.withValues(alpha: 0.1),
-                    ],
+                  color: Colors.white.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: _buildServerIconContent(
+                    countryCode,
+                    isSmartConnect && provider.activeConfig == null,
                   ),
                 ),
               ),
-            ),
-            // Content
-            Row(
-              children: [
-                // Flag/Icon with gradient and highlight
-                Stack(
+              SizedBox(width: responsive.scale(14).clamp(10.0, 18.0)),
+              // Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Container(
-                      width: responsive.serverIconSize,
-                      height: responsive.serverIconSize,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                          colors: [
-                            Colors.white.withValues(alpha: 0.12),
-                            Colors.white.withValues(alpha: 0.06),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.15),
-                          width: 1,
-                        ),
-                      ),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(10),
-                        child: _buildServerIconContent(countryCode, isSmartConnect && provider.activeConfig == null),
+                    Text(
+                      AppLocalizations.of(context).translate('server_selection.current_server').toUpperCase(),
+                      style: GoogleFonts.poppins(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        fontSize: responsive.scale(9.5).clamp(8.5, 11.5),
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 1.0,
                       ),
                     ),
-
+                    const SizedBox(height: 4),
+                    Text(
+                      serverName,
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: responsive.scale(15).clamp(13.0, 17.0),
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: -0.2,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ],
                 ),
-                const SizedBox(width: 12),
-                // Server info
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        AppLocalizations.of(context).translate('server_selection.current_server').toUpperCase(),
-                        style: TextStyle(
-                          color: Colors.white.withValues(alpha: 0.5),
-                          fontSize: responsive.scale(10),
-                          fontWeight: FontWeight.w600,
-                          letterSpacing: 0.5,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        serverName,
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: responsive.scale(15),
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: -0.3,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ),
+              ),
+              Consumer<LanguageProvider>(
+                builder: (context, langProvider, _) => Icon(
+                  langProvider.isRtl ? Icons.chevron_left : Icons.chevron_right,
+                  color: Colors.white.withValues(alpha: 0.4),
+                  size: responsive.scale(22).clamp(18.0, 26.0),
                 ),
-                // Arrow button
-                Consumer<LanguageProvider>(
-                  builder: (context, langProvider, _) => Container(
-                    width: responsive.scale(34),
-                    height: responsive.scale(34),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      langProvider.isRtl ? Icons.chevron_left : Icons.chevron_right,
-                      color: Colors.white.withValues(alpha: 0.7),
-                      size: responsive.scale(18),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -676,90 +638,123 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         width: double.infinity,
         height: double.infinity,
         placeholder: (context, url) => Container(
-          color: Colors.white.withValues(alpha: 0.1),
+          color: Colors.white.withValues(alpha: 0.08),
         ),
         errorWidget: (context, url, error) => Container(
-          color: Colors.white.withValues(alpha: 0.1),
-          child: const Icon(Icons.public, color: Colors.white, size: 24),
+          color: Colors.white.withValues(alpha: 0.08),
+          child: const Icon(Icons.public, color: Colors.white70, size: 22),
         ),
       );
     }
 
     return Icon(
-      isSmartConnect ? Icons.flash_on : Icons.language,
-      color: Colors.white,
-      size: 24,
+      isSmartConnect ? Icons.bolt_rounded : Icons.language_rounded,
+      color: Colors.white.withValues(alpha: 0.85),
+      size: 22,
     );
   }
 
   Widget _buildStatsGrid(V2RayProvider provider) {
     final v2rayService = provider.v2rayService;
     final isConnected = provider.activeConfig != null;
-    
+    final responsive = ResponsiveHelper(context);
+
     return StreamBuilder(
       stream: _statsStream,
       builder: (context, snapshot) {
-        return Row(
-          key: const ValueKey('stats'), // Prevent rebuild animation
-          children: [
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.arrow_downward_rounded,
-                label: AppLocalizations.of(context).translate('home.download'),
-                value: isConnected ? v2rayService.getFormattedDownload() : '0 B',
-              ),
+        return Container(
+          key: const ValueKey('stats'),
+          padding: EdgeInsets.symmetric(
+            horizontal: responsive.scale(20).clamp(14.0, 28.0),
+            vertical: responsive.scale(16).clamp(12.0, 22.0),
+          ),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.035),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.07),
+              width: 1,
             ),
-            SizedBox(width: ResponsiveHelper(context).scale(16).clamp(10.0, 22.0)),
-            Expanded(
-              child: _buildStatCard(
-                icon: Icons.arrow_upward_rounded,
-                label: AppLocalizations.of(context).translate('home.upload'),
-                value: isConnected ? v2rayService.getFormattedUpload() : '0 B',
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: _buildMinimalStat(
+                  icon: Icons.arrow_downward_rounded,
+                  label: AppLocalizations.of(context).translate('home.download'),
+                  value: isConnected ? v2rayService.getFormattedDownload() : '0 B',
+                  color: const Color(0xFF00FFA3),
+                ),
               ),
-            ),
-          ],
+              Container(
+                width: 1,
+                height: responsive.scale(36).clamp(28.0, 44.0),
+                color: Colors.white.withValues(alpha: 0.07),
+              ),
+              Expanded(
+                child: _buildMinimalStat(
+                  icon: Icons.arrow_upward_rounded,
+                  label: AppLocalizations.of(context).translate('home.upload'),
+                  value: isConnected ? v2rayService.getFormattedUpload() : '0 B',
+                  color: const Color(0xFF00D9FF),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
   }
 
-  Widget _buildStatCard({
+  Widget _buildMinimalStat({
     required IconData icon,
     required String label,
     required String value,
+    required Color color,
   }) {
     final responsive = ResponsiveHelper(context);
-    
-    return Column(
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+        Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: color,
+            size: responsive.scale(14).clamp(12.0, 18.0),
+          ),
+        ),
+        SizedBox(width: responsive.scale(10).clamp(8.0, 14.0)),
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(
-              icon,
-              color: Colors.white.withValues(alpha: 0.5),
-              size: responsive.statsIconSize,
-            ),
-            const SizedBox(width: 4),
             Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.5),
-                fontSize: responsive.statsLabelFontSize,
+              label.toUpperCase(),
+              style: GoogleFonts.poppins(
+                color: Colors.white.withValues(alpha: 0.4),
+                fontSize: responsive.scale(9).clamp(8.0, 11.0),
                 fontWeight: FontWeight.w500,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              value,
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: responsive.scale(13.5).clamp(11.5, 16.0),
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
               ),
             ),
           ],
-        ),
-        const SizedBox(height: 8),
-        Text(
-          value,
-          style: GoogleFonts.poppins(
-            color: Colors.white,
-            fontSize: responsive.statsValueFontSize,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.3,
-          ),
         ),
       ],
     );
