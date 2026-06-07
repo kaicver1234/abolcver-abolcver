@@ -19,6 +19,7 @@ import '../screens/ip_info_screen.dart';
 import '../screens/speedtest_screen.dart';
 import '../screens/host_checker_screen.dart';
 import '../screens/dns_settings_screen.dart';
+import '../screens/per_app_proxy_screen.dart';
 import '../screens/donation_screen.dart';
 import '../services/remote_config_service.dart';
 import '../services/analytics_service.dart';
@@ -708,7 +709,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         SizedBox(height: responsive.scale(4)),
         Icon(
           icon,
-          color: color,
+          color: Colors.white,
           size: responsive.scale(18).clamp(14.0, 22.0),
         ),
         SizedBox(height: responsive.scale(4)),
@@ -797,7 +798,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
           ),
           child: Icon(
             icon,
-            color: color,
+            color: Colors.white,
             size: responsive.scale(14).clamp(12.0, 18.0),
           ),
         ),
@@ -863,6 +864,13 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         'color': const Color(0xFFA78BFA),
         'screen': const DnsSettingsScreen(),
       },
+      {
+        'icon': Icons.apps_rounded,
+        'label': AppLocalizations.of(context).translate('home.per_app_proxy'),
+        'subtitle': AppLocalizations.of(context).translate('tools.per_app_proxy_desc'),
+        'color': const Color(0xFFFFB347),
+        'screen': const PerAppProxyScreen(),
+      },
     ];
 
     return SingleChildScrollView(
@@ -884,7 +892,7 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
           
           // Tools Grid
           ...tools.map((tool) => Padding(
-            padding: EdgeInsets.only(bottom: responsive.scale(16)),
+            padding: EdgeInsets.only(bottom: responsive.scale(10)),
             child: _buildToolCard(
               icon: tool['icon'] as IconData,
               label: tool['label'] as String,
@@ -918,14 +926,14 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         child: Row(
           children: [
             Container(
-              padding: EdgeInsets.all(responsive.scale(13).clamp(10.0, 18.0)),
+              padding: EdgeInsets.all(responsive.scale(9).clamp(7.0, 13.0)),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(icon, color: Colors.white, size: responsive.toolIconSize),
             ),
-            SizedBox(width: responsive.scale(14).clamp(10.0, 20.0)),
+            SizedBox(width: responsive.scale(11).clamp(8.0, 16.0)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -934,16 +942,16 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
                     label,
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: responsive.scale(15).clamp(13.0, 19.0),
+                      fontSize: responsive.scale(13).clamp(11.5, 16.0),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     subtitle,
                     style: TextStyle(
                       color: Colors.white.withValues(alpha: 0.5),
-                      fontSize: responsive.scale(12.5).clamp(11.0, 15.0),
+                      fontSize: responsive.scale(11).clamp(9.5, 13.0),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -953,15 +961,15 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
             ),
             Consumer<LanguageProvider>(
               builder: (context, langProvider, _) => Container(
-                padding: EdgeInsets.all(responsive.scale(8).clamp(6.0, 11.0)),
+                padding: EdgeInsets.all(responsive.scale(6).clamp(4.0, 9.0)),
                 decoration: BoxDecoration(
                   color: Colors.white.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   langProvider.isRtl ? Icons.chevron_left : Icons.chevron_right,
                   color: Colors.white,
-                  size: responsive.scale(20).clamp(16.0, 26.0),
+                  size: responsive.scale(16).clamp(13.0, 22.0),
                 ),
               ),
             ),

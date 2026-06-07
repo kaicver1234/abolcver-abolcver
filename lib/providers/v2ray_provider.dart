@@ -9,13 +9,17 @@ import '../services/v2ray_service.dart';
 import '../services/server_service.dart';
 import '../services/analytics_service.dart';
 import 'dns_provider.dart';
+import 'per_app_proxy_provider.dart';
 
 class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   final V2RayService _v2rayService = V2RayService();
   final ServerService _serverService = ServerService();
   final AnalyticsService _analyticsService = AnalyticsService();
   DnsProvider? _dnsProvider;
+  PerAppProxyProvider? _perAppProxyProvider;
   List<String>? _lastAppliedDnsServers;
+  PerAppProxyMode? _lastAppliedPerAppMode;
+  List<String>? _lastAppliedPerAppPackages;
 
   void setDnsProvider(DnsProvider dns) {
     final previous = _dnsProvider;
@@ -51,6 +55,75 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         });
       }
     }
+  }
+
+  /// Attach the Per-App Proxy provider. We register a reconnect callback so
+  /// that when the user applies new per-app settings the VPN re-establishes
+  /// with the updated routing rules.
+  void setPerAppProxyProvider(PerAppProxyProvider provider) {
+    final previous = _perAppProxyProvider;
+    _perAppProxyProvider = provider;
+
+    // Only initialize baseline on FIRST attach. Re-running this on every
+    // notifyListeners() (which is what ChangeNotifierProxyProvider does)
+    // would silently overwrite the last-applied state with the user's
+    // in-flight edits, so the diff check inside the reconnect callback
+    // would never see a change.
+    if (previous == null) {
+      _lastAppliedPerAppMode = provider.mode;
+      _lastAppliedPerAppPackages =
+          List<String>.from(provider.selectedPackages)..sort();
+    }
+
+    if (previous == provider) return;
+    provider.setReconnectCallback(_reconnectForPerAppProxyIfNeeded);
+  }
+
+  /// Called by [PerAppProxyProvider] after the user persists new settings.
+  /// Compares against the last-applied state and reconnects only if either
+  /// the mode or the package selection actually changed AND the VPN is up.
+  void _reconnectForPerAppProxyIfNeeded() {
+    final provider = _perAppProxyProvider;
+    if (provider == null) return;
+
+    final newMode = provider.mode;
+    final newPackages = List<String>.from(provider.selectedPackages)..sort();
+
+    final modeChanged = _lastAppliedPerAppMode != newMode;
+    final packagesChanged = _lastAppliedPerAppPackages == null ||
+        _lastAppliedPerAppPackages!.length != newPackages.length ||
+        !_listsEqualOrdered(_lastAppliedPerAppPackages!, newPackages);
+
+    if (!modeChanged && !packagesChanged) {
+      debugPrint('🛡️ Per-App Proxy applied: no functional change, skipping reconnect');
+      return;
+    }
+
+    _lastAppliedPerAppMode = newMode;
+    _lastAppliedPerAppPackages = newPackages;
+
+    final active = _v2rayService.activeConfig;
+    if (active == null || _isConnecting) {
+      debugPrint('🛡️ Per-App Proxy applied: VPN not running, settings will take effect on next connect');
+      return;
+    }
+
+    debugPrint('🛡️ Per-App Proxy changed while connected → reconnecting to apply');
+    Future(() async {
+      try {
+        await connectToServer(active);
+      } catch (e) {
+        debugPrint('⚠️ Reconnect after Per-App Proxy change failed: $e');
+      }
+    });
+  }
+
+  bool _listsEqualOrdered(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
   }
   bool statusPingOnly = false;
   List<V2RayConfig> _configs = [];
@@ -1224,7 +1297,12 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         try {
           // Attempt connection with timeout
           success = await _v2rayService
-              .connect(config, dnsServers: _dnsProvider?.activeServers)
+              .connect(
+                config,
+                dnsServers: _dnsProvider?.activeServers,
+                blockedApps: _perAppProxyProvider?.blockedAppsForVpn,
+                allowedApps: _perAppProxyProvider?.allowedAppsForVpn,
+              )
               .timeout(
                 Duration(seconds: connectionTimeout),
                 onTimeout: () {

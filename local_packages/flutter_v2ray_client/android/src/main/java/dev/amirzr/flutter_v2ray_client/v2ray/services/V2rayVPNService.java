@@ -178,6 +178,28 @@ public class V2rayVPNService extends VpnService implements V2rayServicesListener
                     Log.w("VPN_SERVICE", "Failed to add blocked app: " + e.getMessage());
                 }
             }
+        } else if (v2rayConfig.ALLOWED_APPS != null && !v2rayConfig.ALLOWED_APPS.isEmpty()) {
+            // Per-App Proxy: only the listed apps go through the VPN.
+            // Always add our own package so the v2ray core itself is reachable.
+            boolean ownAppAdded = false;
+            for (int i = 0; i < v2rayConfig.ALLOWED_APPS.size(); i++) {
+                String pkg = v2rayConfig.ALLOWED_APPS.get(i);
+                try {
+                    builder.addAllowedApplication(pkg);
+                    if (pkg.equals(getPackageName())) {
+                        ownAppAdded = true;
+                    }
+                } catch (Exception e) {
+                    Log.w("VPN_SERVICE", "Failed to add allowed app " + pkg + ": " + e.getMessage());
+                }
+            }
+            if (!ownAppAdded) {
+                try {
+                    builder.addAllowedApplication(getPackageName());
+                } catch (Exception e) {
+                    Log.w("VPN_SERVICE", "Failed to add own package as allowed: " + e.getMessage());
+                }
+            }
         }
         
         // Optimize DNS configuration

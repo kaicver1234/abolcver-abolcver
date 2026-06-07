@@ -158,6 +158,7 @@ public class FlutterV2rayPlugin implements FlutterPlugin, MethodCallHandler, Act
                                 call.argument("remark"),
                                 call.argument("config"),
                                 call.argument("blocked_apps"),
+                                call.argument("allowed_apps"),
                                 call.argument("bypass_subnets"));
 
                         AppConfigs.NOTIFICATION_DISCONNECT_BUTTON_NAME = call.argument("notificationDisconnectButtonName");

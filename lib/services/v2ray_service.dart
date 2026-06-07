@@ -256,7 +256,12 @@ class V2RayService extends ChangeNotifier {
     // while the app was killed.
   }
 
-  Future<bool> connect(V2RayConfig config, {List<String>? dnsServers}) async {
+  Future<bool> connect(
+    V2RayConfig config, {
+    List<String>? dnsServers,
+    List<String>? blockedApps,
+    List<String>? allowedApps,
+  }) async {
     try {
       await initialize();
 
@@ -283,12 +288,21 @@ class V2RayService extends ChangeNotifier {
 
       // Clean server name for notification (remove country code prefix like [DE])
       final cleanRemark = config.remark.replaceAll(RegExp(r'^\[[A-Z]{2}\]\s*'), '').trim();
-      
+
+      if (blockedApps != null && blockedApps.isNotEmpty) {
+        debugPrint('🛡️ Per-App Proxy: excluding ${blockedApps.length} app(s) from VPN');
+      }
+      if (allowedApps != null && allowedApps.isNotEmpty) {
+        debugPrint('🛡️ Per-App Proxy: routing only ${allowedApps.length} app(s) through VPN');
+      }
+
       // Start V2Ray in VPN mode - simplified without extra features
       await _flutterV2ray.startV2Ray(
         remark: cleanRemark,
         config: parser.getFullConfiguration(),
         proxyOnly: false, // Always use VPN mode (not proxy mode)
+        blockedApps: blockedApps,
+        allowedApps: allowedApps,
         notificationDisconnectButtonName: "DISCONNECT",
       );
 

@@ -17,7 +17,8 @@
         "ip_information_desc": "مشاهده اطلاعات دقیق درباره آدرس آی‌پی فعلی شما",
         "host_checker_desc": "بررسی وضعیت، زمان پاسخ و جزئیات هر میزبان وب",
         "speed_test_desc": "تست سرعت اتصال اینترنت شما",
-        "dns_server_desc": "انتخاب سرور DNS هنگام اتصال به VPN"
+        "dns_server_desc": "انتخاب سرور DNS هنگام اتصال به VPN",
+        "per_app_proxy_desc": "انتخاب اینکه کدام برنامه‌ها از VPN استفاده کنند"
     },
     "settings": {
         "title": "تنظیمات"
@@ -45,6 +46,7 @@
         "ip_info": "اطلاعات آی‌پی",
         "host_checker": "بررسی میزبان",
         "dns_server": "سرور DNS",
+        "per_app_proxy": "پروکسی برنامه‌ها",
         "duration": "مدت زمان",
         "upload": "آپلود",
         "download": "دانلود",

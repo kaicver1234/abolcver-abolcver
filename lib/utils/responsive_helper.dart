@@ -106,8 +106,8 @@ class ResponsiveHelper {
   double get flagHeight        => scale(36).clamp(28.0, 46.0);
 
   // ─── Tools (speedtest, host check, etc.) ─────────────────────────────────
-  double get toolIconSize    => scale(30).clamp(24.0, 44.0);
-  double get toolCardPadding => scale(20).clamp(14.0, 28.0);
+  double get toolIconSize    => scale(22).clamp(18.0, 32.0);
+  double get toolCardPadding => scale(14).clamp(10.0, 20.0);
 
   // ─── Bottom nav ──────────────────────────────────────────────────────────
   double get bottomNavHeight => (isLandscape ? scale(64) : scale(78)).clamp(58.0, 96.0);

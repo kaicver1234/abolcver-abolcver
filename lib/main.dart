@@ -7,6 +7,7 @@ import 'providers/v2ray_provider.dart';
 import 'providers/speed_test_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/dns_provider.dart';
+import 'providers/per_app_proxy_provider.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/privacy_welcome_screen.dart';
 import 'screens/language_selection_screen.dart';
@@ -93,15 +94,20 @@ void main() async {
   // Initialize DNS provider
   final dnsProvider = DnsProvider();
   await dnsProvider.initialize();
-  
+
+  // Initialize Per-App Proxy provider
+  final perAppProxyProvider = PerAppProxyProvider();
+  await perAppProxyProvider.initialize();
+
   debugPrint('🎨 Launching app...');
-  
+
   // Run app directly
   runApp(MyApp(
     languageSelected: languageSelected,
     privacyAccepted: privacyAccepted,
     languageProvider: languageProvider,
     dnsProvider: dnsProvider,
+    perAppProxyProvider: perAppProxyProvider,
   ));
 }
 
@@ -134,6 +140,7 @@ class MyApp extends StatelessWidget {
   final bool privacyAccepted;
   final LanguageProvider languageProvider;
   final DnsProvider dnsProvider;
+  final PerAppProxyProvider perAppProxyProvider;
 
   const MyApp({
     super.key,
@@ -141,6 +148,7 @@ class MyApp extends StatelessWidget {
     required this.privacyAccepted,
     required this.languageProvider,
     required this.dnsProvider,
+    required this.perAppProxyProvider,
   });
 
   @override
@@ -161,10 +169,12 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider.value(value: languageProvider),
         ChangeNotifierProvider.value(value: dnsProvider),
-        ChangeNotifierProxyProvider<DnsProvider, V2RayProvider>(
+        ChangeNotifierProvider.value(value: perAppProxyProvider),
+        ChangeNotifierProxyProvider2<DnsProvider, PerAppProxyProvider, V2RayProvider>(
           create: (_) => V2RayProvider(),
-          update: (_, dns, v2ray) {
+          update: (_, dns, perApp, v2ray) {
             v2ray?.setDnsProvider(dns);
+            v2ray?.setPerAppProxyProvider(perApp);
             return v2ray!;
           },
         ),
