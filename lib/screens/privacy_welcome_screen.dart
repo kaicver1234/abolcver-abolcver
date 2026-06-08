@@ -263,50 +263,59 @@ class _WelcomePage extends StatelessWidget {
     final tr = AppLocalizations.of(context);
     final r = ResponsiveHelper(context);
     final hPad = r.scale(28).clamp(18.0, 40.0);
+    final vPad = r.scale(20).clamp(12.0, 32.0);
 
-    return SingleChildScrollView(
-      physics: const ClampingScrollPhysics(),
-      padding: EdgeInsets.symmetric(horizontal: hPad),
-      child: Column(
-        children: [
-          SizedBox(height: r.scale(36).clamp(20.0, 56.0)),
-          _HeroIcon(
-            icon: Icons.shield_rounded,
-            size: r.scale(120).clamp(92.0, 156.0),
-            iconSize: r.scale(54).clamp(40.0, 70.0),
-          ),
-          SizedBox(height: r.scale(40).clamp(24.0, 56.0)),
-          Text(
-            tr.translate('privacy_welcome.welcome_title'),
-            textAlign: TextAlign.center,
-            style: _headingStyle(
-              context,
-              r.scale(28).clamp(20.0, 36.0),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(hPad, vPad, hPad, vPad),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight - (vPad * 2),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _HeroIcon(
+                  icon: Icons.shield_rounded,
+                  size: r.scale(120).clamp(92.0, 156.0),
+                  iconSize: r.scale(54).clamp(40.0, 70.0),
+                ),
+                SizedBox(height: r.scale(36).clamp(22.0, 52.0)),
+                Text(
+                  tr.translate('privacy_welcome.welcome_title'),
+                  textAlign: TextAlign.center,
+                  style: _headingStyle(
+                    context,
+                    r.scale(28).clamp(20.0, 36.0),
+                  ),
+                ),
+                SizedBox(height: r.scale(12).clamp(8.0, 18.0)),
+                Text(
+                  tr.translate('privacy_welcome.welcome_subtitle'),
+                  textAlign: TextAlign.center,
+                  style: _bodyStyle(
+                    context,
+                    r.scale(14.5).clamp(12.0, 17.0),
+                  ),
+                ),
+                SizedBox(height: r.scale(28).clamp(18.0, 40.0)),
+                Wrap(
+                  spacing: r.scale(8).clamp(6.0, 12.0),
+                  runSpacing: r.scale(8).clamp(6.0, 10.0),
+                  alignment: WrapAlignment.center,
+                  children: [
+                    _Pill(icon: Icons.lock_rounded,   label: tr.translate('privacy_welcome.secure')),
+                    _Pill(icon: Icons.bolt_rounded,   label: tr.translate('privacy_welcome.fast')),
+                    _Pill(icon: Icons.public_rounded, label: tr.translate('privacy_welcome.global')),
+                  ],
+                ),
+              ],
             ),
           ),
-          SizedBox(height: r.scale(12).clamp(8.0, 18.0)),
-          Text(
-            tr.translate('privacy_welcome.welcome_subtitle'),
-            textAlign: TextAlign.center,
-            style: _bodyStyle(
-              context,
-              r.scale(14.5).clamp(12.0, 17.0),
-            ),
-          ),
-          SizedBox(height: r.scale(32).clamp(20.0, 44.0)),
-          Wrap(
-            spacing: r.scale(8).clamp(6.0, 12.0),
-            runSpacing: r.scale(8).clamp(6.0, 10.0),
-            alignment: WrapAlignment.center,
-            children: [
-              _Pill(icon: Icons.lock_rounded,   label: tr.translate('privacy_welcome.secure')),
-              _Pill(icon: Icons.bolt_rounded,   label: tr.translate('privacy_welcome.fast')),
-              _Pill(icon: Icons.public_rounded, label: tr.translate('privacy_welcome.global')),
-            ],
-          ),
-          SizedBox(height: r.scale(32).clamp(20.0, 44.0)),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -378,43 +387,52 @@ class _GetStartedPage extends StatelessWidget {
     final tr = AppLocalizations.of(context);
     final r = ResponsiveHelper(context);
     final hPad = r.scale(28).clamp(18.0, 40.0);
+    final vPad = r.scale(20).clamp(12.0, 32.0);
 
-    return SingleChildScrollView(
-      physics: const ClampingScrollPhysics(),
-      padding: EdgeInsets.symmetric(horizontal: hPad),
-      child: Column(
-        children: [
-          SizedBox(height: r.scale(48).clamp(28.0, 72.0)),
-          _HeroIcon(
-            icon: Icons.check_rounded,
-            size: r.scale(116).clamp(88.0, 148.0),
-            iconSize: r.scale(54).clamp(40.0, 68.0),
-          ),
-          SizedBox(height: r.scale(40).clamp(24.0, 56.0)),
-          Text(
-            tr.translate('privacy_welcome.ready_to_start'),
-            textAlign: TextAlign.center,
-            style: _headingStyle(
-              context,
-              r.scale(26).clamp(20.0, 32.0),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          padding: EdgeInsets.fromLTRB(hPad, vPad, hPad, vPad),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minHeight: constraints.maxHeight - (vPad * 2),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _HeroIcon(
+                  icon: Icons.check_rounded,
+                  size: r.scale(116).clamp(88.0, 148.0),
+                  iconSize: r.scale(54).clamp(40.0, 68.0),
+                ),
+                SizedBox(height: r.scale(36).clamp(22.0, 52.0)),
+                Text(
+                  tr.translate('privacy_welcome.ready_to_start'),
+                  textAlign: TextAlign.center,
+                  style: _headingStyle(
+                    context,
+                    r.scale(26).clamp(20.0, 32.0),
+                  ),
+                ),
+                SizedBox(height: r.scale(12).clamp(8.0, 18.0)),
+                Text(
+                  tr.translate('privacy_welcome.one_tap_away'),
+                  textAlign: TextAlign.center,
+                  style: _bodyStyle(
+                    context,
+                    r.scale(14.5).clamp(12.0, 17.0),
+                  ),
+                ),
+                SizedBox(height: r.scale(28).clamp(18.0, 40.0)),
+                _NoRegistrationChip(
+                  label: tr.translate('privacy_welcome.no_registration'),
+                ),
+              ],
             ),
           ),
-          SizedBox(height: r.scale(12).clamp(8.0, 18.0)),
-          Text(
-            tr.translate('privacy_welcome.one_tap_away'),
-            textAlign: TextAlign.center,
-            style: _bodyStyle(
-              context,
-              r.scale(14.5).clamp(12.0, 17.0),
-            ),
-          ),
-          SizedBox(height: r.scale(32).clamp(20.0, 44.0)),
-          _NoRegistrationChip(
-            label: tr.translate('privacy_welcome.no_registration'),
-          ),
-          SizedBox(height: r.scale(28).clamp(18.0, 40.0)),
-        ],
-      ),
+        );
+      },
     );
   }
 }

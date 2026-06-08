@@ -37,8 +37,8 @@ class RoutingProvider with ChangeNotifier {
     'ff00::/8',
   ];
 
-  bool _bypassIran = true;
-  bool _bypassPrivate = true;
+  bool _bypassIran = false;
+  bool _bypassPrivate = false;
   List<String> _customSubnets = const [];
   List<String> _customDomains = const [];
   bool _initialized = false;
@@ -118,8 +118,8 @@ class RoutingProvider with ChangeNotifier {
     if (_initialized) return;
     try {
       final prefs = await SharedPreferences.getInstance();
-      _bypassIran = prefs.getBool(_bypassIranKey) ?? true;
-      _bypassPrivate = prefs.getBool(_bypassPrivateKey) ?? true;
+      _bypassIran = prefs.getBool(_bypassIranKey) ?? false;
+      _bypassPrivate = prefs.getBool(_bypassPrivateKey) ?? false;
       _customSubnets = (prefs.getStringList(_customSubnetsKey) ?? const [])
           .where(isValidCidr)
           .toList(growable: false);

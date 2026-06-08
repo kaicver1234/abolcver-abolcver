@@ -104,12 +104,12 @@ class _ServerListItemState extends State<ServerListItem> {
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(5),
                         child: CachedNetworkImage(
-                          imageUrl: 'https://flagcdn.com/w160/${widget.config.countryCode!.toLowerCase()}.png',
+                          imageUrl: widget.config.countryFlagUrl,
                           fit: BoxFit.cover,
                           width: double.infinity,
                           height: double.infinity,
-                          memCacheWidth: 160,
-                          maxWidthDiskCache: 160,
+                          memCacheWidth: 360,
+                          maxWidthDiskCache: 360,
                           placeholder: (context, url) => Container(
                             color: Colors.grey.withValues(alpha: 0.2),
                           ),

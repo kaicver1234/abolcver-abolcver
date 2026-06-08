@@ -326,7 +326,10 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
       validate: RoutingProvider.isValidCidr,
       onAdd: routing.addCustomSubnet,
       onRemove: routing.removeCustomSubnet,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      // CIDR needs '/' (and ':' for IPv6); a numeric keypad exposes neither,
+      // so the user could never type a valid subnet. visiblePassword gives a
+      // full keyboard while suppressing autocorrect/suggestions.
+      keyboardType: TextInputType.visiblePassword,
     );
   }
 

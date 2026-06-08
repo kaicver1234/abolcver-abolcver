@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../widgets/app_background.dart';
+import '../widgets/modern_glass_card.dart';
 import '../services/analytics_service.dart';
+
+// Shared palette with the rest of the app (see routing_settings_screen).
+const Color _kPrimary = Color(0xFF00D9FF);
+const Color _kAccent = Color(0xFF00FFA3);
+const Color _kDanger = Color(0xFFFF6B6B);
 
 class IpInfoScreen extends StatefulWidget {
   const IpInfoScreen({super.key});
@@ -15,38 +22,28 @@ class IpInfoScreen extends StatefulWidget {
 }
 
 class _IpInfoScreenState extends State<IpInfoScreen>
-    with TickerProviderStateMixin {
+    with SingleTickerProviderStateMixin {
   bool _isLoading = true;
   Map<String, dynamic>? _ipData;
   String? _errorMessage;
   bool _copied = false;
 
-  late AnimationController _animController;
-  late Animation<double> _fadeAnimation;
-  late Animation<double> _slideAnimation;
-  late AnimationController _waveController;
+  late final AnimationController _animController;
+  late final Animation<double> _fade;
+
+  bool get _isRtl =>
+      Provider.of<LanguageProvider>(context, listen: false).isRtl;
+
+  String _t({required String fa, required String en}) => _isRtl ? fa : en;
 
   @override
   void initState() {
     super.initState();
     _animController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 450),
     );
-    
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    )..repeat();
-    
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOut),
-    );
-    
-    _slideAnimation = Tween<double>(begin: 30.0, end: 0.0).animate(
-      CurvedAnimation(parent: _animController, curve: Curves.easeOutCubic),
-    );
-    
+    _fade = CurvedAnimation(parent: _animController, curve: Curves.easeOut);
     AnalyticsService().logScreenView(screenName: 'Safheh_Ettelaat_IP');
     _fetchIpInfo();
   }
@@ -54,7 +51,6 @@ class _IpInfoScreenState extends State<IpInfoScreen>
   @override
   void dispose() {
     _animController.dispose();
-    _waveController.dispose();
     super.dispose();
   }
 
@@ -102,21 +98,21 @@ class _IpInfoScreenState extends State<IpInfoScreen>
     } on http.ClientException catch (_) {
       if (!mounted) return;
       setState(() {
-        _errorMessage = 'No internet connection';
+        _errorMessage = _t(fa: 'اتصال اینترنت برقرار نیست', en: 'No internet connection');
         _isLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _errorMessage = e.toString().contains('timeout')
-            ? 'Connection timeout'
-            : 'Unable to fetch IP information';
+            ? _t(fa: 'زمان اتصال به پایان رسید', en: 'Connection timeout')
+            : _t(fa: 'دریافت اطلاعات IP ممکن نشد', en: 'Unable to fetch IP information');
         _isLoading = false;
       });
     }
   }
 
-  void _copyToClipboard(String text) async {
+  Future<void> _copyToClipboard(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (!mounted) return;
     setState(() => _copied = true);
@@ -127,27 +123,59 @@ class _IpInfoScreenState extends State<IpInfoScreen>
 
   @override
   Widget build(BuildContext context) {
-    final languageProvider = Provider.of<LanguageProvider>(context);
-
+    final isRtl = _isRtl;
     return Directionality(
-      textDirection: languageProvider.textDirection,
+      textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
       child: AppBackground(
         child: Scaffold(
           backgroundColor: Colors.transparent,
-          body: SafeArea(
-            child: ResponsivePageWrapper(
-              child: Column(
-              children: [
-                _buildMinimalHeader(context, languageProvider),
-                Expanded(
-                  child: _isLoading
-                      ? _buildMinimalLoading()
-                      : _errorMessage != null
-                          ? _buildMinimalError()
-                          : _buildMinimalContent(),
-                ),
-              ],
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(
+                isRtl
+                    ? Icons.arrow_forward_ios_rounded
+                    : Icons.arrow_back_ios_rounded,
+                color: Colors.white,
+                size: 18,
+              ),
+              onPressed: () => Navigator.pop(context),
             ),
+            title: Text(
+              _t(fa: 'اطلاعات IP', en: 'IP Information'),
+              style: GoogleFonts.poppins(
+                color: Colors.white,
+                fontSize: 17,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(
+                  Icons.refresh_rounded,
+                  color: _isLoading
+                      ? Colors.white.withValues(alpha: 0.3)
+                      : _kPrimary,
+                  size: 22,
+                ),
+                onPressed: _isLoading
+                    ? null
+                    : () {
+                        AnalyticsService().logIpInfoRefresh();
+                        _fetchIpInfo();
+                      },
+              ),
+            ],
+          ),
+          body: SafeArea(
+            top: false,
+            child: ResponsivePageWrapper(
+              child: _isLoading
+                  ? _buildLoading()
+                  : _errorMessage != null
+                      ? _buildError()
+                      : _buildContent(),
             ),
           ),
         ),
@@ -155,90 +183,22 @@ class _IpInfoScreenState extends State<IpInfoScreen>
     );
   }
 
-  Widget _buildMinimalHeader(BuildContext context, LanguageProvider langProvider) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
-      child: Row(
-        children: [
-          // Back button
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                langProvider.isRtl
-                    ? Icons.arrow_forward_rounded
-                    : Icons.arrow_back_rounded,
-                color: Colors.white,
-                size: 20,
-              ),
-            ),
-          ),
-          
-          const SizedBox(width: 16),
-          
-          // Title
-          Expanded(
-            child: Text(
-              'IP Information',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ),
-          
-          // Refresh button
-          GestureDetector(
-            onTap: _isLoading ? null : () {
-              AnalyticsService().logIpInfoRefresh();
-              _fetchIpInfo();
-            },
-            child: Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: _isLoading 
-                    ? Colors.white.withValues(alpha: 0.05)
-                    : const Color(0xFF00D9FF).withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                Icons.refresh_rounded,
-                color: _isLoading 
-                    ? Colors.white.withValues(alpha: 0.3)
-                    : const Color(0xFF00D9FF),
-                size: 20,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMinimalLoading() {
+  Widget _buildLoading() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Wave loading animation (3 bars)
-          _buildWaveLoading(),
-          
-          const SizedBox(height: 24),
-          
+          const SizedBox(
+            width: 28,
+            height: 28,
+            child: CircularProgressIndicator(strokeWidth: 2, color: _kPrimary),
+          ),
+          const SizedBox(height: 18),
           Text(
-            'Detecting IP...',
+            _t(fa: 'در حال شناسایی IP...', en: 'Detecting IP...'),
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.6),
-              fontSize: 14,
+              fontSize: 13.5,
               fontWeight: FontWeight.w500,
             ),
           ),
@@ -247,128 +207,62 @@ class _IpInfoScreenState extends State<IpInfoScreen>
     );
   }
 
-  Widget _buildWaveLoading() {
-    return AnimatedBuilder(
-      animation: _waveController,
-      builder: (context, child) {
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(3, (index) {
-            // Calculate wave animation with delay for each bar
-            final delay = index * 0.2;
-            final progress = (_waveController.value + delay) % 1.0;
-            
-            // Calculate vertical offset (bounce up and down)
-            final offset = progress < 0.5
-                ? -20.0 * (progress * 2)
-                : -20.0 * (2 - progress * 2);
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Transform.translate(
-                offset: Offset(0, offset),
-                child: Container(
-                  width: 5,
-                  height: 35,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color(0xFF5A5A5A),
-                        Color(0xFF3A3A3A),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(2.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF4A4A4A).withValues(alpha: 0.3),
-                        blurRadius: 10,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
-
-  Widget _buildMinimalError() {
+  Widget _buildError() {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Error icon
             Container(
-              width: 64,
-              height: 64,
+              width: 60,
+              height: 60,
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444).withValues(alpha: 0.1),
+                color: _kDanger.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
-                Icons.error_outline_rounded,
-                color: Color(0xFFEF4444),
-                size: 32,
-              ),
+              child: const Icon(Icons.wifi_off_rounded, color: _kDanger, size: 28),
             ),
-            
-            const SizedBox(height: 20),
-            
+            const SizedBox(height: 18),
             Text(
-              'Connection Failed',
-              style: TextStyle(
+              _t(fa: 'اتصال ناموفق', en: 'Connection Failed'),
+              style: GoogleFonts.poppins(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),
             ),
-            
-            const SizedBox(height: 8),
-            
+            const SizedBox(height: 6),
             Text(
-              _errorMessage ?? 'Unable to fetch IP information',
+              _errorMessage ?? '',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.5),
-                fontSize: 14,
+                fontSize: 13,
+                height: 1.4,
               ),
             ),
-            
-            const SizedBox(height: 32),
-            
-            // Retry button
+            const SizedBox(height: 26),
             GestureDetector(
               onTap: _fetchIpInfo,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 14),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 28, vertical: 13),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00D9FF).withValues(alpha: 0.15),
+                  color: _kPrimary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFF00D9FF).withValues(alpha: 0.3),
-                  ),
+                  border: Border.all(color: _kPrimary.withValues(alpha: 0.3)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(
-                      Icons.refresh_rounded,
-                      color: Color(0xFF00D9FF),
-                      size: 18,
-                    ),
+                    const Icon(Icons.refresh_rounded, color: _kPrimary, size: 18),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Try Again',
-                      style: TextStyle(
-                        color: Color(0xFF00D9FF),
-                        fontSize: 14,
+                    Text(
+                      _t(fa: 'تلاش دوباره', en: 'Try Again'),
+                      style: GoogleFonts.poppins(
+                        color: _kPrimary,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -382,64 +276,79 @@ class _IpInfoScreenState extends State<IpInfoScreen>
     );
   }
 
-  Widget _buildMinimalContent() {
+  Widget _buildContent() {
     if (_ipData == null) return const SizedBox();
-    
     return FadeTransition(
-      opacity: _fadeAnimation,
-      child: AnimatedBuilder(
-        animation: _slideAnimation,
-        builder: (context, child) {
-          return Transform.translate(
-            offset: Offset(0, _slideAnimation.value),
-            child: child,
-          );
-        },
-        child: SingleChildScrollView(
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildIPCard(),
-              const SizedBox(height: 20),
-              _buildLocationSection(),
-              const SizedBox(height: 16),
-              _buildNetworkSection(),
-            ],
-          ),
+      opacity: _fade,
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(20, 4, 20, 28),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildHeroCard(),
+            const SizedBox(height: 24),
+            _buildSectionLabel(_t(fa: 'موقعیت', en: 'Location')),
+            const SizedBox(height: 12),
+            _buildInfoCard([
+              (Icons.flag_rounded, _t(fa: 'کشور', en: 'Country'),
+                  '${_ipData!['country']} (${_ipData!['countryCode']})'),
+              (Icons.location_city_rounded, _t(fa: 'شهر', en: 'City'),
+                  (_ipData!['city'] ?? '—').toString()),
+              (Icons.map_rounded, _t(fa: 'استان', en: 'Region'),
+                  (_ipData!['regionName'] ?? '—').toString()),
+              (Icons.schedule_rounded, _t(fa: 'منطقه زمانی', en: 'Timezone'),
+                  (_ipData!['timezone'] ?? '—').toString()),
+              (Icons.my_location_rounded, _t(fa: 'مختصات', en: 'Coordinates'),
+                  _coords()),
+            ]),
+            const SizedBox(height: 22),
+            _buildSectionLabel(_t(fa: 'شبکه', en: 'Network')),
+            const SizedBox(height: 12),
+            _buildInfoCard([
+              (Icons.business_rounded, _t(fa: 'سرویس‌دهنده', en: 'ISP'),
+                  (_ipData!['isp'] ?? '—').toString()),
+              (Icons.corporate_fare_rounded, _t(fa: 'سازمان', en: 'Organization'),
+                  (_ipData!['org'] ?? '—').toString()),
+              (Icons.numbers_rounded, _t(fa: 'شماره AS', en: 'AS Number'),
+                  (_ipData!['as'] ?? '—').toString()),
+            ]),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildIPCard() {
-    final ip = _ipData!['query'] ?? 'Unknown';
-    final city = _ipData!['city'] ?? '';
-    final country = _ipData!['country'] ?? '';
-    final countryCode = (_ipData!['countryCode'] ?? '').toString().toLowerCase();
+  String _coords() {
+    final lat = _ipData!['lat'];
+    final lon = _ipData!['lon'];
+    if (lat is num && lon is num) {
+      return '${lat.toStringAsFixed(4)}, ${lon.toStringAsFixed(4)}';
+    }
+    return '—';
+  }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: const Color(0xFF00D9FF).withValues(alpha: 0.15),
-        ),
-      ),
+  Widget _buildHeroCard() {
+    final ip = (_ipData!['query'] ?? 'Unknown').toString();
+    final city = (_ipData!['city'] ?? '').toString();
+    final country = (_ipData!['country'] ?? '').toString();
+    final countryCode =
+        (_ipData!['countryCode'] ?? '').toString().toLowerCase();
+    final location =
+        [city, country].where((s) => s.isNotEmpty).join(', ');
+
+    return ModernGlassCard(
+      padding: const EdgeInsets.all(22),
       child: Column(
         children: [
-          // Flag and status
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // Live indicator
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF00FFA3).withValues(alpha: 0.1),
+                  color: _kAccent.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -449,16 +358,16 @@ class _IpInfoScreenState extends State<IpInfoScreen>
                       width: 6,
                       height: 6,
                       decoration: const BoxDecoration(
-                        color: Color(0xFF00FFA3),
+                        color: _kAccent,
                         shape: BoxShape.circle,
                       ),
                     ),
                     const SizedBox(width: 6),
-                    const Text(
+                    Text(
                       'LIVE',
-                      style: TextStyle(
-                        color: Color(0xFF00FFA3),
-                        fontSize: 11,
+                      style: GoogleFonts.poppins(
+                        color: _kAccent,
+                        fontSize: 10.5,
                         fontWeight: FontWeight.w700,
                         letterSpacing: 1,
                       ),
@@ -466,91 +375,29 @@ class _IpInfoScreenState extends State<IpInfoScreen>
                   ],
                 ),
               ),
-              
-              // Flag from API
-              if (countryCode.isNotEmpty && countryCode.length == 2)
-                Container(
-                  width: 64,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.1),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.2),
-                        blurRadius: 8,
-                        spreadRadius: 0,
-                      ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(6.5),
-                    child: Image.network(
-                      'https://flagcdn.com/w160/$countryCode.png',
-                      fit: BoxFit.cover,
-                      width: double.infinity,
-                      height: double.infinity,
-                      errorBuilder: (context, error, stackTrace) {
-                        // Fallback to emoji if image fails to load
-                        final flagEmoji = countryCode.toUpperCase().split('').map((c) {
-                          return String.fromCharCode(c.codeUnitAt(0) + 127397);
-                        }).join();
-                        return Center(
-                          child: Text(
-                            flagEmoji,
-                            style: const TextStyle(fontSize: 30),
-                          ),
-                        );
-                      },
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Center(
-                          child: SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                Colors.white.withValues(alpha: 0.3),
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
+              if (countryCode.length == 2) _buildFlag(countryCode),
             ],
           ),
-          
-          const SizedBox(height: 24),
-          
-          // IP Address
+          const SizedBox(height: 22),
           Text(
-            'Your IP Address',
+            _t(fa: 'آدرس IP شما', en: 'YOUR IP ADDRESS'),
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.4),
               fontSize: 11,
               fontWeight: FontWeight.w500,
-              letterSpacing: 1.5,
+              letterSpacing: 1.4,
             ),
           ),
-          
-          const SizedBox(height: 12),
-          
-          // IP with copy button
+          const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Flexible(
                 child: Text(
                   ip,
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     color: Colors.white,
-                    fontSize: 32,
+                    fontSize: 28,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.5,
                   ),
@@ -558,9 +405,7 @@ class _IpInfoScreenState extends State<IpInfoScreen>
                   overflow: TextOverflow.ellipsis,
                 ),
               ),
-              
-              const SizedBox(width: 12),
-              
+              const SizedBox(width: 10),
               GestureDetector(
                 onTap: () => _copyToClipboard(ip),
                 child: AnimatedContainer(
@@ -568,30 +413,28 @@ class _IpInfoScreenState extends State<IpInfoScreen>
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
                     color: _copied
-                        ? const Color(0xFF00FFA3).withValues(alpha: 0.15)
-                        : Colors.white.withValues(alpha: 0.05),
+                        ? _kAccent.withValues(alpha: 0.15)
+                        : Colors.white.withValues(alpha: 0.06),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
                     _copied ? Icons.check_rounded : Icons.copy_rounded,
                     size: 16,
-                    color: _copied 
-                        ? const Color(0xFF00FFA3)
+                    color: _copied
+                        ? _kAccent
                         : Colors.white.withValues(alpha: 0.6),
                   ),
                 ),
               ),
             ],
           ),
-          
-          const SizedBox(height: 16),
-          
-          // Location
-          if (city.isNotEmpty || country.isNotEmpty)
+          if (location.isNotEmpty) ...[
+            const SizedBox(height: 14),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.03),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -605,10 +448,10 @@ class _IpInfoScreenState extends State<IpInfoScreen>
                   const SizedBox(width: 6),
                   Flexible(
                     child: Text(
-                      [city, country].where((s) => s.isNotEmpty).join(', '),
+                      location,
                       style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.6),
-                        fontSize: 13,
+                        color: Colors.white.withValues(alpha: 0.65),
+                        fontSize: 12.5,
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
@@ -618,172 +461,93 @@ class _IpInfoScreenState extends State<IpInfoScreen>
                 ],
               ),
             ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _buildLocationSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Section title
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00D9FF).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.public_rounded,
-                  color: Color(0xFF00D9FF),
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Location',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
+  Widget _buildFlag(String countryCode) {
+    return Container(
+      width: 56,
+      height: 40,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.2),
+            blurRadius: 8,
           ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(7),
+        child: Image.network(
+          'https://flagcdn.com/w160/$countryCode.png',
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            final emoji = countryCode.toUpperCase().split('').map((c) {
+              return String.fromCharCode(c.codeUnitAt(0) + 127397);
+            }).join();
+            return Center(child: Text(emoji, style: const TextStyle(fontSize: 26)));
+          },
+          loadingBuilder: (context, child, progress) {
+            if (progress == null) return child;
+            return Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    Colors.white.withValues(alpha: 0.3),
+                  ),
+                ),
+              ),
+            );
+          },
         ),
-        
-        // Location items
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.03),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              _buildInfoRow(
-                Icons.flag_rounded,
-                'Country',
-                '${_ipData!['country']} (${_ipData!['countryCode']})',
-              ),
-              _buildDivider(),
-              _buildInfoRow(
-                Icons.location_city_rounded,
-                'City',
-                _ipData!['city'] ?? 'Unknown',
-              ),
-              _buildDivider(),
-              _buildInfoRow(
-                Icons.map_rounded,
-                'Region',
-                _ipData!['regionName'] ?? 'Unknown',
-              ),
-              _buildDivider(),
-              _buildInfoRow(
-                Icons.schedule_rounded,
-                'Timezone',
-                _ipData!['timezone'] ?? 'Unknown',
-              ),
-              _buildDivider(),
-              _buildInfoRow(
-                Icons.my_location_rounded,
-                'Coordinates',
-                '${(_ipData!['lat'] as num).toStringAsFixed(4)}, ${(_ipData!['lon'] as num).toStringAsFixed(4)}',
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildNetworkSection() {
+  Widget _buildSectionLabel(String text) {
+    return Text(
+      text.toUpperCase(),
+      style: GoogleFonts.poppins(
+        color: Colors.white.withValues(alpha: 0.55),
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 1.1,
+      ),
+    );
+  }
+
+  Widget _buildInfoCard(List<(IconData, String, String)> rows) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Section title
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 12),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00FFA3).withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.router_rounded,
-                  color: Color(0xFF00FFA3),
-                  size: 16,
-                ),
-              ),
-              const SizedBox(width: 10),
-              const Text(
-                'Network',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-        
-        // Network items
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.03),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            children: [
-              _buildInfoRow(
-                Icons.business_rounded,
-                'ISP',
-                _ipData!['isp'] ?? 'Unknown',
-              ),
-              _buildDivider(),
-              _buildInfoRow(
-                Icons.corporate_fare_rounded,
-                'Organization',
-                _ipData!['org'] ?? 'Unknown',
-              ),
-              _buildDivider(),
-              _buildInfoRow(
-                Icons.numbers_rounded,
-                'AS Number',
-                _ipData!['as'] ?? 'Unknown',
-              ),
-            ],
-          ),
-        ),
+        for (int i = 0; i < rows.length; i++) ...[
+          _buildInfoRow(rows[i].$1, rows[i].$2, rows[i].$3),
+          if (i != rows.length - 1) _buildDivider(),
+        ],
       ],
     );
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(vertical: 14),
       child: Row(
         children: [
-          Icon(
-            icon,
-            color: Colors.white.withValues(alpha: 0.4),
-            size: 16,
-          ),
+          Icon(icon, color: Colors.white.withValues(alpha: 0.4), size: 16),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
               label,
               style: TextStyle(
                 color: Colors.white.withValues(alpha: 0.5),
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -794,7 +558,7 @@ class _IpInfoScreenState extends State<IpInfoScreen>
               value,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 13,
+                fontSize: 12.5,
                 fontWeight: FontWeight.w600,
               ),
               textAlign: TextAlign.end,
@@ -810,8 +574,7 @@ class _IpInfoScreenState extends State<IpInfoScreen>
   Widget _buildDivider() {
     return Container(
       height: 1,
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      color: Colors.white.withValues(alpha: 0.03),
+      color: Colors.white.withValues(alpha: 0.05),
     );
   }
 }
