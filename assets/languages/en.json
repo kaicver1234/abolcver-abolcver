@@ -18,7 +18,8 @@
         "host_checker_desc": "Check status, response time and details of any web host",
         "speed_test_desc": "Test your internet connection speed",
         "dns_server_desc": "Choose DNS server used during VPN connection",
-        "per_app_proxy_desc": "Choose which apps go through the VPN"
+        "per_app_proxy_desc": "Choose which apps go through the VPN",
+        "routing_desc": "Bypass Iran traffic and configure custom routing rules"
     },
     "settings": {
         "title": "Settings"
@@ -47,6 +48,7 @@
         "host_checker": "Host Checker",
         "dns_server": "DNS Server",
         "per_app_proxy": "Per-App Proxy",
+        "routing": "Routing & Bypass",
         "duration": "Duration",
         "upload": "Upload",
         "download": "Download",

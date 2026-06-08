@@ -8,6 +8,7 @@ import 'providers/speed_test_provider.dart';
 import 'providers/theme_provider.dart';
 import 'providers/dns_provider.dart';
 import 'providers/per_app_proxy_provider.dart';
+import 'providers/routing_provider.dart';
 import 'screens/main_navigation_screen.dart';
 import 'screens/privacy_welcome_screen.dart';
 import 'screens/language_selection_screen.dart';
@@ -99,6 +100,10 @@ void main() async {
   final perAppProxyProvider = PerAppProxyProvider();
   await perAppProxyProvider.initialize();
 
+  // Initialize Routing (geo-bypass) provider
+  final routingProvider = RoutingProvider();
+  await routingProvider.initialize();
+
   debugPrint('🎨 Launching app...');
 
   // Run app directly
@@ -108,6 +113,7 @@ void main() async {
     languageProvider: languageProvider,
     dnsProvider: dnsProvider,
     perAppProxyProvider: perAppProxyProvider,
+    routingProvider: routingProvider,
   ));
 }
 
@@ -141,6 +147,7 @@ class MyApp extends StatelessWidget {
   final LanguageProvider languageProvider;
   final DnsProvider dnsProvider;
   final PerAppProxyProvider perAppProxyProvider;
+  final RoutingProvider routingProvider;
 
   const MyApp({
     super.key,
@@ -149,6 +156,7 @@ class MyApp extends StatelessWidget {
     required this.languageProvider,
     required this.dnsProvider,
     required this.perAppProxyProvider,
+    required this.routingProvider,
   });
 
   @override
@@ -170,11 +178,13 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: languageProvider),
         ChangeNotifierProvider.value(value: dnsProvider),
         ChangeNotifierProvider.value(value: perAppProxyProvider),
-        ChangeNotifierProxyProvider2<DnsProvider, PerAppProxyProvider, V2RayProvider>(
+        ChangeNotifierProvider.value(value: routingProvider),
+        ChangeNotifierProxyProvider3<DnsProvider, PerAppProxyProvider, RoutingProvider, V2RayProvider>(
           create: (_) => V2RayProvider(),
-          update: (_, dns, perApp, v2ray) {
+          update: (_, dns, perApp, routing, v2ray) {
             v2ray?.setDnsProvider(dns);
             v2ray?.setPerAppProxyProvider(perApp);
+            v2ray?.setRoutingProvider(routing);
             return v2ray!;
           },
         ),

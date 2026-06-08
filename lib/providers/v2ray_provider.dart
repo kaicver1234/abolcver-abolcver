@@ -10,6 +10,7 @@ import '../services/server_service.dart';
 import '../services/analytics_service.dart';
 import 'dns_provider.dart';
 import 'per_app_proxy_provider.dart';
+import 'routing_provider.dart';
 
 class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   final V2RayService _v2rayService = V2RayService();
@@ -17,9 +18,16 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
   final AnalyticsService _analyticsService = AnalyticsService();
   DnsProvider? _dnsProvider;
   PerAppProxyProvider? _perAppProxyProvider;
+  RoutingProvider? _routingProvider;
   List<String>? _lastAppliedDnsServers;
   PerAppProxyMode? _lastAppliedPerAppMode;
   List<String>? _lastAppliedPerAppPackages;
+  // Snapshot of the last-applied routing settings so we only reconnect when
+  // something the tunnel cares about actually changed.
+  bool? _lastAppliedBypassIran;
+  bool? _lastAppliedBypassPrivate;
+  List<String>? _lastAppliedCustomSubnets;
+  List<String>? _lastAppliedCustomDomains;
 
   void setDnsProvider(DnsProvider dns) {
     final previous = _dnsProvider;
@@ -114,6 +122,70 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
         await connectToServer(active);
       } catch (e) {
         debugPrint('⚠️ Reconnect after Per-App Proxy change failed: $e');
+      }
+    });
+  }
+
+  /// Attach the routing provider and react to user-driven changes. Whenever
+  /// the geo-bypass settings actually change, reconnect to apply them — the
+  /// rules live inside the v2ray core config, so they only take effect on a
+  /// fresh startV2Ray.
+  void setRoutingProvider(RoutingProvider provider) {
+    final previous = _routingProvider;
+
+    // First attach: snapshot the current state as the baseline so we don't
+    // trigger a spurious reconnect on startup.
+    if (previous == null) {
+      _lastAppliedBypassIran = provider.bypassIran;
+      _lastAppliedBypassPrivate = provider.bypassPrivate;
+      _lastAppliedCustomSubnets =
+          List<String>.from(provider.customSubnets)..sort();
+      _lastAppliedCustomDomains =
+          List<String>.from(provider.customDomains)..sort();
+      _routingProvider = provider;
+      provider.addListener(_onRoutingSettingsChanged);
+      return;
+    }
+
+    if (previous == provider) return;
+    previous.removeListener(_onRoutingSettingsChanged);
+    _routingProvider = provider;
+    provider.addListener(_onRoutingSettingsChanged);
+  }
+
+  void _onRoutingSettingsChanged() {
+    final provider = _routingProvider;
+    if (provider == null) return;
+
+    final newSubnets = List<String>.from(provider.customSubnets)..sort();
+    final newDomains = List<String>.from(provider.customDomains)..sort();
+
+    final changed = _lastAppliedBypassIran != provider.bypassIran ||
+        _lastAppliedBypassPrivate != provider.bypassPrivate ||
+        _lastAppliedCustomSubnets == null ||
+        !_listsEqualOrdered(_lastAppliedCustomSubnets!, newSubnets) ||
+        _lastAppliedCustomDomains == null ||
+        !_listsEqualOrdered(_lastAppliedCustomDomains!, newDomains);
+
+    if (!changed) return;
+
+    _lastAppliedBypassIran = provider.bypassIran;
+    _lastAppliedBypassPrivate = provider.bypassPrivate;
+    _lastAppliedCustomSubnets = newSubnets;
+    _lastAppliedCustomDomains = newDomains;
+
+    final active = _v2rayService.activeConfig;
+    if (active == null || _isConnecting) {
+      debugPrint('🧭 Routing applied: VPN not running, will take effect on next connect');
+      return;
+    }
+
+    debugPrint('🧭 Routing changed while connected → reconnecting to apply');
+    Future(() async {
+      try {
+        await connectToServer(active);
+      } catch (e) {
+        debugPrint('⚠️ Reconnect after routing change failed: $e');
       }
     });
   }
@@ -1017,12 +1089,19 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     _v2rayService.removeListener(_onV2RayServiceChanged);
     _vpnStatusSubscription?.cancel();
     _stateValidationTimer?.cancel(); // Cancel periodic validator
+    _routingProvider?.removeListener(_onRoutingSettingsChanged);
     if (_v2rayService.activeConfig != null) {
       _v2rayService.disconnect().catchError((e) {
         debugPrint('Error disconnecting in dispose: $e');
       });
     }
-    _v2rayService.dispose();
+    // NOTE: V2RayService is a singleton (see V2RayService._instance).
+    // Disposing it here would put the only instance into a "disposed"
+    // state, so the next consumer (after a hot reload, or any future
+    // V2RayProvider) would crash on the first listener add. Provider
+    // owns its listener registration and the v2ray service handles its
+    // own resource lifecycle, so we deliberately don't call
+    // _v2rayService.dispose().
     super.dispose();
   }
 
@@ -1302,6 +1381,8 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
                 dnsServers: _dnsProvider?.activeServers,
                 blockedApps: _perAppProxyProvider?.blockedAppsForVpn,
                 allowedApps: _perAppProxyProvider?.allowedAppsForVpn,
+                bypassSubnets: _routingProvider?.effectiveBypassSubnets,
+                routingRules: _routingProvider?.buildRoutingRules(),
               )
               .timeout(
                 Duration(seconds: connectionTimeout),

@@ -21,6 +21,7 @@ import '../screens/host_checker_screen.dart';
 import '../screens/dns_settings_screen.dart';
 import '../screens/per_app_proxy_screen.dart';
 import '../screens/donation_screen.dart';
+import '../screens/routing_settings_screen.dart';
 import '../services/remote_config_service.dart';
 import '../services/analytics_service.dart';
 
@@ -726,112 +727,6 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
     );
   }
 
-  Widget _buildStatsGrid(V2RayProvider provider) {
-    final v2rayService = provider.v2rayService;
-    final isConnected = provider.activeConfig != null;
-    final responsive = ResponsiveHelper(context);
-
-    return StreamBuilder(
-      stream: _statsStream,
-      builder: (context, snapshot) {
-        return Container(
-          key: const ValueKey('stats'),
-          padding: EdgeInsets.symmetric(
-            horizontal: responsive.scale(20).clamp(14.0, 28.0),
-            vertical: responsive.scale(16).clamp(12.0, 22.0),
-          ),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.035),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.07),
-              width: 1,
-            ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: _buildMinimalStat(
-                  icon: Icons.arrow_downward_rounded,
-                  label: AppLocalizations.of(context).translate('home.download'),
-                  value: isConnected ? v2rayService.getFormattedDownload() : '0 B',
-                  color: const Color(0xFF00FFA3),
-                ),
-              ),
-              Container(
-                width: 1,
-                height: responsive.scale(36).clamp(28.0, 44.0),
-                color: Colors.white.withValues(alpha: 0.07),
-              ),
-              Expanded(
-                child: _buildMinimalStat(
-                  icon: Icons.arrow_upward_rounded,
-                  label: AppLocalizations.of(context).translate('home.upload'),
-                  value: isConnected ? v2rayService.getFormattedUpload() : '0 B',
-                  color: const Color(0xFF00D9FF),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildMinimalStat({
-    required IconData icon,
-    required String label,
-    required String value,
-    required Color color,
-  }) {
-    final responsive = ResponsiveHelper(context);
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(7),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: responsive.scale(14).clamp(12.0, 18.0),
-          ),
-        ),
-        SizedBox(width: responsive.scale(10).clamp(8.0, 14.0)),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              label.toUpperCase(),
-              style: GoogleFonts.poppins(
-                color: Colors.white.withValues(alpha: 0.4),
-                fontSize: responsive.scale(9).clamp(8.0, 11.0),
-                fontWeight: FontWeight.w500,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              value,
-              style: GoogleFonts.poppins(
-                color: Colors.white,
-                fontSize: responsive.scale(13.5).clamp(11.5, 16.0),
-                fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
   // Tools Page - Quick access to tools
   Widget _buildToolsPage(BuildContext context) {
     final responsive = ResponsiveHelper(context);
@@ -870,6 +765,13 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
         'subtitle': AppLocalizations.of(context).translate('tools.per_app_proxy_desc'),
         'color': const Color(0xFFFFB347),
         'screen': const PerAppProxyScreen(),
+      },
+      {
+        'icon': Icons.alt_route_rounded,
+        'label': AppLocalizations.of(context).translate('home.routing'),
+        'subtitle': AppLocalizations.of(context).translate('tools.routing_desc'),
+        'color': const Color(0xFF00D9FF),
+        'screen': const RoutingSettingsScreen(),
       },
     ];
 

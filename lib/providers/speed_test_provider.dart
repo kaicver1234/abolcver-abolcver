@@ -20,22 +20,25 @@ class SpeedTestProvider with ChangeNotifier {
   static const String _downloadUrl = '$_baseUrl/__down';
   static const String _uploadUrl = '$_baseUrl/__up';
 
+  // Faster sequence — total runtime ~15-25s on typical connections.
+  // - Latency: 10 packets is enough for a stable median + jitter.
+  // - Download: one tiny warmup + two larger samples (median = stable result).
+  // - Upload: one tiny warmup + two samples.
   static const List<Map<String, dynamic>> _measurements = [
-    {'type': 'latency', 'numPackets': 20},
-    {'type': 'download', 'bytes': 1000000,  'count': 2, 'warmup': true},
-    {'type': 'download', 'bytes': 10000000, 'count': 4},
-    {'type': 'download', 'bytes': 25000000, 'count': 3},
-    {'type': 'upload',   'bytes': 1000000,  'count': 2, 'warmup': true},
-    {'type': 'upload',   'bytes': 5000000,  'count': 4},
+    {'type': 'latency', 'numPackets': 10},
+    {'type': 'download', 'bytes': 1000000,  'count': 1, 'warmup': true},
+    {'type': 'download', 'bytes': 10000000, 'count': 2},
+    {'type': 'upload',   'bytes': 500000,   'count': 1, 'warmup': true},
+    {'type': 'upload',   'bytes': 3000000,  'count': 2},
   ];
 
   String _measurementId = '';
 
   SpeedTestProvider() {
     _dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(seconds: 60),
-      sendTimeout: const Duration(seconds: 60),
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 25),
+      sendTimeout: const Duration(seconds: 25),
       headers: {'User-Agent': 'Tiksar VPN Speed Test'},
     ));
   }
@@ -122,7 +125,7 @@ class SpeedTestProvider with ChangeNotifier {
         if (currentPhase.isNotEmpty) {
           _state = _state.copyWith(progress: 0.0, currentSpeed: 0);
           notifyListeners();
-          await Future.delayed(const Duration(milliseconds: 600));
+          await Future.delayed(const Duration(milliseconds: 250));
           if (_isCanceled) return;
         }
 
@@ -160,7 +163,7 @@ class SpeedTestProvider with ChangeNotifier {
           break;
       }
 
-      await Future.delayed(const Duration(milliseconds: 30));
+      await Future.delayed(const Duration(milliseconds: 10));
     }
   }
 
@@ -223,7 +226,7 @@ class SpeedTestProvider with ChangeNotifier {
         }
       }
 
-      await Future.delayed(const Duration(milliseconds: 10));
+      await Future.delayed(const Duration(milliseconds: 5));
     }
 
     if (_latencies.isEmpty) {
@@ -280,7 +283,7 @@ class SpeedTestProvider with ChangeNotifier {
         }
       }
 
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future.delayed(const Duration(milliseconds: 20));
     }
   }
 
@@ -410,7 +413,7 @@ class SpeedTestProvider with ChangeNotifier {
         }
       }
 
-      await Future.delayed(const Duration(milliseconds: 50));
+      await Future.delayed(const Duration(milliseconds: 20));
     }
   }
 
@@ -435,7 +438,7 @@ class SpeedTestProvider with ChangeNotifier {
             'Content-Type': 'application/octet-stream',
             'Cache-Control': 'no-cache, no-store',
           },
-          sendTimeout: const Duration(seconds: 90),
+          sendTimeout: const Duration(seconds: 25),
         ),
         cancelToken: _cancelToken,
         onSendProgress: (sent, total) {

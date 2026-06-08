@@ -3,47 +3,93 @@ import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/speed_test_provider.dart';
 import '../models/speed_test_state.dart';
-import '../widgets/cyber_glow_background.dart';
 import '../widgets/app_background.dart';
 import '../widgets/speed_test/modern_speed_gauge.dart';
 import '../utils/app_localizations.dart';
 import '../services/analytics_service.dart';
 import '../utils/responsive_helper.dart';
 
-const Color _downloadColor = Color(0xFF00FFA3);
-const Color _uploadColor = Color(0xFF00D9FF);
-const Color _pingColor = Color(0xFFB388FF);
+// Shared palette with the routing/per-app screens so the app feels consistent.
+const Color _kBg = Color(0xFF0A0A0A);
+const Color _kCard = Color(0xFF111111);
+const Color _kBorder = Color(0xFF222222);
+const Color _kAccent = Color(0xFF00D9FF);
+const Color _kDownload = Color(0xFF00FFA3);
+const Color _kUpload = Color(0xFF00D9FF);
+const Color _kPing = Color(0xFFB388FF);
+const Color _kDanger = Color(0xFFEF4444);
 
 class SpeedTestScreen extends StatelessWidget {
   const SpeedTestScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final languageProvider = Provider.of<LanguageProvider>(context);
+    final lp = Provider.of<LanguageProvider>(context);
+    final tr = AppLocalizations.of(context);
 
     return Directionality(
-      textDirection: languageProvider.textDirection,
+      textDirection: lp.textDirection,
       child: AppBackground(
-        useSecondaryBackground: true,
-        child: CyberGlowBackground(
-          child: SafeArea(
-            child: Consumer<SpeedTestProvider>(
-              builder: (context, provider, child) {
-                return Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: ResponsiveHelper(context).maxContentWidth,
-                    ),
-                    child: Column(
-                      children: [
-                        _Header(state: provider.state),
-                        Expanded(child: _Body(provider: provider)),
-                      ],
-                    ),
-                  ),
-                );
-              },
+        child: Scaffold(
+          backgroundColor: _kBg,
+          appBar: AppBar(
+            backgroundColor: _kBg,
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(
+                lp.isRtl
+                    ? Icons.arrow_forward_ios_rounded
+                    : Icons.arrow_back_ios_rounded,
+                color: Colors.white,
+                size: 20,
+              ),
+              onPressed: () => Navigator.pop(context),
             ),
+            title: Text(
+              tr.translate('speed_test.title_ready'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          body: Consumer<SpeedTestProvider>(
+            builder: (context, provider, _) {
+              final r = ResponsiveHelper(context);
+              return ResponsivePageWrapper(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    r.horizontalPadding,
+                    8,
+                    r.horizontalPadding,
+                    24,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _HeroCard(state: provider.state),
+                      const SizedBox(height: 20),
+                      _PhaseStepper(state: provider.state),
+                      const SizedBox(height: 20),
+                      _GaugeCard(state: provider.state),
+                      const SizedBox(height: 16),
+                      if (provider.state.hadError) ...[
+                        _ErrorMessage(state: provider.state),
+                        const SizedBox(height: 16),
+                      ],
+                      _SectionLabel(
+                        text: tr.translate('speed_test.test_completed'),
+                      ),
+                      const SizedBox(height: 10),
+                      _ResultsCard(state: provider.state),
+                      const SizedBox(height: 24),
+                      _PrimaryButton(provider: provider, state: provider.state),
+                    ],
+                  ),
+                ),
+              );
+            },
           ),
         ),
       ),
@@ -51,33 +97,61 @@ class SpeedTestScreen extends StatelessWidget {
   }
 }
 
-class _Header extends StatelessWidget {
+// ─── Hero card (matches routing screen hero) ────────────────────────────────
+
+class _HeroCard extends StatelessWidget {
   final SpeedTestState state;
-  const _Header({required this.state});
+  const _HeroCard({required this.state});
 
   @override
   Widget build(BuildContext context) {
     final tr = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+    final isRunning = state.step != SpeedTestStep.ready;
+    final accent = _phaseColor(state.step);
+
+    final String title;
+    final String subtitle;
+    if (isRunning) {
+      title = tr.translate('speed_test.title_testing');
+      subtitle = _subtitle(state, tr);
+    } else if (state.testCompleted) {
+      title = tr.translate('speed_test.title_completed');
+      subtitle = tr.translate('speed_test.subtitle_completed');
+    } else if (state.hadError) {
+      title = tr.translate('speed_test.title_error');
+      subtitle = tr.translate('speed_test.subtitle_error');
+    } else {
+      title = tr.translate('speed_test.title_ready');
+      subtitle = tr.translate('speed_test.subtitle_ready');
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _kBorder),
+      ),
       child: Row(
         children: [
-          GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.06),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: isRunning
+                  ? accent.withValues(alpha: 0.12)
+                  : Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color:
+                    isRunning ? accent.withValues(alpha: 0.3) : _kBorder,
               ),
-              child: Consumer<LanguageProvider>(
-                builder: (context, lp, _) => Icon(
-                  lp.isRtl ? Icons.arrow_forward_ios : Icons.arrow_back_ios_new,
-                  color: Colors.white,
-                  size: 18,
-                ),
-              ),
+            ),
+            child: Icon(
+              Icons.speed_rounded,
+              color: isRunning ? accent : Colors.white70,
+              size: 26,
             ),
           ),
           const SizedBox(width: 14),
@@ -86,25 +160,21 @@ class _Header extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  tr.translate('speed_test.title_ready'),
+                  title,
                   style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
                     color: Colors.white,
-                    letterSpacing: -0.3,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
-                  _subtitle(state, tr),
+                  subtitle,
                   style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.55),
                     fontSize: 12,
-                    color: Colors.white.withValues(alpha: 0.5),
+                    height: 1.4,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
@@ -115,152 +185,52 @@ class _Header extends StatelessWidget {
   }
 
   String _subtitle(SpeedTestState s, AppLocalizations tr) {
-    if (s.step == SpeedTestStep.loading) return tr.translate('speed_test.measuring_latency');
-    if (s.step == SpeedTestStep.download) return tr.translate('speed_test.download_test');
-    if (s.step == SpeedTestStep.upload) return tr.translate('speed_test.upload_test');
-    if (s.testCompleted) return tr.translate('speed_test.test_completed');
-    if (s.hadError) return tr.translate('speed_test.subtitle_error');
-    return tr.translate('speed_test.subtitle_ready');
+    if (s.step == SpeedTestStep.loading) {
+      return tr.translate('speed_test.measuring_latency');
+    }
+    if (s.step == SpeedTestStep.download) {
+      return tr.translate('speed_test.download_test');
+    }
+    if (s.step == SpeedTestStep.upload) {
+      return tr.translate('speed_test.upload_test');
+    }
+    return tr.translate('speed_test.subtitle_testing');
   }
 }
 
-class _Body extends StatelessWidget {
-  final SpeedTestProvider provider;
-  const _Body({required this.provider});
-
-  @override
-  Widget build(BuildContext context) {
-    final state = provider.state;
-    final tr = AppLocalizations.of(context);
-    final isRunning = state.step != SpeedTestStep.ready;
-
-    final color = _phaseColor(state.step);
-    final maxScale = _phaseMaxScale(state.step);
-    final phaseLabel = _phaseLabel(state.step, tr);
-    final displayValue = isRunning ? state.currentSpeed : state.result.downloadSpeed;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        children: [
-          const SizedBox(height: 8),
-          _PhaseStepper(currentStep: state.step, completed: state.testCompleted),
-          const SizedBox(height: 24),
-          Expanded(
-            child: Center(
-              child: ModernSpeedGauge(
-                value: state.step == SpeedTestStep.ready && !state.testCompleted ? 0 : displayValue,
-                maxValue: maxScale,
-                color: color,
-                label: phaseLabel,
-                size: 300,
-                isIdle: state.step == SpeedTestStep.ready && !state.testCompleted,
-                centerOverlay: state.step == SpeedTestStep.loading
-                    ? _LoadingCenter(tr: tr)
-                    : null,
-              ),
-            ),
-          ),
-          if (state.hadError) ...[
-            const SizedBox(height: 12),
-            _ErrorMessage(state: state),
-          ],
-          const SizedBox(height: 16),
-          _ResultsRow(state: state),
-          const SizedBox(height: 20),
-          _PrimaryButton(provider: provider, state: state),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  Color _phaseColor(SpeedTestStep s) {
-    switch (s) {
-      case SpeedTestStep.download:
-        return _downloadColor;
-      case SpeedTestStep.upload:
-        return _uploadColor;
-      case SpeedTestStep.loading:
-        return _pingColor;
-      case SpeedTestStep.ready:
-        return _downloadColor;
-    }
-  }
-
-  double _phaseMaxScale(SpeedTestStep s) {
-    switch (s) {
-      case SpeedTestStep.download:
-        return 100;
-      case SpeedTestStep.upload:
-        return 50;
-      default:
-        return 100;
-    }
-  }
-
-  String? _phaseLabel(SpeedTestStep s, AppLocalizations tr) {
-    switch (s) {
-      case SpeedTestStep.download:
-        return tr.translate('speed_test.download').toUpperCase();
-      case SpeedTestStep.upload:
-        return tr.translate('speed_test.upload').toUpperCase();
-      case SpeedTestStep.loading:
-        return null;
-      case SpeedTestStep.ready:
-        return null;
-    }
-  }
-}
-
-class _LoadingCenter extends StatelessWidget {
-  final AppLocalizations tr;
-  const _LoadingCenter({required this.tr});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: 36,
-          height: 36,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            valueColor: AlwaysStoppedAnimation(_pingColor),
-          ),
-        ),
-        const SizedBox(height: 18),
-        Text(
-          tr.translate('speed_test.measuring_latency'),
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.7),
-            fontSize: 13,
-            letterSpacing: 0.5,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
-    );
-  }
-}
+// ─── Phase stepper ──────────────────────────────────────────────────────────
 
 class _PhaseStepper extends StatelessWidget {
-  final SpeedTestStep currentStep;
-  final bool completed;
-  const _PhaseStepper({required this.currentStep, required this.completed});
+  final SpeedTestState state;
+  const _PhaseStepper({required this.state});
 
   @override
   Widget build(BuildContext context) {
+    final tr = AppLocalizations.of(context);
+    final step = state.step;
+    final completed = state.testCompleted;
+
     final phases = <_PhaseChipData>[
-      _PhaseChipData('PING', _pingColor, currentStep == SpeedTestStep.loading,
-          completed || currentStep == SpeedTestStep.download || currentStep == SpeedTestStep.upload),
-      _PhaseChipData('DOWNLOAD', _downloadColor,
-          currentStep == SpeedTestStep.download,
-          completed || currentStep == SpeedTestStep.upload),
-      _PhaseChipData('UPLOAD', _uploadColor,
-          currentStep == SpeedTestStep.upload, completed),
+      _PhaseChipData(
+        tr.translate('speed_test.ping'),
+        _kPing,
+        step == SpeedTestStep.loading,
+        completed ||
+            step == SpeedTestStep.download ||
+            step == SpeedTestStep.upload,
+      ),
+      _PhaseChipData(
+        tr.translate('speed_test.download'),
+        _kDownload,
+        step == SpeedTestStep.download,
+        completed || step == SpeedTestStep.upload,
+      ),
+      _PhaseChipData(
+        tr.translate('speed_test.upload'),
+        _kUpload,
+        step == SpeedTestStep.upload,
+        completed,
+      ),
     ];
 
     return Row(
@@ -270,7 +240,7 @@ class _PhaseStepper extends StatelessWidget {
           _PhaseChip(data: phases[i]),
           if (i < phases.length - 1)
             Container(
-              width: 16,
+              width: 18,
               height: 1,
               margin: const EdgeInsets.symmetric(horizontal: 6),
               color: Colors.white.withValues(alpha: 0.15),
@@ -318,7 +288,8 @@ class _PhaseChip extends StatelessWidget {
             height: 6,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: highlight ? data.color : Colors.white.withValues(alpha: 0.3),
+              color:
+                  highlight ? data.color : Colors.white.withValues(alpha: 0.3),
               boxShadow: data.active
                   ? [BoxShadow(color: data.color, blurRadius: 6)]
                   : null,
@@ -331,9 +302,8 @@ class _PhaseChip extends StatelessWidget {
               fontSize: 10,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.2,
-              color: highlight
-                  ? data.color
-                  : Colors.white.withValues(alpha: 0.4),
+              color:
+                  highlight ? data.color : Colors.white.withValues(alpha: 0.4),
             ),
           ),
         ],
@@ -342,25 +312,101 @@ class _PhaseChip extends StatelessWidget {
   }
 }
 
-class _ResultsRow extends StatelessWidget {
+// ─── Gauge card ─────────────────────────────────────────────────────────────
+
+class _GaugeCard extends StatelessWidget {
   final SpeedTestState state;
-  const _ResultsRow({required this.state});
+  const _GaugeCard({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final tr = AppLocalizations.of(context);
+    final isRunning = state.step != SpeedTestStep.ready;
+    final color = _phaseColor(state.step);
+    final maxScale = _phaseMaxScale(state.step);
+    final label = _phaseLabel(state.step, tr);
+    final value = isRunning ? state.currentSpeed : state.result.downloadSpeed;
+    final isIdle = state.step == SpeedTestStep.ready && !state.testCompleted;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      decoration: BoxDecoration(
+        color: _kCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: _kBorder),
+      ),
+      child: Center(
+        child: ModernSpeedGauge(
+          value: isIdle ? 0 : value,
+          maxValue: maxScale,
+          color: color,
+          label: label,
+          size: 260,
+          isIdle: isIdle,
+          centerOverlay: state.step == SpeedTestStep.loading
+              ? const _LoadingCenter()
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+class _LoadingCenter extends StatelessWidget {
+  const _LoadingCenter();
+
+  @override
+  Widget build(BuildContext context) {
+    final tr = AppLocalizations.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const SizedBox(
+          width: 32,
+          height: 32,
+          child: CircularProgressIndicator(
+            strokeWidth: 2.5,
+            valueColor: AlwaysStoppedAnimation(_kPing),
+          ),
+        ),
+        const SizedBox(height: 14),
+        Text(
+          tr.translate('speed_test.measuring_latency'),
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.7),
+            fontSize: 12,
+            letterSpacing: 0.5,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─── Results card ───────────────────────────────────────────────────────────
+
+class _ResultsCard extends StatelessWidget {
+  final SpeedTestState state;
+  const _ResultsCard({required this.state});
 
   @override
   Widget build(BuildContext context) {
     final tr = AppLocalizations.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+        color: _kCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kBorder),
       ),
       child: Row(
         children: [
           _ResultCell(
             icon: Icons.network_ping,
-            color: _pingColor,
+            color: _kPing,
             label: tr.translate('speed_test.ping'),
             value: state.result.ping > 0 ? state.result.ping.toString() : '—',
             unit: tr.translate('speed_test.ms'),
@@ -368,7 +414,7 @@ class _ResultsRow extends StatelessWidget {
           _divider(),
           _ResultCell(
             icon: Icons.arrow_downward_rounded,
-            color: _downloadColor,
+            color: _kDownload,
             label: tr.translate('speed_test.download'),
             value: state.result.downloadSpeed > 0
                 ? state.result.downloadSpeed.toStringAsFixed(1)
@@ -378,7 +424,7 @@ class _ResultsRow extends StatelessWidget {
           _divider(),
           _ResultCell(
             icon: Icons.arrow_upward_rounded,
-            color: _uploadColor,
+            color: _kUpload,
             label: tr.translate('speed_test.upload'),
             value: state.result.uploadSpeed > 0
                 ? state.result.uploadSpeed.toStringAsFixed(1)
@@ -392,7 +438,7 @@ class _ResultsRow extends StatelessWidget {
 
   Widget _divider() => Container(
         width: 1,
-        height: 36,
+        height: 38,
         color: Colors.white.withValues(alpha: 0.06),
       );
 }
@@ -467,6 +513,26 @@ class _ResultCell extends StatelessWidget {
   }
 }
 
+// ─── Misc ───────────────────────────────────────────────────────────────────
+
+class _SectionLabel extends StatelessWidget {
+  final String text;
+  const _SectionLabel({required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: Colors.white.withValues(alpha: 0.55),
+        fontSize: 12,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.5,
+      ),
+    );
+  }
+}
+
 class _PrimaryButton extends StatelessWidget {
   final SpeedTestProvider provider;
   final SpeedTestState state;
@@ -476,7 +542,7 @@ class _PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final tr = AppLocalizations.of(context);
     final isRunning = state.step != SpeedTestStep.ready;
-    final color = isRunning ? Colors.redAccent : _downloadColor;
+    final color = isRunning ? _kDanger : _kAccent;
     final label = isRunning
         ? tr.translate('speed_test.stop')
         : (state.testCompleted
@@ -485,8 +551,9 @@ class _PrimaryButton extends StatelessWidget {
 
     return SizedBox(
       width: double.infinity,
-      child: GestureDetector(
-        onTap: () {
+      height: 52,
+      child: ElevatedButton(
+        onPressed: () {
           if (isRunning) {
             provider.stopTest();
           } else {
@@ -494,47 +561,33 @@ class _PrimaryButton extends StatelessWidget {
             provider.startTest();
           }
         },
-        child: Container(
-          height: 56,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                color.withValues(alpha: 0.9),
-                color.withValues(alpha: 0.65),
-              ],
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: Colors.black,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded,
+              color: Colors.black,
+              size: 22,
             ),
-            borderRadius: BorderRadius.circular(28),
-            boxShadow: [
-              BoxShadow(
-                color: color.withValues(alpha: 0.35),
-                blurRadius: 20,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded,
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: const TextStyle(
                 color: Colors.black,
-                size: 24,
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
               ),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.4,
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -551,24 +604,68 @@ class _ErrorMessage extends StatelessWidget {
     final errorKey = state.errorMessage ?? 'test_failed';
     final msg = tr.translate('speed_test.$errorKey');
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.red.withValues(alpha: 0.12),
+        color: _kDanger.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+        border: Border.all(color: _kDanger.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          Icon(Icons.error_outline, color: Colors.red.shade300, size: 18),
+          Icon(Icons.error_outline,
+              color: _kDanger.withValues(alpha: 0.85), size: 18),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
               msg,
-              style: TextStyle(color: Colors.red.shade200, fontSize: 12),
+              style: TextStyle(
+                color: _kDanger.withValues(alpha: 0.95),
+                fontSize: 12,
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+}
+
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+Color _phaseColor(SpeedTestStep s) {
+  switch (s) {
+    case SpeedTestStep.download:
+      return _kDownload;
+    case SpeedTestStep.upload:
+      return _kUpload;
+    case SpeedTestStep.loading:
+      return _kPing;
+    case SpeedTestStep.ready:
+      return _kAccent;
+  }
+}
+
+double _phaseMaxScale(SpeedTestStep s) {
+  switch (s) {
+    case SpeedTestStep.download:
+      return 100;
+    case SpeedTestStep.upload:
+      return 50;
+    default:
+      return 100;
+  }
+}
+
+String? _phaseLabel(SpeedTestStep s, AppLocalizations tr) {
+  switch (s) {
+    case SpeedTestStep.download:
+      return tr.translate('speed_test.download').toUpperCase();
+    case SpeedTestStep.upload:
+      return tr.translate('speed_test.upload').toUpperCase();
+    case SpeedTestStep.loading:
+      return null;
+    case SpeedTestStep.ready:
+      return null;
   }
 }

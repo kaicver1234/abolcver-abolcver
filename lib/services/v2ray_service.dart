@@ -261,6 +261,8 @@ class V2RayService extends ChangeNotifier {
     List<String>? dnsServers,
     List<String>? blockedApps,
     List<String>? allowedApps,
+    List<String>? bypassSubnets,
+    List<Map<String, dynamic>>? routingRules,
   }) async {
     try {
       await initialize();
@@ -280,6 +282,24 @@ class V2RayService extends ChangeNotifier {
         debugPrint('🌐 DNS injected: ${dnsServers.join(', ')}');
       }
 
+      // Inject routing rules (geo-bypass). The default outbound is `proxy`
+      // (the actual server), `direct` is the freedom outbound already in
+      // outbound2, and rules with outboundTag=direct send matched traffic
+      // out without going through the VPN server.
+      if (routingRules != null && routingRules.isNotEmpty) {
+        // Preserve any existing rules the URL parser added (rare), but our
+        // bypass rules come FIRST so they take precedence over any wildcard.
+        final existing = (parser.routing['rules'] as List?)
+                ?.cast<Map<String, dynamic>>() ??
+            const [];
+        parser.routing = {
+          ...parser.routing,
+          'domainStrategy': 'IPIfNonMatch',
+          'rules': [...routingRules, ...existing],
+        };
+        debugPrint('🧭 Routing rules injected: ${routingRules.length}');
+      }
+
       // Request permission if needed (for VPN mode)
       bool hasPermission = await _flutterV2ray.requestPermission();
       if (!hasPermission) {
@@ -295,6 +315,9 @@ class V2RayService extends ChangeNotifier {
       if (allowedApps != null && allowedApps.isNotEmpty) {
         debugPrint('🛡️ Per-App Proxy: routing only ${allowedApps.length} app(s) through VPN');
       }
+      if (bypassSubnets != null && bypassSubnets.isNotEmpty) {
+        debugPrint('🧭 Bypass subnets: ${bypassSubnets.length} entries');
+      }
 
       // Start V2Ray in VPN mode - simplified without extra features
       await _flutterV2ray.startV2Ray(
@@ -303,6 +326,7 @@ class V2RayService extends ChangeNotifier {
         proxyOnly: false, // Always use VPN mode (not proxy mode)
         blockedApps: blockedApps,
         allowedApps: allowedApps,
+        bypassSubnets: bypassSubnets,
         notificationDisconnectButtonName: "DISCONNECT",
       );
 

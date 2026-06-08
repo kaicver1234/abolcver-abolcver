@@ -159,7 +159,6 @@ class _AnnouncementBannerWidgetState extends State<AnnouncementBannerWidget>
     final double closeIcon    = isSmallScreen ? 14 : (isTablet ? 18 : 16);
     final double closeBtn     = isSmallScreen ? 24 : (isTablet ? 30 : 26);
     final double bottomMargin = isSmallScreen ? 12 : (isTablet ? 18 : 14);
-    final double accentWidth  = isSmallScreen ? 3 : 3.5;
     final double actionHeight = isSmallScreen ? 36 : (isTablet ? 46 : 40);
 
     return SlideTransition(
