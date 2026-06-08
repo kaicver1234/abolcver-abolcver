@@ -1,17 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/routing_provider.dart';
 import '../providers/language_provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/app_background.dart';
+import '../widgets/modern_glass_card.dart';
 import '../utils/responsive_helper.dart';
 
-const _kBg = Color(0xFF0A0A0A);
-const _kCard = Color(0xFF111111);
-const _kBorder = Color(0xFF222222);
-const _kAccent = Color(0xFF00D9FF);
-const _kDanger = Color(0xFFEF4444);
+// Match the home screen language: pure-black canvas with translucent
+// white surfaces. No bespoke palette here — anything tinted comes from
+// per-section accent colors (the same ones used for the tool cards).
+const Color _kPrimary = Color(0xFF00D9FF);
+const Color _kIranAccent = Color(0xFF00FFA3);
+const Color _kLanAccent = Color(0xFFA78BFA);
+const Color _kSubnetAccent = Color(0xFFFFB347);
+const Color _kDomainAccent = Color(0xFFFF6B9D);
+const Color _kDanger = Color(0xFFFF6B6B);
 
 class RoutingSettingsScreen extends StatefulWidget {
   const RoutingSettingsScreen({super.key});
@@ -42,9 +48,9 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
       textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
       child: AppBackground(
         child: Scaffold(
-          backgroundColor: _kBg,
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
-            backgroundColor: _kBg,
+            backgroundColor: Colors.transparent,
             elevation: 0,
             leading: IconButton(
               icon: Icon(
@@ -52,15 +58,15 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
                     ? Icons.arrow_forward_ios_rounded
                     : Icons.arrow_back_ios_rounded,
                 color: Colors.white,
-                size: 20,
+                size: 18,
               ),
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(
               _t(fa: 'مسیریابی و دور زدن', en: 'Routing & Bypass'),
-              style: const TextStyle(
+              style: GoogleFonts.poppins(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -74,7 +80,7 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
                     height: 28,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: _kAccent,
+                      color: _kPrimary,
                     ),
                   ),
                 );
@@ -82,12 +88,17 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
               final r = ResponsiveHelper(context);
               return ResponsivePageWrapper(
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.all(r.horizontalPadding),
+                  padding: EdgeInsets.fromLTRB(
+                    r.horizontalPadding,
+                    8,
+                    r.horizontalPadding,
+                    32,
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildHeroCard(routing),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 22),
                       _buildSectionLabel(
                         _t(fa: 'دور زدن سریع', en: 'Quick Bypass'),
                       ),
@@ -111,9 +122,8 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
                       _buildDomainHint(),
                       const SizedBox(height: 12),
                       _buildDomainEditor(routing),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 28),
                       _buildInfoCard(),
-                      const SizedBox(height: 40),
                     ],
                   ),
                 ),
@@ -131,33 +141,21 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
         (routing.customSubnets.isNotEmpty ? 1 : 0) +
         (routing.customDomains.isNotEmpty ? 1 : 0);
     final isActive = activeCount > 0;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _kCard,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _kBorder),
-      ),
+    return ModernGlassCard(
+      padding: const EdgeInsets.all(18),
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: isActive
-                  ? _kAccent.withValues(alpha: 0.12)
-                  : Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color:
-                    isActive ? _kAccent.withValues(alpha: 0.3) : _kBorder,
-              ),
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.alt_route_rounded,
-              color: isActive ? _kAccent : Colors.white70,
-              size: 26,
+              color: Colors.white,
+              size: 24,
             ),
           ),
           const SizedBox(width: 14),
@@ -167,27 +165,47 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
               children: [
                 Text(
                   _t(fa: 'مسیریابی هوشمند', en: 'Smart Routing'),
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   _t(
                     fa: 'ترافیک انتخابی از خارج تونل عبور می‌کند',
                     en: 'Selected traffic skips the VPN tunnel',
                   ),
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.55),
-                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 11.5,
                     height: 1.4,
                   ),
                 ),
               ],
             ),
           ),
+          if (isActive)
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.12),
+                ),
+              ),
+              child: Text(
+                '$activeCount',
+                style: GoogleFonts.poppins(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -196,7 +214,7 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
   Widget _buildIranToggle(RoutingProvider routing) {
     return _buildToggleTile(
       icon: Icons.flag_rounded,
-      iconColor: const Color(0xFF22C55E),
+      iconAccent: _kIranAccent,
       title: _t(fa: 'دور زدن ترافیک ایران', en: 'Bypass Iran traffic'),
       subtitle: _t(
         fa: 'سایت‌ها و سرویس‌های ایرانی بدون VPN باز شوند',
@@ -210,7 +228,7 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
   Widget _buildPrivateToggle(RoutingProvider routing) {
     return _buildToggleTile(
       icon: Icons.lan_rounded,
-      iconColor: const Color(0xFFA78BFA),
+      iconAccent: _kLanAccent,
       title: _t(fa: 'دور زدن شبکه محلی', en: 'Bypass LAN / Private'),
       subtitle: _t(
         fa: 'پرینتر، روتر و دستگاه‌های شبکه در دسترس باقی بمانند',
@@ -223,29 +241,24 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
 
   Widget _buildToggleTile({
     required IconData icon,
-    required Color iconColor,
+    required Color iconAccent,
     required String title,
     required String subtitle,
     required bool value,
     required Future<void> Function(bool) onChanged,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: _kCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBorder),
-      ),
+    return ModernGlassCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       child: Row(
         children: [
           Container(
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: iconColor.withValues(alpha: 0.12),
+              color: Colors.white.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, color: iconColor, size: 20),
+            child: Icon(icon, color: Colors.white, size: 19),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -254,9 +267,9 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     color: Colors.white,
-                    fontSize: 14,
+                    fontSize: 13.5,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -264,7 +277,7 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.55),
+                    color: Colors.white.withValues(alpha: 0.5),
                     fontSize: 11.5,
                     height: 1.4,
                   ),
@@ -276,7 +289,7 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
           Switch.adaptive(
             value: value,
             // ignore: deprecated_member_use
-            activeColor: _kAccent,
+            activeColor: iconAccent,
             onChanged: (v) => onChanged(v),
           ),
         ],
@@ -291,8 +304,8 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
         en: 'Add extra subnets in CIDR form (example: 192.0.2.0/24)',
       ),
       style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.55),
-        fontSize: 12,
+        color: Colors.white.withValues(alpha: 0.5),
+        fontSize: 11.5,
         height: 1.5,
       ),
     );
@@ -300,7 +313,8 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
 
   Widget _buildSubnetEditor(RoutingProvider routing) {
     return _ListEditor(
-      hint: _t(fa: '10.0.0.0/8', en: '10.0.0.0/8'),
+      hint: '10.0.0.0/8',
+      accent: _kSubnetAccent,
       addLabel: _t(fa: 'افزودن', en: 'Add'),
       emptyLabel: _t(fa: 'موردی اضافه نشده', en: 'Nothing added yet'),
       invalidLabel: _t(
@@ -323,8 +337,8 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
         en: 'Plain domains (example.com) or prefixes: domain: full: regexp: geosite:',
       ),
       style: TextStyle(
-        color: Colors.white.withValues(alpha: 0.55),
-        fontSize: 12,
+        color: Colors.white.withValues(alpha: 0.5),
+        fontSize: 11.5,
         height: 1.5,
       ),
     );
@@ -333,6 +347,7 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
   Widget _buildDomainEditor(RoutingProvider routing) {
     return _ListEditor(
       hint: _t(fa: 'example.ir', en: 'example.com'),
+      accent: _kDomainAccent,
       addLabel: _t(fa: 'افزودن', en: 'Add'),
       emptyLabel: _t(fa: 'موردی اضافه نشده', en: 'Nothing added yet'),
       invalidLabel: _t(
@@ -350,12 +365,12 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
 
   Widget _buildSectionLabel(String text) {
     return Text(
-      text,
-      style: TextStyle(
+      text.toUpperCase(),
+      style: GoogleFonts.poppins(
         color: Colors.white.withValues(alpha: 0.55),
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.5,
+        letterSpacing: 1.1,
       ),
     );
   }
@@ -364,14 +379,18 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: _kAccent.withValues(alpha: 0.06),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: _kAccent.withValues(alpha: 0.2)),
+        color: Colors.white.withValues(alpha: 0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline_rounded, color: _kAccent, size: 18),
+          Icon(
+            Icons.info_outline_rounded,
+            color: Colors.white.withValues(alpha: 0.7),
+            size: 18,
+          ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
@@ -380,7 +399,7 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
                 en: 'Changing these while connected will reconnect the VPN to apply the new rules.',
               ),
               style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.7),
+                color: Colors.white.withValues(alpha: 0.65),
                 fontSize: 11.5,
                 height: 1.5,
               ),
@@ -394,6 +413,7 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
 
 class _ListEditor extends StatefulWidget {
   final String hint;
+  final Color accent;
   final String addLabel;
   final String emptyLabel;
   final String invalidLabel;
@@ -406,6 +426,7 @@ class _ListEditor extends StatefulWidget {
 
   const _ListEditor({
     required this.hint,
+    required this.accent,
     required this.addLabel,
     required this.emptyLabel,
     required this.invalidLabel,
@@ -459,13 +480,8 @@ class _ListEditorState extends State<_ListEditor> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ModernGlassCard(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      decoration: BoxDecoration(
-        color: _kCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBorder),
-      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -482,7 +498,7 @@ class _ListEditorState extends State<_ListEditor> {
                     LengthLimitingTextInputFormatter(253),
                   ],
                   style: const TextStyle(color: Colors.white, fontSize: 14),
-                  cursorColor: _kAccent,
+                  cursorColor: widget.accent,
                   decoration: InputDecoration(
                     isDense: true,
                     hintText: widget.hint,
@@ -502,7 +518,8 @@ class _ListEditorState extends State<_ListEditor> {
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
                       borderSide: BorderSide(
-                          color: _kAccent.withValues(alpha: 0.6), width: 1.2),
+                          color: widget.accent.withValues(alpha: 0.6),
+                          width: 1.2),
                     ),
                   ),
                 ),
@@ -513,12 +530,15 @@ class _ListEditorState extends State<_ListEditor> {
                 child: ElevatedButton(
                   onPressed: _busy ? null : _handleAdd,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _kAccent,
-                    foregroundColor: Colors.black,
+                    backgroundColor: Colors.white.withValues(alpha: 0.1),
+                    foregroundColor: Colors.white,
                     elevation: 0,
                     padding: const EdgeInsets.symmetric(horizontal: 18),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.15),
+                      ),
                     ),
                   ),
                   child: _busy
@@ -527,13 +547,15 @@ class _ListEditorState extends State<_ListEditor> {
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.black,
+                            color: Colors.white,
                           ),
                         )
                       : Text(
                           widget.addLabel,
-                          style: const TextStyle(
-                              fontSize: 13, fontWeight: FontWeight.w700),
+                          style: GoogleFonts.poppins(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w600,
+                          ),
                         ),
                 ),
               ),
@@ -573,15 +595,23 @@ class _ListEditorState extends State<_ListEditor> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 6),
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
         decoration: BoxDecoration(
           color: Colors.white.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.06)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Row(
           children: [
+            Container(
+              width: 6,
+              height: 6,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: widget.accent.withValues(alpha: 0.7),
+              ),
+            ),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 value,
@@ -601,7 +631,7 @@ class _ListEditorState extends State<_ListEditor> {
                 padding: const EdgeInsets.all(6),
                 child: Icon(
                   Icons.close_rounded,
-                  color: _kDanger.withValues(alpha: 0.85),
+                  color: Colors.white.withValues(alpha: 0.55),
                   size: 16,
                 ),
               ),

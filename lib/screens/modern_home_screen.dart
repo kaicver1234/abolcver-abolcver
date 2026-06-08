@@ -394,11 +394,12 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
                 ? provider.v2rayService.getFormattedConnectedTime()
                 : '00:00:00',
             key: const ValueKey('timer'),
-            style: GoogleFonts.jetBrainsMono(
-              fontSize: responsive.timerFontSize * 0.85,
-              fontWeight: FontWeight.w300,
-              color: Colors.white.withValues(alpha: isConnected ? 0.95 : 0.3),
-              letterSpacing: 3.0,
+            style: GoogleFonts.poppins(
+              fontSize: responsive.timerFontSize * 0.95,
+              fontWeight: FontWeight.w500,
+              color: Colors.white.withValues(alpha: isConnected ? 1.0 : 0.35),
+              letterSpacing: 2.0,
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         );
@@ -474,40 +475,32 @@ class _ModernHomeScreenState extends State<ModernHomeScreen>
 
     return AnimatedSwitcher(
       duration: const Duration(milliseconds: 300),
-      child: Container(
+      child: Row(
         key: ValueKey(isConnecting ? 'c' : isConnected ? 'on' : 'off'),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: 0.04),
-          borderRadius: BorderRadius.circular(100),
-          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 7,
-              height: 7,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: color,
-                boxShadow: [
-                  BoxShadow(color: color.withValues(alpha: 0.55), blurRadius: 8, spreadRadius: 0.5),
-                ],
-              ),
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: color,
+              boxShadow: [
+                BoxShadow(color: color.withValues(alpha: 0.55), blurRadius: 8, spreadRadius: 0.5),
+              ],
             ),
-            const SizedBox(width: 9),
-            Text(
-              text,
-              style: GoogleFonts.poppins(
-                color: Colors.white.withValues(alpha: 0.85),
-                fontSize: 11.5,
-                fontWeight: FontWeight.w500,
-                letterSpacing: 0.4,
-              ),
+          ),
+          const SizedBox(width: 9),
+          Text(
+            text,
+            style: GoogleFonts.poppins(
+              color: Colors.white.withValues(alpha: 0.85),
+              fontSize: 12.5,
+              fontWeight: FontWeight.w500,
+              letterSpacing: 0.4,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

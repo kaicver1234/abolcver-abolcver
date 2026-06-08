@@ -1,23 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../providers/language_provider.dart';
 import '../providers/speed_test_provider.dart';
 import '../models/speed_test_state.dart';
 import '../widgets/app_background.dart';
+import '../widgets/modern_glass_card.dart';
 import '../widgets/speed_test/modern_speed_gauge.dart';
 import '../utils/app_localizations.dart';
 import '../services/analytics_service.dart';
 import '../utils/responsive_helper.dart';
 
-// Shared palette with the routing/per-app screens so the app feels consistent.
-const Color _kBg = Color(0xFF0A0A0A);
-const Color _kCard = Color(0xFF111111);
-const Color _kBorder = Color(0xFF222222);
-const Color _kAccent = Color(0xFF00D9FF);
+const Color _kPing = Color(0xFFA78BFA);
 const Color _kDownload = Color(0xFF00FFA3);
 const Color _kUpload = Color(0xFF00D9FF);
-const Color _kPing = Color(0xFFB388FF);
-const Color _kDanger = Color(0xFFEF4444);
+const Color _kDanger = Color(0xFFFF6B6B);
 
 class SpeedTestScreen extends StatelessWidget {
   const SpeedTestScreen({super.key});
@@ -31,9 +28,9 @@ class SpeedTestScreen extends StatelessWidget {
       textDirection: lp.textDirection,
       child: AppBackground(
         child: Scaffold(
-          backgroundColor: _kBg,
+          backgroundColor: Colors.transparent,
           appBar: AppBar(
-            backgroundColor: _kBg,
+            backgroundColor: Colors.transparent,
             elevation: 0,
             leading: IconButton(
               icon: Icon(
@@ -41,15 +38,15 @@ class SpeedTestScreen extends StatelessWidget {
                     ? Icons.arrow_forward_ios_rounded
                     : Icons.arrow_back_ios_rounded,
                 color: Colors.white,
-                size: 20,
+                size: 18,
               ),
               onPressed: () => Navigator.pop(context),
             ),
             title: Text(
               tr.translate('speed_test.title_ready'),
-              style: const TextStyle(
+              style: GoogleFonts.poppins(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: 17,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -59,19 +56,20 @@ class SpeedTestScreen extends StatelessWidget {
               final r = ResponsiveHelper(context);
               return ResponsivePageWrapper(
                 child: SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
                   padding: EdgeInsets.fromLTRB(
                     r.horizontalPadding,
                     8,
                     r.horizontalPadding,
-                    24,
+                    32,
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _HeroCard(state: provider.state),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 22),
                       _PhaseStepper(state: provider.state),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 22),
                       _GaugeCard(state: provider.state),
                       const SizedBox(height: 16),
                       if (provider.state.hadError) ...[
@@ -97,7 +95,7 @@ class SpeedTestScreen extends StatelessWidget {
   }
 }
 
-// ─── Hero card (matches routing screen hero) ────────────────────────────────
+// ─── Hero card ──────────────────────────────────────────────────────────────
 
 class _HeroCard extends StatelessWidget {
   final SpeedTestState state;
@@ -107,13 +105,12 @@ class _HeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final tr = AppLocalizations.of(context);
     final isRunning = state.step != SpeedTestStep.ready;
-    final accent = _phaseColor(state.step);
 
     final String title;
     final String subtitle;
     if (isRunning) {
       title = tr.translate('speed_test.title_testing');
-      subtitle = _subtitle(state, tr);
+      subtitle = _phaseSubtitle(state, tr);
     } else if (state.testCompleted) {
       title = tr.translate('speed_test.title_completed');
       subtitle = tr.translate('speed_test.subtitle_completed');
@@ -125,33 +122,21 @@ class _HeroCard extends StatelessWidget {
       subtitle = tr.translate('speed_test.subtitle_ready');
     }
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: _kCard,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _kBorder),
-      ),
+    return ModernGlassCard(
+      padding: const EdgeInsets.all(18),
       child: Row(
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 48,
+            height: 48,
             decoration: BoxDecoration(
-              color: isRunning
-                  ? accent.withValues(alpha: 0.12)
-                  : Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color:
-                    isRunning ? accent.withValues(alpha: 0.3) : _kBorder,
-              ),
+              color: Colors.white.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
+            child: const Icon(
               Icons.speed_rounded,
-              color: isRunning ? accent : Colors.white70,
-              size: 26,
+              color: Colors.white,
+              size: 24,
             ),
           ),
           const SizedBox(width: 14),
@@ -161,30 +146,41 @@ class _HeroCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: GoogleFonts.poppins(
                     color: Colors.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 3),
                 Text(
                   subtitle,
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.55),
-                    fontSize: 12,
+                    color: Colors.white.withValues(alpha: 0.5),
+                    fontSize: 11.5,
                     height: 1.4,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ],
             ),
           ),
+          if (isRunning)
+            const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Colors.white,
+              ),
+            ),
         ],
       ),
     );
   }
 
-  String _subtitle(SpeedTestState s, AppLocalizations tr) {
+  String _phaseSubtitle(SpeedTestState s, AppLocalizations tr) {
     if (s.step == SpeedTestStep.loading) {
       return tr.translate('speed_test.measuring_latency');
     }
@@ -240,10 +236,10 @@ class _PhaseStepper extends StatelessWidget {
           _PhaseChip(data: phases[i]),
           if (i < phases.length - 1)
             Container(
-              width: 18,
+              width: 16,
               height: 1,
               margin: const EdgeInsets.symmetric(horizontal: 6),
-              color: Colors.white.withValues(alpha: 0.15),
+              color: Colors.white.withValues(alpha: 0.12),
             ),
         ],
       ],
@@ -271,13 +267,13 @@ class _PhaseChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         color: highlight
-            ? data.color.withValues(alpha: 0.12)
-            : Colors.white.withValues(alpha: 0.04),
+            ? Colors.white.withValues(alpha: 0.08)
+            : Colors.white.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: highlight
-              ? data.color.withValues(alpha: data.active ? 0.6 : 0.3)
-              : Colors.white.withValues(alpha: 0.08),
+          color: data.active
+              ? data.color.withValues(alpha: 0.5)
+              : Colors.white.withValues(alpha: 0.1),
         ),
       ),
       child: Row(
@@ -297,13 +293,13 @@ class _PhaseChip extends StatelessWidget {
           ),
           const SizedBox(width: 6),
           Text(
-            data.label,
-            style: TextStyle(
+            data.label.toUpperCase(),
+            style: GoogleFonts.poppins(
               fontSize: 10,
               fontWeight: FontWeight.w700,
-              letterSpacing: 1.2,
+              letterSpacing: 1.0,
               color:
-                  highlight ? data.color : Colors.white.withValues(alpha: 0.4),
+                  highlight ? Colors.white : Colors.white.withValues(alpha: 0.4),
             ),
           ),
         ],
@@ -328,21 +324,15 @@ class _GaugeCard extends StatelessWidget {
     final value = isRunning ? state.currentSpeed : state.result.downloadSpeed;
     final isIdle = state.step == SpeedTestStep.ready && !state.testCompleted;
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      decoration: BoxDecoration(
-        color: _kCard,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: _kBorder),
-      ),
+    return ModernGlassCard(
+      padding: const EdgeInsets.symmetric(vertical: 22),
       child: Center(
         child: ModernSpeedGauge(
           value: isIdle ? 0 : value,
           maxValue: maxScale,
           color: color,
           label: label,
-          size: 260,
+          size: 250,
           isIdle: isIdle,
           centerOverlay: state.step == SpeedTestStep.loading
               ? const _LoadingCenter()
@@ -395,13 +385,8 @@ class _ResultsCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tr = AppLocalizations.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
-      decoration: BoxDecoration(
-        color: _kCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kBorder),
-      ),
+    return ModernGlassCard(
+      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 8),
       child: Row(
         children: [
           _ResultCell(
@@ -439,7 +424,7 @@ class _ResultsCard extends StatelessWidget {
   Widget _divider() => Container(
         width: 1,
         height: 38,
-        color: Colors.white.withValues(alpha: 0.06),
+        color: Colors.white.withValues(alpha: 0.08),
       );
 }
 
@@ -464,32 +449,35 @@ class _ResultCell extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, color: color, size: 14),
-              const SizedBox(width: 4),
-              Text(
-                label.toUpperCase(),
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white.withValues(alpha: 0.5),
-                  letterSpacing: 0.8,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: color, size: 14),
           ),
           const SizedBox(height: 8),
+          Text(
+            label.toUpperCase(),
+            style: GoogleFonts.poppins(
+              fontSize: 9,
+              fontWeight: FontWeight.w600,
+              color: Colors.white.withValues(alpha: 0.5),
+              letterSpacing: 0.8,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
           RichText(
+            textAlign: TextAlign.center,
             text: TextSpan(
               children: [
                 TextSpan(
                   text: value,
-                  style: TextStyle(
-                    fontSize: 20,
+                  style: GoogleFonts.poppins(
+                    fontSize: 19,
                     fontWeight: FontWeight.w700,
                     color: value == '—'
                         ? Colors.white.withValues(alpha: 0.3)
@@ -522,12 +510,12 @@ class _SectionLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Text(
-      text,
-      style: TextStyle(
+      text.toUpperCase(),
+      style: GoogleFonts.poppins(
         color: Colors.white.withValues(alpha: 0.55),
-        fontSize: 12,
+        fontSize: 11,
         fontWeight: FontWeight.w600,
-        letterSpacing: 0.5,
+        letterSpacing: 1.1,
       ),
     );
   }
@@ -542,18 +530,28 @@ class _PrimaryButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final tr = AppLocalizations.of(context);
     final isRunning = state.step != SpeedTestStep.ready;
-    final color = isRunning ? _kDanger : _kAccent;
+    final isStop = isRunning;
     final label = isRunning
         ? tr.translate('speed_test.stop')
         : (state.testCompleted
             ? tr.translate('speed_test.test_again')
             : tr.translate('speed_test.start_test'));
 
+    final gradientColors = isStop
+        ? [_kDanger.withValues(alpha: 0.95), _kDanger.withValues(alpha: 0.7)]
+        : [
+            Colors.white.withValues(alpha: 0.18),
+            Colors.white.withValues(alpha: 0.08),
+          ];
+    final borderColor =
+        isStop ? _kDanger.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.18);
+    final fg = Colors.white;
+
     return SizedBox(
       width: double.infinity,
-      height: 52,
-      child: ElevatedButton(
-        onPressed: () {
+      height: 54,
+      child: GestureDetector(
+        onTap: () {
           if (isRunning) {
             provider.stopTest();
           } else {
@@ -561,33 +559,46 @@ class _PrimaryButton extends StatelessWidget {
             provider.startTest();
           }
         },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: color,
-          foregroundColor: Colors.black,
-          elevation: 0,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: gradientColors,
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: borderColor, width: 1.2),
+            boxShadow: isStop
+                ? [
+                    BoxShadow(
+                      color: _kDanger.withValues(alpha: 0.25),
+                      blurRadius: 16,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
           ),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              isRunning ? Icons.stop_rounded : Icons.play_arrow_rounded,
-              color: Colors.black,
-              size: 22,
-            ),
-            const SizedBox(width: 8),
-            Text(
-              label,
-              style: const TextStyle(
-                color: Colors.black,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.4,
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                isStop ? Icons.stop_rounded : Icons.play_arrow_rounded,
+                color: fg,
+                size: 22,
               ),
-            ),
-          ],
+              const SizedBox(width: 8),
+              Text(
+                label,
+                style: GoogleFonts.poppins(
+                  color: fg,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.4,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -642,7 +653,7 @@ Color _phaseColor(SpeedTestStep s) {
     case SpeedTestStep.loading:
       return _kPing;
     case SpeedTestStep.ready:
-      return _kAccent;
+      return _kDownload;
   }
 }
 
