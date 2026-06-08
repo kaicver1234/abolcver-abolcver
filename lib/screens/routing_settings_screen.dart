@@ -275,7 +275,8 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
           const SizedBox(width: 8),
           Switch.adaptive(
             value: value,
-            activeThumbColor: _kAccent,
+            // ignore: deprecated_member_use
+            activeColor: _kAccent,
             onChanged: (v) => onChanged(v),
           ),
         ],
