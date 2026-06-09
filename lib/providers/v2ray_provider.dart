@@ -277,15 +277,15 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       }
       
       debugPrint('📋 Total servers available: ${servers.length}');
-      debugPrint('🎯 Testing first 15 servers using V2Ray core delay...');
+      debugPrint('🎯 Testing first 20 servers using V2Ray core delay...');
 
-      // Test first 15 servers using V2Ray core delay
-      final serversToTest = servers.take(15).toList();
+      // Test first 20 servers using V2Ray core delay
+      final serversToTest = servers.take(20).toList();
       debugPrint('📦 Servers to test: ${serversToTest.length}');
-      
-      // Test servers in batches (10 at a time)
+
+      // Test servers in batches (20 at a time)
       final results = <String, int>{};
-      final batchSize = 15;
+      final batchSize = 20;
       
       for (int i = 0; i < serversToTest.length; i += batchSize) {
         final end = (i + batchSize < serversToTest.length) ? i + batchSize : serversToTest.length;
@@ -335,11 +335,11 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
       debugPrint('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
       debugPrint('📊 RESULTS: Got ${results.length}/${serversToTest.length} responses');
       
-      // Find fastest server from results
+      // Find fastest server from results — lowest ping wins.
       V2RayConfig? fastestServer;
       int lowestPing = 999999;
       int successfulPings = 0;
-      
+
       for (final server in serversToTest) {
         final delay = results[server.id];
         if (delay != null && delay >= 0 && delay < 10000) {
@@ -1735,7 +1735,11 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
 
   void _setLoading(bool loading) {
     _isLoading = loading;
-    _isLoadingServers = loading; // Update server loading state as well
+    // Note: _isLoadingServers is owned by fetchServers() and must NOT be
+    // mirrored here. Otherwise unrelated flows (loadConfigs, addSubscription,
+    // _initialize's finally block, etc.) flip the server-loading flag off
+    // while a background fetchServers() is still in flight, briefly showing
+    // an empty/loaded server list before the real fetch completes.
     notifyListeners();
   }
 
@@ -1754,7 +1758,16 @@ class V2RayProvider with ChangeNotifier, WidgetsBindingObserver {
     
     // Actually disconnect the VPN service
     await _v2rayService.disconnect();
-    
+
+    // Mirror the cleanup that the regular disconnect() flow performs.
+    // Without these, the 120s grace period stays armed and silently swallows
+    // every subsequent native VPN status event (resume sync, validator, etc.),
+    // and the periodic validator timer keeps ticking forever.
+    statusPingOnly = false;
+    _lastSuccessfulConnection = null;
+    await _clearConnectionTimestamp();
+    _stopStateValidator();
+
     // Update config status when disconnected from notification
     for (int i = 0; i < _configs.length; i++) {
       _configs[i].isConnected = false;

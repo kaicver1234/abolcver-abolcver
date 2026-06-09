@@ -54,6 +54,58 @@ class AnalyticsService {
     }
   }
 
+  // ── Central event helper ───────────────────────────────────────────────
+  //
+  // Every public log* method funnels through here so the support guard,
+  // error handling and Firebase's value-type/length constraints live in ONE
+  // place instead of being copy-pasted (and drifting) across ~25 methods.
+  //
+  // Firebase Analytics constraints enforced here:
+  //   • Parameter values must be String or num — bool is silently dropped, so
+  //     we coerce bool → int (1/0) via [_sanitizeParams].
+  //   • String values are capped at 100 chars; longer values cause the whole
+  //     event to be rejected, so we truncate.
+  //   • A manual `timestamp` param is redundant (Firebase stamps every event)
+  //     and wastes one of the 25 allowed params — callers no longer pass it.
+  Future<void> _log(
+    String name, {
+    Map<String, Object?>? params,
+    String? debugLabel,
+  }) async {
+    if (!_isSupported || _analytics == null) return;
+
+    try {
+      await _analytics!.logEvent(
+        name: name,
+        parameters: params == null ? null : _sanitizeParams(params),
+      );
+      if (debugLabel != null) {
+        debugPrint('📊 Analytics: $debugLabel');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Analytics error [$name]: $e');
+    }
+  }
+
+  /// Coerce a loosely-typed param map into what Firebase accepts: keys map to
+  /// String or num only. Bools become 1/0, null entries are dropped, and
+  /// over-long strings are truncated to the 100-char limit.
+  Map<String, Object> _sanitizeParams(Map<String, Object?> params) {
+    final out = <String, Object>{};
+    params.forEach((key, value) {
+      if (value == null) return;
+      if (value is bool) {
+        out[key] = value ? 1 : 0;
+      } else if (value is num) {
+        out[key] = value;
+      } else {
+        final s = value.toString();
+        out[key] = s.length > 100 ? s.substring(0, 100) : s;
+      }
+    });
+    return out;
+  }
+
   /// Log VPN connection event
   Future<void> logVpnConnect({
     required String serverName,
@@ -61,46 +113,30 @@ class AnalyticsService {
     required int serverPort,
     String? country,
     String? protocol,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'vpn_connect',
-        parameters: {
-          'server_name': serverName,
-          'server_address': serverAddress,
-          'server_port': serverPort,
-          'country': country ?? 'unknown',
-          'protocol': protocol ?? 'vmess',
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-          'connection_method': 'manual',
-        },
-      );
-      debugPrint('📊 Analytics: VPN Connect - $serverName');
-    } catch (e) {
-      debugPrint('⚠️ Analytics error: $e');
-    }
+  }) {
+    return _log(
+      'vpn_connect',
+      params: {
+        'server_name': serverName,
+        'server_address': serverAddress,
+        'server_port': serverPort,
+        'country': country ?? 'unknown',
+        'protocol': protocol ?? 'vmess',
+        'connection_method': 'manual',
+      },
+      debugLabel: 'VPN Connect - $serverName',
+    );
   }
 
   /// Log auto-connect event
   Future<void> logAutoConnect({
     required String serverName,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'vpn_auto_connect',
-        parameters: {
-          'server_name': serverName,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-      debugPrint('📊 Analytics: Auto Connect - $serverName');
-    } catch (e) {
-      debugPrint('⚠️ Analytics error: $e');
-    }
+  }) {
+    return _log(
+      'vpn_auto_connect',
+      params: {'server_name': serverName},
+      debugLabel: 'Auto Connect - $serverName',
+    );
   }
 
   /// Log VPN disconnection event
@@ -110,48 +146,35 @@ class AnalyticsService {
     required int uploadBytes,
     required int downloadBytes,
     String? disconnectReason,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'vpn_disconnect',
-        parameters: {
-          'server_name': serverName,
-          'duration_seconds': durationSeconds,
-          'upload_bytes': uploadBytes,
-          'download_bytes': downloadBytes,
-          'total_bytes': uploadBytes + downloadBytes,
-          'disconnect_reason': disconnectReason ?? 'user_action',
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-      debugPrint('📊 Analytics: VPN Disconnect - Duration: ${durationSeconds}s, Data: ${(uploadBytes + downloadBytes) / 1024 / 1024}MB');
-    } catch (e) {
-      debugPrint('⚠️ Analytics error: $e');
-    }
+  }) {
+    return _log(
+      'vpn_disconnect',
+      params: {
+        'server_name': serverName,
+        'duration_seconds': durationSeconds,
+        'upload_bytes': uploadBytes,
+        'download_bytes': downloadBytes,
+        'total_bytes': uploadBytes + downloadBytes,
+        'disconnect_reason': disconnectReason ?? 'user_action',
+      },
+      debugLabel:
+          'VPN Disconnect - Duration: ${durationSeconds}s, Data: ${(uploadBytes + downloadBytes) / 1024 / 1024}MB',
+    );
   }
 
   /// Log connection failure
   Future<void> logConnectionFailure({
     required String serverName,
     required String errorMessage,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'vpn_connection_failure',
-        parameters: {
-          'server_name': serverName,
-          'error_message': errorMessage,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-      debugPrint('📊 Analytics: Connection Failure - $serverName');
-    } catch (e) {
-      debugPrint('⚠️ Analytics error: $e');
-    }
+  }) {
+    return _log(
+      'vpn_connection_failure',
+      params: {
+        'server_name': serverName,
+        'error_message': errorMessage,
+      },
+      debugLabel: 'Connection Failure - $serverName',
+    );
   }
 
   /// Log subscription addition
@@ -159,43 +182,30 @@ class AnalyticsService {
     required String subscriptionName,
     required int serverCount,
     required String subscriptionType,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'subscription_added',
-        parameters: {
-          'subscription_name': subscriptionName,
-          'server_count': serverCount,
-          'subscription_type': subscriptionType,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-      debugPrint('📊 Analytics: Subscription Added - $serverCount servers');
-    } catch (e) {
-      debugPrint('⚠️ Analytics error: $e');
-    }
+  }) {
+    return _log(
+      'subscription_added',
+      params: {
+        'subscription_name': subscriptionName,
+        'server_count': serverCount,
+        'subscription_type': subscriptionType,
+      },
+      debugLabel: 'Subscription Added - $serverCount servers',
+    );
   }
 
   /// Log subscription update
   Future<void> logSubscriptionUpdated({
     required String subscriptionName,
     required int newServerCount,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'subscription_updated',
-        parameters: {
-          'subscription_name': subscriptionName,
-          'new_server_count': newServerCount,
-        },
-      );
-    } catch (e) {
-      // Silently fail
-    }
+  }) {
+    return _log(
+      'subscription_updated',
+      params: {
+        'subscription_name': subscriptionName,
+        'new_server_count': newServerCount,
+      },
+    );
   }
 
   /// Log app update check
@@ -203,41 +213,29 @@ class AnalyticsService {
     required String currentVersion,
     required String latestVersion,
     required bool updateAvailable,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'update_check',
-        parameters: {
-          'current_version': currentVersion,
-          'latest_version': latestVersion,
-          'update_available': updateAvailable,
-        },
-      );
-    } catch (e) {
-      // Silently fail
-    }
+  }) {
+    return _log(
+      'update_check',
+      params: {
+        'current_version': currentVersion,
+        'latest_version': latestVersion,
+        'update_available': updateAvailable,
+      },
+    );
   }
 
   /// Log language change
   Future<void> logLanguageChange({
     required String fromLanguage,
     required String toLanguage,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'language_change',
-        parameters: {
-          'from_language': fromLanguage,
-          'to_language': toLanguage,
-        },
-      );
-    } catch (e) {
-      // Silently fail
-    }
+  }) {
+    return _log(
+      'language_change',
+      params: {
+        'from_language': fromLanguage,
+        'to_language': toLanguage,
+      },
+    );
   }
 
   /// Log screen view
@@ -246,14 +244,14 @@ class AnalyticsService {
     String? screenClass,
   }) async {
     if (!_isSupported || _analytics == null) return;
-    
+
     try {
       await _analytics!.logScreenView(
         screenName: screenName,
         screenClass: screenClass ?? screenName,
       );
     } catch (e) {
-      // Silently fail
+      debugPrint('⚠️ Analytics error [screen_view]: $e');
     }
   }
 
@@ -262,23 +260,16 @@ class AnalyticsService {
     required String errorType,
     required String errorMessage,
     String? serverName,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'connection_error',
-        parameters: {
-          'error_type': errorType,
-          'error_message': errorMessage,
-          if (serverName != null) 'server_name': serverName,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-      debugPrint('📊 Analytics: Connection Error - $errorType');
-    } catch (e) {
-      debugPrint('⚠️ Analytics error: $e');
-    }
+  }) {
+    return _log(
+      'connection_error',
+      params: {
+        'error_type': errorType,
+        'error_message': errorMessage,
+        'server_name': serverName,
+      },
+      debugLabel: 'Connection Error - $errorType',
+    );
   }
 
   /// Log server ping test
@@ -286,77 +277,56 @@ class AnalyticsService {
     required String serverName,
     required int pingMs,
     required bool success,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'server_ping_test',
-        parameters: {
-          'server_name': serverName,
-          'ping_ms': pingMs,
-          'success': success,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-    } catch (e) {
-      debugPrint('⚠️ Analytics error: $e');
-    }
+  }) {
+    return _log(
+      'server_ping_test',
+      params: {
+        'server_name': serverName,
+        'ping_ms': pingMs,
+        'success': success,
+      },
+    );
   }
 
   /// Log server selection
   Future<void> logServerSelection({
     required String serverName,
     required String selectionMethod,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'server_selection',
-        parameters: {
-          'server_name': serverName,
-          'selection_method': selectionMethod, // 'manual', 'auto', 'fastest'
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-      debugPrint('📊 Analytics: Server Selected - $serverName ($selectionMethod)');
-    } catch (e) {
-      debugPrint('⚠️ Analytics error: $e');
-    }
+  }) {
+    return _log(
+      'server_selection',
+      params: {
+        'server_name': serverName,
+        'selection_method': selectionMethod, // 'manual', 'auto', 'fastest'
+      },
+      debugLabel: 'Server Selected - $serverName ($selectionMethod)',
+    );
   }
 
   /// Log app feature usage
   Future<void> logFeatureUsage({
     required String featureName,
     Map<String, dynamic>? additionalParams,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'feature_usage',
-        parameters: {
-          'feature_name': featureName,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-          if (additionalParams != null) ...additionalParams,
-        },
-      );
-      debugPrint('📊 Analytics: Feature Used - $featureName');
-    } catch (e) {
-      debugPrint('⚠️ Analytics error: $e');
-    }
+  }) {
+    return _log(
+      'feature_usage',
+      params: {
+        'feature_name': featureName,
+        if (additionalParams != null) ...additionalParams,
+      },
+      debugLabel: 'Feature Used - $featureName',
+    );
   }
 
   /// Log user session
   Future<void> logAppOpen() async {
     if (!_isSupported || _analytics == null) return;
-    
+
     try {
       await _analytics!.logAppOpen();
       debugPrint('📊 Analytics: App Opened');
     } catch (e) {
-      debugPrint('⚠️ Analytics error: $e');
+      debugPrint('⚠️ Analytics error [app_open]: $e');
     }
   }
 
@@ -364,22 +334,15 @@ class AnalyticsService {
   Future<void> logSettingsChange({
     required String settingName,
     required String newValue,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    
-    try {
-      await _analytics!.logEvent(
-        name: 'settings_change',
-        parameters: {
-          'setting_name': settingName,
-          'new_value': newValue,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-      debugPrint('📊 Analytics: Setting Changed - $settingName: $newValue');
-    } catch (e) {
-      debugPrint('⚠️ Analytics error: $e');
-    }
+  }) {
+    return _log(
+      'settings_change',
+      params: {
+        'setting_name': settingName,
+        'new_value': newValue,
+      },
+      debugLabel: 'Setting Changed - $settingName: $newValue',
+    );
   }
 
   /// Set user property (e.g., preferred language, app version)
@@ -388,7 +351,7 @@ class AnalyticsService {
     required String value,
   }) async {
     if (!_isSupported || _analytics == null) return;
-    
+
     try {
       await _analytics!.setUserProperty(
         name: name,
@@ -402,7 +365,7 @@ class AnalyticsService {
   /// Set user ID (optional, for tracking specific users)
   Future<void> setUserId(String userId) async {
     if (!_isSupported || _analytics == null) return;
-    
+
     try {
       await _analytics!.setUserId(id: userId);
     } catch (e) {
@@ -414,56 +377,35 @@ class AnalyticsService {
   Future<void> logTabChange({
     required String tabName,
     required int tabIndex,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    try {
-      await _analytics!.logEvent(
-        name: 'tab_taghir',
-        parameters: {
-          'tab_name': tabName,
-          'tab_index': tabIndex,
-        },
-      );
-      debugPrint('📊 Analytics: Tab Taghir - $tabName');
-    } catch (e) {
-      // Silently fail
-    }
+  }) {
+    return _log(
+      'tab_taghir',
+      params: {
+        'tab_name': tabName,
+        'tab_index': tabIndex,
+      },
+      debugLabel: 'Tab Taghir - $tabName',
+    );
   }
 
   /// Log DNS settings change
   Future<void> logDnsChange({
     required String dnsType,
     required String dnsValue,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    try {
-      await _analytics!.logEvent(
-        name: 'tanzimate_dns_taghir',
-        parameters: {
-          'dns_type': dnsType,
-          'dns_value': dnsValue,
-        },
-      );
-      debugPrint('📊 Analytics: DNS Taghir - $dnsType: $dnsValue');
-    } catch (e) {
-      // Silently fail
-    }
+  }) {
+    return _log(
+      'tanzimate_dns_taghir',
+      params: {
+        'dns_type': dnsType,
+        'dns_value': dnsValue,
+      },
+      debugLabel: 'DNS Taghir - $dnsType: $dnsValue',
+    );
   }
 
   /// Log speed test start
-  Future<void> logSpeedTestStart() async {
-    if (!_isSupported || _analytics == null) return;
-    try {
-      await _analytics!.logEvent(
-        name: 'test_saraat_shoru',
-        parameters: {
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-      debugPrint('📊 Analytics: Test Saraat Shoru');
-    } catch (e) {
-      // Silently fail
-    }
+  Future<void> logSpeedTestStart() {
+    return _log('test_saraat_shoru', debugLabel: 'Test Saraat Shoru');
   }
 
   /// Log speed test result
@@ -471,21 +413,17 @@ class AnalyticsService {
     required double downloadMbps,
     required double uploadMbps,
     required int pingMs,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    try {
-      await _analytics!.logEvent(
-        name: 'natije_test_saraat',
-        parameters: {
-          'download_mbps': downloadMbps.toStringAsFixed(1),
-          'upload_mbps': uploadMbps.toStringAsFixed(1),
-          'ping_ms': pingMs,
-        },
-      );
-      debugPrint('📊 Analytics: Natije Test Saraat - D:${downloadMbps.toStringAsFixed(1)} U:${uploadMbps.toStringAsFixed(1)}');
-    } catch (e) {
-      // Silently fail
-    }
+  }) {
+    return _log(
+      'natije_test_saraat',
+      params: {
+        'download_mbps': downloadMbps.toStringAsFixed(1),
+        'upload_mbps': uploadMbps.toStringAsFixed(1),
+        'ping_ms': pingMs,
+      },
+      debugLabel:
+          'Natije Test Saraat - D:${downloadMbps.toStringAsFixed(1)} U:${uploadMbps.toStringAsFixed(1)}',
+    );
   }
 
   /// Log host check
@@ -493,91 +431,54 @@ class AnalyticsService {
     required String host,
     required bool isReachable,
     required int responseTimeMs,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    try {
-      await _analytics!.logEvent(
-        name: 'baresi_host',
-        parameters: {
-          'host': host,
-          'ghabele_dastresi': isReachable,
-          'zaman_pasokh_ms': responseTimeMs,
-        },
-      );
-      debugPrint('📊 Analytics: Baresi Host - $host (${isReachable ? "movafagh" : "nabood"})');
-    } catch (e) {
-      // Silently fail
-    }
+  }) {
+    return _log(
+      'baresi_host',
+      params: {
+        'host': host,
+        'ghabele_dastresi': isReachable,
+        'zaman_pasokh_ms': responseTimeMs,
+      },
+      debugLabel:
+          'Baresi Host - $host (${isReachable ? "movafagh" : "nabood"})',
+    );
   }
 
   /// Log server list refresh
   Future<void> logServerListRefresh({
     required int serverCount,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    try {
-      await _analytics!.logEvent(
-        name: 'berozresani_list_server',
-        parameters: {
-          'tedad_server': serverCount,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-      debugPrint('📊 Analytics: Berozresani List Server - $serverCount ta');
-    } catch (e) {
-      // Silently fail
-    }
+  }) {
+    return _log(
+      'berozresani_list_server',
+      params: {'tedad_server': serverCount},
+      debugLabel: 'Berozresani List Server - $serverCount ta',
+    );
   }
 
   /// Log smart connect usage
   Future<void> logSmartConnect({
     required String selectedServer,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    try {
-      await _analytics!.logEvent(
-        name: 'otaghak_hoshmandam',
-        parameters: {
-          'server_entekhabi': selectedServer,
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-      debugPrint('📊 Analytics: Otaghak Hoshmandam - $selectedServer');
-    } catch (e) {
-      // Silently fail
-    }
+  }) {
+    return _log(
+      'otaghak_hoshmandam',
+      params: {'server_entekhabi': selectedServer},
+      debugLabel: 'Otaghak Hoshmandam - $selectedServer',
+    );
   }
 
   /// Log IP info screen refresh
-  Future<void> logIpInfoRefresh() async {
-    if (!_isSupported || _analytics == null) return;
-    try {
-      await _analytics!.logEvent(
-        name: 'berozresani_ettelaat_ip',
-        parameters: {
-          'timestamp': DateTime.now().millisecondsSinceEpoch,
-        },
-      );
-    } catch (e) {
-      // Silently fail
-    }
+  Future<void> logIpInfoRefresh() {
+    return _log('berozresani_ettelaat_ip');
   }
 
   /// Log about screen social link tap
   Future<void> logSocialLinkTap({
     required String platform,
-  }) async {
-    if (!_isSupported || _analytics == null) return;
-    try {
-      await _analytics!.logEvent(
-        name: 'link_ejtemai_zade_shod',
-        parameters: {
-          'platform': platform,
-        },
-      );
-      debugPrint('📊 Analytics: Link Ejtemai - $platform');
-    } catch (e) {
-      // Silently fail
-    }
+  }) {
+    return _log(
+      'link_ejtemai_zade_shod',
+      params: {'platform': platform},
+      debugLabel: 'Link Ejtemai - $platform',
+    );
   }
 }

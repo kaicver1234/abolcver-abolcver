@@ -270,17 +270,22 @@ class V2RayService extends ChangeNotifier {
       // Parse the configuration
       V2RayURL parser = V2ray.parseFromURL(config.fullConfig);
 
-      // Inject custom DNS servers if provided
-      if (dnsServers != null && dnsServers.isNotEmpty) {
-        parser.dns = {
-          'servers': dnsServers,
-          'queryStrategy': 'UseIPv4',
-          'disableCache': false,
-          'disableFallback': false,
-          'disableFallbackIfMatch': false,
-        };
-        debugPrint('🌐 DNS injected: ${dnsServers.join(', ')}');
-      }
+      // Inject DNS servers. If the user picked custom DNS we honour it;
+      // otherwise we fall back to a fast, reliable public resolver pair
+      // (Cloudflare + Google) so domain lookups — which gate how quickly
+      // pages start loading — aren't left to a slow/ISP resolver.
+      final effectiveDns = (dnsServers != null && dnsServers.isNotEmpty)
+          ? dnsServers
+          : const ['1.1.1.1', '8.8.8.8'];
+      parser.dns = {
+        'servers': effectiveDns,
+        'queryStrategy': 'UseIPv4',
+        'disableCache': false,
+        'disableFallback': false,
+        'disableFallbackIfMatch': false,
+      };
+      debugPrint('🌐 DNS set: ${effectiveDns.join(', ')}'
+          '${(dnsServers == null || dnsServers.isEmpty) ? ' (default fallback)' : ''}');
 
       // Inject routing rules (geo-bypass). The default outbound is `proxy`
       // (the actual server), `direct` is the freedom outbound already in

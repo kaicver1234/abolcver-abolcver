@@ -1,8 +1,16 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// A modern, minimal circular speed gauge with smooth animated arc,
-/// gradient stroke, soft glow, and centered numeric readout.
+/// Brand colour — the gauge speaks ONLY in this single hue so it stays clean
+/// and on-brand, like the speedtest.net dial.
+const Color _kBrand = Color(0xFF00D9FF);
+
+/// A clean, minimal circular speed gauge inspired by speedtest.net: a simple
+/// 270° dial with evenly spaced ticks, a single-colour progress arc, and a
+/// centered numeric readout.
+///
+/// The numeric readout follows the arc animation so the digits tick smoothly
+/// instead of snapping to the latest sampled value.
 class ModernSpeedGauge extends StatefulWidget {
   final double value;        // current measured value
   final double maxValue;     // scale max (e.g. 100 Mbps)
@@ -34,7 +42,10 @@ class _ModernSpeedGaugeState extends State<ModernSpeedGauge>
   late AnimationController _arcController;
   late AnimationController _pulseController;
   late Animation<double> _arcAnim;
-  double _previousProgress = 0.0;
+  // Track the last interpolated progress so an in-flight animation that gets
+  // interrupted continues smoothly from its CURRENT visual position rather
+  // than snapping to the previous target.
+  double _currentProgress = 0.0;
 
   @override
   void initState() {
@@ -61,10 +72,11 @@ class _ModernSpeedGaugeState extends State<ModernSpeedGauge>
   }
 
   void _animateTo(double target) {
-    _arcAnim = Tween<double>(begin: _previousProgress, end: target).animate(
+    _arcAnim = Tween<double>(begin: _currentProgress, end: target).animate(
       CurvedAnimation(parent: _arcController, curve: Curves.easeOutCubic),
-    );
-    _previousProgress = target;
+    )..addListener(() {
+        _currentProgress = _arcAnim.value;
+      });
     _arcController.forward(from: 0.0);
   }
 
@@ -72,7 +84,7 @@ class _ModernSpeedGaugeState extends State<ModernSpeedGauge>
   void didUpdateWidget(covariant ModernSpeedGauge oldWidget) {
     super.didUpdateWidget(oldWidget);
     final newProgress = _computeProgress();
-    if ((newProgress - _previousProgress).abs() > 0.001 ||
+    if ((newProgress - _arcAnim.value).abs() > 0.001 ||
         widget.maxValue != oldWidget.maxValue) {
       _animateTo(newProgress);
     }
@@ -102,6 +114,9 @@ class _ModernSpeedGaugeState extends State<ModernSpeedGauge>
           final pulse = widget.isIdle
               ? 0.6 + (_pulseController.value * 0.4)
               : 1.0;
+          // Smoothly interpolate the displayed numeric value alongside the arc
+          // so the digits don't pop on each provider sample.
+          final animatedValue = _arcAnim.value * widget.maxValue;
           return Stack(
             alignment: Alignment.center,
             children: [
@@ -113,20 +128,17 @@ class _ModernSpeedGaugeState extends State<ModernSpeedGauge>
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: widget.color.withValues(alpha: 0.10 * pulse),
+                      color: _kBrand.withValues(alpha: 0.10 * pulse),
                       blurRadius: 40,
                       spreadRadius: 4,
                     ),
                   ],
                 ),
               ),
-              // Track + progress arc
+              // Track + ticks + progress arc
               CustomPaint(
                 size: Size(widget.size, widget.size),
-                painter: _GaugePainter(
-                  progress: _arcAnim.value,
-                  color: widget.color,
-                ),
+                painter: _GaugePainter(progress: _arcAnim.value),
               ),
               // Center content
               if (widget.centerOverlay != null)
@@ -142,13 +154,13 @@ class _ModernSpeedGaugeState extends State<ModernSpeedGauge>
                           fontSize: 11,
                           letterSpacing: 2.5,
                           fontWeight: FontWeight.w600,
-                          color: widget.color.withValues(alpha: 0.85),
+                          color: _kBrand.withValues(alpha: 0.85),
                         ),
                       ),
                       const SizedBox(height: 10),
                     ],
                     Text(
-                      _formatValue(widget.value),
+                      _formatValue(animatedValue),
                       style: const TextStyle(
                         fontSize: 64,
                         fontWeight: FontWeight.w700,
@@ -179,9 +191,10 @@ class _ModernSpeedGaugeState extends State<ModernSpeedGauge>
 
 class _GaugePainter extends CustomPainter {
   final double progress;
-  final Color color;
 
-  _GaugePainter({required this.progress, required this.color});
+  _GaugePainter({required this.progress});
+
+  static const _color = _kBrand;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -196,22 +209,26 @@ class _GaugePainter extends CustomPainter {
     final trackPaint = Paint()
       ..color = Colors.white.withValues(alpha: 0.06)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
+      ..strokeWidth = 8
       ..strokeCap = StrokeCap.round;
     canvas.drawArc(rect, startAngle, sweepTotal, false, trackPaint);
 
-    // Subtle tick marks
-    final tickPaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.08)
-      ..strokeWidth = 1.5
-      ..strokeCap = StrokeCap.round;
-    const tickCount = 30;
+    // Evenly spaced ticks that light up in the brand colour up to the fill —
+    // the simple "dial" feel of speedtest.net.
+    const tickCount = 40;
     for (int i = 0; i <= tickCount; i++) {
       final t = i / tickCount;
       final angle = startAngle + sweepTotal * t;
+      final lit = t <= progress + 0.0001;
+      final tickPaint = Paint()
+        ..color = lit
+            ? _color.withValues(alpha: 0.9)
+            : Colors.white.withValues(alpha: 0.10)
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round;
       final outer = Offset(
-        center.dx + (radius - 18) * math.cos(angle),
-        center.dy + (radius - 18) * math.sin(angle),
+        center.dx + (radius - 16) * math.cos(angle),
+        center.dy + (radius - 16) * math.sin(angle),
       );
       final inner = Offset(
         center.dx + (radius - 24) * math.cos(angle),
@@ -222,39 +239,30 @@ class _GaugePainter extends CustomPainter {
 
     if (progress <= 0) return;
 
-    // Gradient progress arc
+    // Single-colour progress arc.
     final sweep = sweepTotal * progress;
     final progressPaint = Paint()
-      ..shader = SweepGradient(
-        startAngle: startAngle,
-        endAngle: startAngle + sweep,
-        colors: [
-          color.withValues(alpha: 0.4),
-          color,
-        ],
-        tileMode: TileMode.clamp,
-      ).createShader(rect)
+      ..color = _color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 10
+      ..strokeWidth = 8
       ..strokeCap = StrokeCap.round;
     canvas.drawArc(rect, startAngle, sweep, false, progressPaint);
 
-    // Glow head at arc tip
+    // Soft glowing head at the arc tip.
     final headAngle = startAngle + sweep;
     final headOffset = Offset(
       center.dx + radius * math.cos(headAngle),
       center.dy + radius * math.sin(headAngle),
     );
     final glowPaint = Paint()
-      ..color = color.withValues(alpha: 0.6)
+      ..color = _color.withValues(alpha: 0.55)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10);
-    canvas.drawCircle(headOffset, 8, glowPaint);
-    final dotPaint = Paint()..color = color;
-    canvas.drawCircle(headOffset, 5, dotPaint);
+    canvas.drawCircle(headOffset, 7, glowPaint);
+    canvas.drawCircle(headOffset, 4.5, Paint()..color = _color);
   }
 
   @override
   bool shouldRepaint(covariant _GaugePainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.color != color;
+    return oldDelegate.progress != progress;
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../models/app_update_info.dart';
@@ -18,18 +19,17 @@ class UpdateDialog extends StatefulWidget {
 class _UpdateDialogState extends State<UpdateDialog>
     with TickerProviderStateMixin {
   late final AnimationController _enterController;
-  late final AnimationController _pulseController;
 
   late final Animation<double> _scaleAnim;
   late final Animation<double> _fadeAnim;
   late final Animation<double> _slideAnim;
-  late final Animation<double> _pulseAnim;
 
+  // ── Brand palette — mirrors the home screen exactly ──────────────────────
+  //   • Pure black background (AppBackground uses 0xFF000000)
+  //   • Cards: white @ 0.035 fill, white @ 0.07 border, radius 20
+  //   • Accents: cyan (primary) and green (success) — NO other hues
   static const _cyan = Color(0xFF00D9FF);
-  static const _green = Color(0xFF00FFA3);
-  static const _purple = Color(0xFFa78bfa);
-  static const _bgDark = Color(0xFF0A0E1A);
-  static const _bgCard = Color(0xFF111827);
+  static const _bg = Color(0xFF000000);
 
   @override
   void initState() {
@@ -39,11 +39,6 @@ class _UpdateDialogState extends State<UpdateDialog>
       duration: const Duration(milliseconds: 420),
       vsync: this,
     );
-
-    _pulseController = AnimationController(
-      duration: const Duration(milliseconds: 2000),
-      vsync: this,
-    )..repeat(reverse: true);
 
     _scaleAnim = CurvedAnimation(
       parent: _enterController,
@@ -60,18 +55,12 @@ class _UpdateDialogState extends State<UpdateDialog>
       curve: Curves.easeOutCubic,
     ).drive(Tween(begin: 24.0, end: 0.0));
 
-    _pulseAnim = CurvedAnimation(
-      parent: _pulseController,
-      curve: Curves.easeInOut,
-    ).drive(Tween(begin: 0.0, end: 1.0));
-
     _enterController.forward();
   }
 
   @override
   void dispose() {
     _enterController.dispose();
-    _pulseController.dispose();
     super.dispose();
   }
 
@@ -90,7 +79,7 @@ class _UpdateDialogState extends State<UpdateDialog>
                 vertical: ResponsiveHelper(context).scale(40).clamp(24.0, 72.0),
               ),
               child: AnimatedBuilder(
-                animation: Listenable.merge([_enterController, _pulseController]),
+                animation: _enterController,
                 builder: (context, _) {
                   return FadeTransition(
                     opacity: _fadeAnim,
@@ -116,15 +105,15 @@ class _UpdateDialogState extends State<UpdateDialog>
     return Container(
       constraints: BoxConstraints(maxWidth: r.isTablet ? 460 : 360),
       decoration: BoxDecoration(
-        color: _bgDark,
+        color: _bg,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(
-          color: _cyan.withValues(alpha: 0.15),
+          color: Colors.white.withValues(alpha: 0.07),
           width: 1,
         ),
         boxShadow: [
           BoxShadow(
-            color: _cyan.withValues(alpha: 0.12),
+            color: _cyan.withValues(alpha: 0.07),
             blurRadius: 40,
             spreadRadius: 0,
           ),
@@ -150,9 +139,6 @@ class _UpdateDialogState extends State<UpdateDialog>
 
   Widget _buildTopBanner() {
     final r = ResponsiveHelper(context);
-    final glowOpacity = 0.15 + _pulseAnim.value * 0.1;
-    final ringSize = r.scale(88).clamp(72.0, 110.0);
-    final iconSize = r.scale(72).clamp(58.0, 92.0);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.fromLTRB(
@@ -162,12 +148,14 @@ class _UpdateDialogState extends State<UpdateDialog>
         r.scale(28).clamp(20.0, 38.0),
       ),
       decoration: BoxDecoration(
+        // Deep, muted wash on black — barely-there tint instead of a bright
+        // gradient, keeping the dialog dark like the rest of the app.
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            const Color(0xFF0D1B2E),
-            const Color(0xFF0A1220),
+            _cyan.withValues(alpha: 0.035),
+            Colors.white.withValues(alpha: 0.012),
           ],
         ),
         border: Border(
@@ -179,48 +167,10 @@ class _UpdateDialogState extends State<UpdateDialog>
       ),
       child: Column(
         children: [
-          // Icon with glow
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              // Glow ring
-              Container(
-                width: ringSize,
-                height: ringSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _cyan.withValues(alpha: glowOpacity),
-                ),
-              ),
-              // Icon container
-              Container(
-                width: iconSize,
-                height: iconSize,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [Color(0xFF1A3A5C), Color(0xFF0D2040)],
-                  ),
-                  border: Border.all(
-                    color: _cyan.withValues(alpha: 0.35),
-                    width: 1.5,
-                  ),
-                ),
-                child: Icon(
-                  Icons.rocket_launch_rounded,
-                  color: _cyan,
-                  size: r.scale(34).clamp(26.0, 44.0),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: r.scale(18).clamp(12.0, 26.0)),
           // Title
           Text(
             widget.updateInfo.title,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               color: Colors.white,
               fontSize: r.scale(20).clamp(16.0, 26.0),
               fontWeight: FontWeight.w700,
@@ -242,12 +192,7 @@ class _UpdateDialogState extends State<UpdateDialog>
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: LinearGradient(
-          colors: [
-            _cyan.withValues(alpha: 0.12),
-            _green.withValues(alpha: 0.08),
-          ],
-        ),
+        color: Colors.white.withValues(alpha: 0.04),
         border: Border.all(
           color: _cyan.withValues(alpha: 0.25),
           width: 1,
@@ -260,18 +205,18 @@ class _UpdateDialogState extends State<UpdateDialog>
             width: 6,
             height: 6,
             decoration: BoxDecoration(
-              color: _green,
+              color: _cyan.withValues(alpha: 0.85),
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: _green.withValues(alpha: 0.6), blurRadius: 6),
+                BoxShadow(color: _cyan.withValues(alpha: 0.4), blurRadius: 5),
               ],
             ),
           ),
           const SizedBox(width: 8),
           Text(
             'v${widget.updateInfo.version}  •  New Update',
-            style: const TextStyle(
-              color: _cyan,
+            style: GoogleFonts.poppins(
+              color: _cyan.withValues(alpha: 0.8),
               fontSize: 12,
               fontWeight: FontWeight.w600,
               letterSpacing: 0.3,
@@ -314,10 +259,11 @@ class _UpdateDialogState extends State<UpdateDialog>
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _bgCard,
+        // Same card treatment as the home screen cards.
+        color: Colors.white.withValues(alpha: 0.035),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withValues(alpha: 0.06),
+          color: Colors.white.withValues(alpha: 0.07),
           width: 1,
         ),
       ),
@@ -329,16 +275,16 @@ class _UpdateDialogState extends State<UpdateDialog>
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: _purple.withValues(alpha: 0.15),
+                  color: _cyan.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.auto_awesome_rounded, color: _purple, size: 14),
+                child: const Icon(Icons.auto_awesome_rounded, color: _cyan, size: 14),
               ),
               const SizedBox(width: 8),
               Text(
                 AppLocalizations.of(context).translate('update.new_changes'),
-                style: const TextStyle(
-                  color: _purple,
+                style: GoogleFonts.poppins(
+                  color: _cyan,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.3,
@@ -350,7 +296,7 @@ class _UpdateDialogState extends State<UpdateDialog>
           const SizedBox(height: 12),
           Text(
             widget.updateInfo.message,
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               color: Colors.white.withValues(alpha: 0.75),
               fontSize: 13,
               height: 1.65,
@@ -372,16 +318,18 @@ class _UpdateDialogState extends State<UpdateDialog>
         width: double.infinity,
         height: r.scale(52).clamp(44.0, 64.0),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [_cyan, _green],
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-          ),
+          // Dark cyan-tinted surface with a defined edge — reads as the
+          // primary action without the loud bright gradient.
+          color: _cyan.withValues(alpha: 0.14),
           borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _cyan.withValues(alpha: 0.45),
+            width: 1.2,
+          ),
           boxShadow: [
             BoxShadow(
-              color: _cyan.withValues(alpha: 0.35),
-              blurRadius: 20,
+              color: _cyan.withValues(alpha: 0.15),
+              blurRadius: 18,
               offset: const Offset(0, 6),
             ),
           ],
@@ -389,14 +337,15 @@ class _UpdateDialogState extends State<UpdateDialog>
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.download_rounded, color: Colors.black87, size: 20),
+            Icon(Icons.download_rounded,
+                color: _cyan.withValues(alpha: 0.95), size: 20),
             const SizedBox(width: 8),
             Text(
               widget.updateInfo.isForced
                   ? AppLocalizations.of(context).translate('update.forced_update')
                   : AppLocalizations.of(context).translate('update.download_update'),
-              style: TextStyle(
-                color: Colors.black87,
+              style: GoogleFonts.poppins(
+                color: _cyan.withValues(alpha: 0.95),
                 fontSize: r.scale(15).clamp(13.0, 18.0),
                 fontWeight: FontWeight.w700,
                 letterSpacing: 0.2,
@@ -427,7 +376,7 @@ class _UpdateDialogState extends State<UpdateDialog>
         child: Center(
           child: Text(
             AppLocalizations.of(context).translate('update.remind_later'),
-            style: TextStyle(
+            style: GoogleFonts.poppins(
               color: Colors.white.withValues(alpha: 0.5),
               fontSize: 14,
               fontWeight: FontWeight.w500,
@@ -440,27 +389,30 @@ class _UpdateDialogState extends State<UpdateDialog>
   }
 
   Widget _buildForcedWarning(BuildContext context) {
+    // Forced updates use the brand cyan accent rather than an off-palette
+    // orange, so the dialog never breaks the two-hue home language.
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: 0.08),
+        color: _cyan.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.orange.withValues(alpha: 0.18),
+          color: _cyan.withValues(alpha: 0.20),
           width: 1,
         ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade400, size: 16),
+          Icon(Icons.info_outline_rounded,
+              color: _cyan.withValues(alpha: 0.9), size: 16),
           const SizedBox(width: 8),
           Flexible(
             child: Text(
               AppLocalizations.of(context).translate('update.must_update'),
-              style: TextStyle(
-                color: Colors.orange.shade400,
+              style: GoogleFonts.poppins(
+                color: _cyan.withValues(alpha: 0.9),
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
                 decoration: TextDecoration.none,
@@ -485,4 +437,3 @@ class _UpdateDialogState extends State<UpdateDialog>
     } catch (_) {}
   }
 }
-
