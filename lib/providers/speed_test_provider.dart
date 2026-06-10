@@ -28,8 +28,8 @@ class SpeedTestProvider with ChangeNotifier {
     {'type': 'latency', 'numPackets': 10},
     {'type': 'download', 'bytes': 1000000,  'count': 1, 'warmup': true},
     {'type': 'download', 'bytes': 10000000, 'count': 2},
-    {'type': 'upload',   'bytes': 500000,   'count': 1, 'warmup': true},
-    {'type': 'upload',   'bytes': 3000000,  'count': 2},
+    {'type': 'upload',   'bytes': 1000000,  'count': 1, 'warmup': true},
+    {'type': 'upload',   'bytes': 8000000,  'count': 2},
   ];
 
   String _measurementId = '';
@@ -420,22 +420,27 @@ class SpeedTestProvider with ChangeNotifier {
   Future<double> _measureUploadSpeed(int bytes) async {
     if (_isCanceled) return 0.0;
 
-    final random = Random();
-    final data = Uint8List.fromList(
-      List<int>.generate(bytes, (_) => random.nextInt(256)),
-    );
+    // Build the payload in bulk (cheap) instead of one random byte at a time,
+    // which used to block the isolate for seconds on multi-MB uploads and made
+    // the measured duration meaningless.
+    final data = Uint8List(bytes);
 
-    final sw = Stopwatch()..start();
     DateTime? lastUpdateTime;
     final List<double> realtimeSpeeds = [];
+    // Only start timing once the request body actually begins flowing to the
+    // socket, and measure against bytes the OS has accepted — not the full
+    // payload that Dio buffers up front.
+    final sw = Stopwatch();
+    int lastSent = 0;
 
     try {
       await _dio.post(
         '$_uploadUrl?measId=$_measurementId&during=upload',
-        data: data,
+        data: Stream.fromIterable([data]),
         options: Options(
           headers: {
             'Content-Type': 'application/octet-stream',
+            'Content-Length': bytes.toString(),
             'Cache-Control': 'no-cache, no-store',
           },
           sendTimeout: const Duration(seconds: 25),
@@ -444,17 +449,23 @@ class SpeedTestProvider with ChangeNotifier {
         onSendProgress: (sent, total) {
           if (_isCanceled) return;
 
+          if (!sw.isRunning && sent > 0) sw.start();
+          lastSent = sent;
+
           final now = DateTime.now();
           final elapsed = sw.elapsedMilliseconds / 1000.0;
 
           if (elapsed > 0.05 &&
-              (lastUpdateTime == null || now.difference(lastUpdateTime!).inMilliseconds > 100)) {
+              (lastUpdateTime == null ||
+                  now.difference(lastUpdateTime!).inMilliseconds > 100)) {
             final currentSpeedMbps = (sent * 8) / elapsed / 1000000;
             realtimeSpeeds.add(currentSpeedMbps);
-            
-            // Use smoothed average instead of raw speed
+
             final smoothedSpeed = realtimeSpeeds.length > 3
-                ? realtimeSpeeds.sublist(realtimeSpeeds.length - 3).reduce((a, b) => a + b) / 3
+                ? realtimeSpeeds
+                        .sublist(realtimeSpeeds.length - 3)
+                        .reduce((a, b) => a + b) /
+                    3
                 : currentSpeedMbps;
             final roundedSpeed = _roundSpeed(smoothedSpeed);
             _state = _state.copyWith(currentSpeed: roundedSpeed);
@@ -465,12 +476,14 @@ class SpeedTestProvider with ChangeNotifier {
       );
 
       if (_isCanceled) return 0.0;
+      if (!sw.isRunning) return 0.0;
 
       sw.stop();
       final durationSeconds = sw.elapsedMilliseconds / 1000.0;
       if (durationSeconds < 0.05) return 0.0;
 
-      return (bytes * 8) / durationSeconds / 1000000;
+      final sentBytes = lastSent > 0 ? lastSent : bytes;
+      return (sentBytes * 8) / durationSeconds / 1000000;
     } catch (e) {
       debugPrint('   ❌ Upload measurement error: $e');
       throw Exception('Upload failed: $e');

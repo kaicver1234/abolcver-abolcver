@@ -81,6 +81,13 @@ class SpeedTestScreen extends StatelessWidget {
 
                       SizedBox(
                           height: r.responsiveValue(
+                              small: 20, medium: 24, large: 28)),
+
+                      // Live numeric readout (ping / download / upload / jitter)
+                      _MetricsPanel(state: provider.state),
+
+                      SizedBox(
+                          height: r.responsiveValue(
                               small: 24, medium: 30, large: 36)),
 
                       // Segmented phase progress (replaces dot indicator)
@@ -247,6 +254,124 @@ class _LoadingCenter extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// ─── Metrics panel (ping / download / upload / jitter) ─────────────────────
+
+class _MetricsPanel extends StatelessWidget {
+  final SpeedTestState state;
+  const _MetricsPanel({required this.state});
+
+  @override
+  Widget build(BuildContext context) {
+    final tr = AppLocalizations.of(context);
+    final result = state.result;
+
+    String fmtSpeed(double v) {
+      if (v <= 0) return '--';
+      if (v >= 100) return v.toStringAsFixed(0);
+      if (v >= 10) return v.toStringAsFixed(1);
+      return v.toStringAsFixed(2);
+    }
+
+    String fmtMs(int v) => v > 0 ? '$v' : '--';
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _MetricTile(
+          icon: Icons.network_ping_rounded,
+          label: tr.translate('speed_test.ping'),
+          value: fmtMs(result.ping),
+          unit: tr.translate('speed_test.ms'),
+        ),
+        _MetricTile(
+          icon: Icons.south_rounded,
+          label: tr.translate('speed_test.download'),
+          value: fmtSpeed(result.downloadSpeed),
+          unit: tr.translate('speed_test.mbps'),
+        ),
+        _MetricTile(
+          icon: Icons.north_rounded,
+          label: tr.translate('speed_test.upload'),
+          value: fmtSpeed(result.uploadSpeed),
+          unit: tr.translate('speed_test.mbps'),
+        ),
+        _MetricTile(
+          icon: Icons.timeline_rounded,
+          label: tr.translate('speed_test.jitter'),
+          value: fmtMs(result.jitter),
+          unit: tr.translate('speed_test.ms'),
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final String unit;
+  const _MetricTile({
+    required this.icon,
+    required this.label,
+    required this.value,
+    required this.unit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final active = value != '--';
+    return Expanded(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 15,
+            color: Colors.white.withValues(alpha: active ? 0.75 : 0.30),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label.toUpperCase(),
+            style: GoogleFonts.poppins(
+              fontSize: 8.5,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.8,
+              color: Colors.white.withValues(alpha: 0.40),
+            ),
+          ),
+          const SizedBox(height: 4),
+          RichText(
+            textAlign: TextAlign.center,
+            text: TextSpan(
+              children: [
+                TextSpan(
+                  text: value,
+                  style: GoogleFonts.poppins(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white
+                        .withValues(alpha: active ? 0.95 : 0.35),
+                  ),
+                ),
+                if (active)
+                  TextSpan(
+                    text: ' $unit',
+                    style: GoogleFonts.poppins(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white.withValues(alpha: 0.45),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
