@@ -4,56 +4,64 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import '../models/speed_test_state.dart';
 
+/// Time-bounded, windowed speed test against Cloudflare's public endpoints.
+///
+/// Design goals (in priority order):
+///   1. Download AND upload both produce correct, stable numbers.
+///   2. Works on any connection speed without timing out: each transfer runs
+///      for a fixed *duration* (not a fixed *size*), then is stopped.
+///   3. Accurate measurement: the speed is computed over a measurement
+///      "window" that skips the first ~1.5s (TLS handshake + TCP slow-start +
+///      socket-buffer fill) and the tail, so neither warmup nor teardown skews
+///      the result.
 class SpeedTestProvider with ChangeNotifier {
   SpeedTestState _state = const SpeedTestState();
   SpeedTestState get state => _state;
 
   bool _isCanceled = false;
-  CancelToken? _cancelToken;
+  CancelToken? _activeToken;
   late Dio _dio;
 
   final List<int> _latencies = [];
-  final List<double> _downloadSpeeds = [];
-  final List<double> _uploadSpeeds = [];
 
   static const String _baseUrl = 'https://speed.cloudflare.com';
   static const String _downloadUrl = '$_baseUrl/__down';
   static const String _uploadUrl = '$_baseUrl/__up';
 
-  // Faster sequence — total runtime ~15-25s on typical connections.
-  // - Latency: 10 packets is enough for a stable median + jitter.
-  // - Download: one tiny warmup + two larger samples (median = stable result).
-  // - Upload: one tiny warmup + two samples.
-  static const List<Map<String, dynamic>> _measurements = [
-    {'type': 'latency', 'numPackets': 10},
-    {'type': 'download', 'bytes': 1000000,  'count': 1, 'warmup': true},
-    {'type': 'download', 'bytes': 10000000, 'count': 2},
-    {'type': 'upload',   'bytes': 1000000,  'count': 1, 'warmup': true},
-    {'type': 'upload',   'bytes': 8000000,  'count': 2},
-  ];
+  // ---- Tunables -------------------------------------------------------------
+  static const int _latencyPackets = 12;
+  // How long each throughput phase actively transfers data.
+  static const Duration _downloadDuration = Duration(seconds: 8);
+  static const Duration _uploadDuration = Duration(seconds: 8);
+  // Ignore the first part of each transfer (ramp-up) when computing the result.
+  static const double _warmupSeconds = 1.5;
+  // A request size large enough that it never finishes before the time limit,
+  // even on very fast links (~1 Gbps * 8s ≈ 1 GB). The transfer is canceled at
+  // the duration mark, so we never actually download/upload this much.
+  static const int _downloadRequestBytes = 2000000000; // 2 GB ceiling
+  static const int _uploadChunkSize = 64 * 1024;
+  // ---------------------------------------------------------------------------
 
   String _measurementId = '';
 
   SpeedTestProvider() {
     _dio = Dio(BaseOptions(
-      connectTimeout: const Duration(seconds: 10),
-      receiveTimeout: const Duration(seconds: 25),
-      sendTimeout: const Duration(seconds: 25),
+      connectTimeout: const Duration(seconds: 12),
+      // Generous transport timeouts; phases are bounded by their own timers.
+      receiveTimeout: const Duration(seconds: 30),
+      sendTimeout: const Duration(seconds: 30),
       headers: {'User-Agent': 'Tiksar VPN Speed Test'},
     ));
   }
 
-  String _generateMeasurementId() {
-    return (Random().nextDouble() * 1e16).round().toString();
-  }
+  String _generateMeasurementId() =>
+      (Random().nextDouble() * 1e16).round().toString();
 
   void stopTest() {
     _isCanceled = true;
-    _cancelToken?.cancel('User canceled');
-    _cancelToken = null;
+    _activeToken?.cancel('User canceled');
+    _activeToken = null;
     _latencies.clear();
-    _downloadSpeeds.clear();
-    _uploadSpeeds.clear();
     _state = const SpeedTestState();
     notifyListeners();
     debugPrint('🛑 Speed test stopped and reset');
@@ -62,15 +70,12 @@ class SpeedTestProvider with ChangeNotifier {
   Future<void> startTest() async {
     if (_state.step != SpeedTestStep.ready) {
       stopTest();
-      await Future.delayed(const Duration(milliseconds: 200));
+      await Future.delayed(const Duration(milliseconds: 150));
     }
 
     _isCanceled = false;
-    _cancelToken = CancelToken();
     _measurementId = _generateMeasurementId();
     _latencies.clear();
-    _downloadSpeeds.clear();
-    _uploadSpeeds.clear();
 
     _state = const SpeedTestState(
       step: SpeedTestStep.loading,
@@ -78,18 +83,45 @@ class SpeedTestProvider with ChangeNotifier {
     );
     notifyListeners();
 
-    debugPrint('🚀 Cloudflare Speed Test Started');
+    debugPrint('🚀 Speed test started');
 
     try {
-      await _runMeasurementSequence();
+      // 1) Latency / jitter
+      await _runLatency();
+      if (_isCanceled) return;
 
-      if (_isCanceled) {
-        debugPrint('🛑 Speed test was canceled');
-        return;
-      }
+      // 2) Download
+      _state = _state.copyWith(
+        step: SpeedTestStep.download,
+        currentPhase: 'Measuring download...',
+        progress: 0.0,
+        currentSpeed: 0,
+      );
+      notifyListeners();
+      final download = await _runThroughput(isUpload: false);
+      if (_isCanceled) return;
+      _state = _state.copyWith(
+        result: _state.result.copyWith(downloadSpeed: download),
+        currentSpeed: 0,
+        progress: 1.0,
+      );
+      notifyListeners();
+      await Future.delayed(const Duration(milliseconds: 250));
+      if (_isCanceled) return;
 
-      _calculateFinalResults();
-      debugPrint('🏁 Speed test completed successfully');
+      // 3) Upload
+      _state = _state.copyWith(
+        step: SpeedTestStep.upload,
+        currentPhase: 'Measuring upload...',
+        progress: 0.0,
+        currentSpeed: 0,
+      );
+      notifyListeners();
+      final upload = await _runThroughput(isUpload: true);
+      if (_isCanceled) return;
+
+      _finalize(download: download, upload: upload);
+      debugPrint('🏁 Speed test completed');
     } catch (e) {
       debugPrint('❌ Speed test error: $e');
       if (!_isCanceled) {
@@ -104,414 +136,232 @@ class SpeedTestProvider with ChangeNotifier {
     }
   }
 
-  Future<void> _runMeasurementSequence() async {
-    String currentPhase = '';
-
-    // Count measurements by phase for accurate per-phase progress
-    final downloadMeasurements = _measurements.where((m) => m['type'] == 'download').toList();
-    final uploadMeasurements = _measurements.where((m) => m['type'] == 'upload').toList();
-    int downloadDone = 0;
-    int uploadDone = 0;
-
-    for (int i = 0; i < _measurements.length; i++) {
-      if (_isCanceled) return;
-
-      final measurement = _measurements[i];
-      final type = measurement['type'] as String;
-
-      final bool phaseChanged = type != currentPhase;
-      if (phaseChanged) {
-        // Smooth transition between phases
-        if (currentPhase.isNotEmpty) {
-          _state = _state.copyWith(progress: 0.0, currentSpeed: 0);
-          notifyListeners();
-          await Future.delayed(const Duration(milliseconds: 250));
-          if (_isCanceled) return;
-        }
-
-        currentPhase = type;
-        final nextStep = type == 'download'
-            ? SpeedTestStep.download
-            : type == 'upload'
-                ? SpeedTestStep.upload
-                : SpeedTestStep.loading;
-        _state = _state.copyWith(step: nextStep);
-        notifyListeners();
-      }
-
-      // Progress within current phase
-      double phaseProgress = 0.0;
-      if (type == 'download') {
-        phaseProgress = downloadDone / downloadMeasurements.length;
-      } else if (type == 'upload') {
-        phaseProgress = uploadDone / uploadMeasurements.length;
-      }
-
-      debugPrint('📊 Measurement $i: $type');
-
-      switch (type) {
-        case 'latency':
-          await _runLatencyMeasurement(measurement);
-          break;
-        case 'download':
-          await _runDownloadMeasurement(measurement, phaseProgress);
-          downloadDone++;
-          break;
-        case 'upload':
-          await _runUploadMeasurement(measurement, phaseProgress);
-          uploadDone++;
-          break;
-      }
-
-      await Future.delayed(const Duration(milliseconds: 10));
-    }
-  }
-
-  Future<void> _runLatencyMeasurement(Map<String, dynamic> config) async {
-    final numPackets = config['numPackets'] as int;
-    int consecutiveFailures = 0;
-
+  // ---------------------------------------------------------------------------
+  // Latency
+  // ---------------------------------------------------------------------------
+  Future<void> _runLatency() async {
     _state = _state.copyWith(
       step: SpeedTestStep.loading,
-      currentPhase: 'Measuring latency... ($numPackets packets)',
+      currentPhase: 'Measuring latency...',
     );
     notifyListeners();
 
-    for (int i = 0; i < numPackets; i++) {
+    int consecutiveFailures = 0;
+    for (int i = 0; i < _latencyPackets; i++) {
       if (_isCanceled) return;
-
+      final token = CancelToken();
+      _activeToken = token;
       try {
         final sw = Stopwatch()..start();
         await _dio.get(
           '$_downloadUrl?bytes=0&measId=$_measurementId',
-          cancelToken: _cancelToken,
+          options: Options(headers: {'Cache-Control': 'no-cache, no-store'}),
+          cancelToken: token,
         );
         sw.stop();
-
         final latency = sw.elapsedMilliseconds;
         if (latency > 0 && latency < 5000) {
           _latencies.add(latency);
           consecutiveFailures = 0;
-
-          final avgLatency = _latencies.isNotEmpty
-              ? (_latencies.reduce((a, b) => a + b) / _latencies.length).round()
-              : 0;
-
-          int jitter = 0;
-          if (_latencies.length >= 2) {
-            int jitterSum = 0;
-            for (int j = 1; j < _latencies.length; j++) {
-              jitterSum += (_latencies[j] - _latencies[j - 1]).abs();
-            }
-            jitter = (jitterSum / (_latencies.length - 1)).round();
-          }
-
-          _state = _state.copyWith(
-            result: _state.result.copyWith(
-              ping: latency,
-              latency: avgLatency,
-              jitter: jitter,
-            ),
-          );
-          notifyListeners();
-
-          debugPrint('   📡 Latency ${i + 1}/$numPackets: ${latency}ms');
+          _publishLatency(lastPing: latency);
         }
       } catch (e) {
+        if (_isCanceled) return;
         consecutiveFailures++;
-        debugPrint('   ❌ Latency measurement ${i + 1} failed: $e');
-
         if (consecutiveFailures >= 3) {
           throw Exception('Network connection failed');
         }
       }
-
-      await Future.delayed(const Duration(milliseconds: 5));
+      await Future.delayed(const Duration(milliseconds: 30));
     }
 
-    if (_latencies.isEmpty) {
-      throw Exception('Failed to measure latency');
-    }
+    if (_latencies.isEmpty) throw Exception('Failed to measure latency');
   }
 
-  Future<void> _runDownloadMeasurement(Map<String, dynamic> config, double progress) async {
-    final bytes = config['bytes'] as int;
-    final count = config['count'] as int;
-    final isWarmup = config['warmup'] as bool? ?? false;
-    final sizeLabel = _formatBytes(bytes);
-    int consecutiveFailures = 0;
-
+  void _publishLatency({required int lastPing}) {
+    final avg =
+        (_latencies.reduce((a, b) => a + b) / _latencies.length).round();
     _state = _state.copyWith(
-      step: SpeedTestStep.download,
-      currentPhase: 'Download test: $sizeLabel',
-      progress: progress,
+      result: _state.result.copyWith(
+        ping: _latencies.reduce(min),
+        latency: avg,
+        jitter: _jitter(),
+      ),
     );
     notifyListeners();
-
-    for (int i = 0; i < count; i++) {
-      if (_isCanceled) return;
-
-      try {
-        final speed = await _measureDownloadSpeed(bytes);
-        if (speed > 0) {
-          consecutiveFailures = 0;
-          if (!isWarmup) {
-            _downloadSpeeds.add(speed);
-          }
-
-          // Display: rolling median of recent samples (more stable than percentile)
-          final samples = _downloadSpeeds.isNotEmpty ? _downloadSpeeds : [speed];
-          final stable = _calculatePercentile(samples, 0.5);
-
-          _state = _state.copyWith(
-            currentSpeed: speed,
-            result: _state.result.copyWith(
-              downloadSpeed: stable,
-              ping: _latencies.isNotEmpty ? _latencies.last : 0,
-            ),
-          );
-          notifyListeners();
-
-          debugPrint('   📥 Download ${i + 1}/$count ($sizeLabel)${isWarmup ? " [warmup]" : ""}: ${speed.toStringAsFixed(2)} Mbps');
-        }
-      } catch (e) {
-        consecutiveFailures++;
-        debugPrint('   ❌ Download measurement ${i + 1} failed: $e');
-
-        if (consecutiveFailures >= 3) {
-          throw Exception('Network connection lost during download test');
-        }
-      }
-
-      await Future.delayed(const Duration(milliseconds: 20));
-    }
   }
 
-  Future<double> _measureDownloadSpeed(int bytes) async {
-    if (_isCanceled) return 0.0;
+  int _jitter() {
+    if (_latencies.length < 2) return 0;
+    int sum = 0;
+    for (int i = 1; i < _latencies.length; i++) {
+      sum += (_latencies[i] - _latencies[i - 1]).abs();
+    }
+    return (sum / (_latencies.length - 1)).round();
+  }
 
-    final sw = Stopwatch();
-    DateTime? lastUpdateTime;
-    final List<double> realtimeSpeeds = [];
-    int totalReceived = 0;
-    bool started = false;
+  // ---------------------------------------------------------------------------
+  // Throughput (shared by download & upload)
+  // ---------------------------------------------------------------------------
+  /// Runs a single time-bounded transfer and returns the windowed speed in Mbps.
+  Future<double> _runThroughput({required bool isUpload}) async {
+    final duration = isUpload ? _uploadDuration : _downloadDuration;
+    // Cumulative samples: [elapsedSeconds, cumulativeBytes].
+    final List<List<double>> samples = [];
+    final transferSw = Stopwatch();
+    DateTime? lastUiUpdate;
+
+    final token = CancelToken();
+    _activeToken = token;
+
+    // Timer that stops the transfer once the measurement duration elapses.
+    Timer? stopTimer;
+
+    void record(int cumulativeBytes) {
+      if (!transferSw.isRunning) transferSw.start();
+      final t = transferSw.elapsedMilliseconds / 1000.0;
+      samples.add([t, cumulativeBytes.toDouble()]);
+
+      // Drive the live gauge + progress bar.
+      final now = DateTime.now();
+      if (lastUiUpdate == null ||
+          now.difference(lastUiUpdate!).inMilliseconds >= 120) {
+        lastUiUpdate = now;
+        final instant = _instantSpeedMbps(samples);
+        _state = _state.copyWith(
+          currentSpeed: _roundSpeed(instant),
+          progress: (t / (duration.inMilliseconds / 1000.0)).clamp(0.0, 1.0),
+        );
+        notifyListeners();
+      }
+    }
 
     try {
-      await _dio.get<List<int>>(
-        '$_downloadUrl?bytes=$bytes&measId=$_measurementId&during=download',
-        options: Options(
-          responseType: ResponseType.bytes,
-          headers: {
-            'Cache-Control': 'no-cache, no-store',
-            'Accept-Encoding': 'identity', // avoid compression skewing byte count
-          },
-        ),
-        cancelToken: _cancelToken,
-        onReceiveProgress: (received, total) {
-          if (_isCanceled) return;
+      if (isUpload) {
+        // Chunked upload: a generator yields zero-filled chunks. The generator
+        // is naturally back-pressured by the real socket throughput, so the
+        // bytes it has yielded ≈ the bytes actually accepted by the network.
+        final chunk = Uint8List(_uploadChunkSize);
+        int sent = 0;
+        bool timeUp = false;
 
-          // Start timing on first received byte (excludes connect/TTFB)
-          if (!started && received > 0) {
-            sw.start();
-            started = true;
+        Stream<List<int>> body() async* {
+          transferSw.start();
+          stopTimer = Timer(duration, () => timeUp = true);
+          while (!timeUp && !_isCanceled) {
+            yield chunk;
+            sent += chunk.length;
+            record(sent);
+            // Yield to the event loop so the socket can drain and our stop
+            // timer / cancellation can fire between chunks.
+            await Future.delayed(Duration.zero);
           }
-          totalReceived = received;
-
-          if (!started) return;
-
-          final now = DateTime.now();
-          final elapsed = sw.elapsedMilliseconds / 1000.0;
-
-          if (elapsed > 0.05 &&
-              (lastUpdateTime == null ||
-                  now.difference(lastUpdateTime!).inMilliseconds > 100)) {
-            final currentSpeedMbps = (received * 8) / elapsed / 1000000;
-            realtimeSpeeds.add(currentSpeedMbps);
-
-            final smoothedSpeed = realtimeSpeeds.length > 3
-                ? realtimeSpeeds
-                        .sublist(realtimeSpeeds.length - 3)
-                        .reduce((a, b) => a + b) /
-                    3
-                : currentSpeedMbps;
-            final roundedSpeed = _roundSpeed(smoothedSpeed);
-            _state = _state.copyWith(currentSpeed: roundedSpeed);
-            notifyListeners();
-            lastUpdateTime = now;
-          }
-        },
-      );
-
-      if (_isCanceled) return 0.0;
-      if (!started) return 0.0;
-
-      sw.stop();
-      final durationSeconds = sw.elapsedMilliseconds / 1000.0;
-      if (durationSeconds < 0.05) return 0.0;
-
-      return (totalReceived * 8) / durationSeconds / 1000000;
-    } catch (e) {
-      debugPrint('   ❌ Download measurement error: $e');
-      throw Exception('Download failed: $e');
-    }
-  }
-
-  Future<void> _runUploadMeasurement(Map<String, dynamic> config, double progress) async {
-    final bytes = config['bytes'] as int;
-    final count = config['count'] as int;
-    final isWarmup = config['warmup'] as bool? ?? false;
-    final sizeLabel = _formatBytes(bytes);
-    int consecutiveFailures = 0;
-
-    _state = _state.copyWith(
-      step: SpeedTestStep.upload,
-      currentPhase: 'Upload test: $sizeLabel',
-      progress: progress,
-    );
-    notifyListeners();
-
-    for (int i = 0; i < count; i++) {
-      if (_isCanceled) return;
-
-      try {
-        final speed = await _measureUploadSpeed(bytes);
-        if (speed > 0) {
-          consecutiveFailures = 0;
-          if (!isWarmup) {
-            _uploadSpeeds.add(speed);
-          }
-
-          final samples = _uploadSpeeds.isNotEmpty ? _uploadSpeeds : [speed];
-          final stable = _calculatePercentile(samples, 0.5);
-
-          int jitter = 0;
-          if (_latencies.length >= 2) {
-            int jitterSum = 0;
-            for (int j = 1; j < _latencies.length; j++) {
-              jitterSum += (_latencies[j] - _latencies[j - 1]).abs();
-            }
-            jitter = (jitterSum / (_latencies.length - 1)).round();
-          }
-
-          _state = _state.copyWith(
-            currentSpeed: speed,
-            result: _state.result.copyWith(
-              uploadSpeed: stable,
-              jitter: jitter,
-            ),
-          );
-          notifyListeners();
-
-          debugPrint('   📤 Upload ${i + 1}/$count ($sizeLabel)${isWarmup ? " [warmup]" : ""}: ${speed.toStringAsFixed(2)} Mbps');
         }
-      } catch (e) {
-        consecutiveFailures++;
-        debugPrint('   ❌ Upload measurement ${i + 1} failed: $e');
 
-        if (consecutiveFailures >= 3) {
-          throw Exception('Network connection lost during upload test');
-        }
+        await _dio.post(
+          '$_uploadUrl?measId=$_measurementId',
+          data: body(),
+          options: Options(
+            headers: {
+              'Content-Type': 'application/octet-stream',
+              'Cache-Control': 'no-cache, no-store',
+            },
+            // No Content-Length => chunked transfer, so we can stop anytime.
+            sendTimeout: const Duration(seconds: 30),
+            receiveTimeout: const Duration(seconds: 30),
+          ),
+          cancelToken: token,
+        );
+      } else {
+        // Download a huge body and cancel it at the duration mark.
+        stopTimer = Timer(duration, () {
+          if (!token.isCancelled) token.cancel('measurement-window-complete');
+        });
+
+        await _dio.get<ResponseBody>(
+          '$_downloadUrl?bytes=$_downloadRequestBytes&measId=$_measurementId',
+          options: Options(
+            responseType: ResponseType.stream,
+            headers: {
+              'Cache-Control': 'no-cache, no-store',
+              'Accept-Encoding': 'identity',
+            },
+          ),
+          cancelToken: token,
+        ).then((resp) async {
+          int received = 0;
+          await for (final part in resp.data!.stream) {
+            if (_isCanceled || token.isCancelled) break;
+            received += part.length;
+            record(received);
+          }
+        });
       }
-
-      await Future.delayed(const Duration(milliseconds: 20));
+    } on DioException catch (e) {
+      // Cancellation at the time limit is the expected, normal stop condition.
+      if (e.type != DioExceptionType.cancel) {
+        stopTimer?.cancel();
+        if (_isCanceled) return 0.0;
+        throw Exception('${isUpload ? 'Upload' : 'Download'} failed: $e');
+      }
+    } finally {
+      stopTimer?.cancel();
     }
-  }
 
-  Future<double> _measureUploadSpeed(int bytes) async {
     if (_isCanceled) return 0.0;
-
-    // Build the payload in bulk (cheap) instead of one random byte at a time,
-    // which used to block the isolate for seconds on multi-MB uploads and made
-    // the measured duration meaningless.
-    final data = Uint8List(bytes);
-
-    DateTime? lastUpdateTime;
-    final List<double> realtimeSpeeds = [];
-    // Only start timing once the request body actually begins flowing to the
-    // socket, and measure against bytes the OS has accepted — not the full
-    // payload that Dio buffers up front.
-    final sw = Stopwatch();
-    int lastSent = 0;
-
-    try {
-      await _dio.post(
-        '$_uploadUrl?measId=$_measurementId&during=upload',
-        data: Stream.fromIterable([data]),
-        options: Options(
-          headers: {
-            'Content-Type': 'application/octet-stream',
-            'Content-Length': bytes.toString(),
-            'Cache-Control': 'no-cache, no-store',
-          },
-          sendTimeout: const Duration(seconds: 25),
-        ),
-        cancelToken: _cancelToken,
-        onSendProgress: (sent, total) {
-          if (_isCanceled) return;
-
-          if (!sw.isRunning && sent > 0) sw.start();
-          lastSent = sent;
-
-          final now = DateTime.now();
-          final elapsed = sw.elapsedMilliseconds / 1000.0;
-
-          if (elapsed > 0.05 &&
-              (lastUpdateTime == null ||
-                  now.difference(lastUpdateTime!).inMilliseconds > 100)) {
-            final currentSpeedMbps = (sent * 8) / elapsed / 1000000;
-            realtimeSpeeds.add(currentSpeedMbps);
-
-            final smoothedSpeed = realtimeSpeeds.length > 3
-                ? realtimeSpeeds
-                        .sublist(realtimeSpeeds.length - 3)
-                        .reduce((a, b) => a + b) /
-                    3
-                : currentSpeedMbps;
-            final roundedSpeed = _roundSpeed(smoothedSpeed);
-            _state = _state.copyWith(currentSpeed: roundedSpeed);
-            notifyListeners();
-            lastUpdateTime = now;
-          }
-        },
-      );
-
-      if (_isCanceled) return 0.0;
-      if (!sw.isRunning) return 0.0;
-
-      sw.stop();
-      final durationSeconds = sw.elapsedMilliseconds / 1000.0;
-      if (durationSeconds < 0.05) return 0.0;
-
-      final sentBytes = lastSent > 0 ? lastSent : bytes;
-      return (sentBytes * 8) / durationSeconds / 1000000;
-    } catch (e) {
-      debugPrint('   ❌ Upload measurement error: $e');
-      throw Exception('Upload failed: $e');
-    }
+    return _windowedSpeedMbps(samples, _warmupSeconds);
   }
 
-  void _calculateFinalResults() {
-    // Use median of non-warmup samples for stable, representative result
-    final downloadSpeed = _downloadSpeeds.isEmpty
-        ? 0.0
-        : _calculatePercentile(_downloadSpeeds, 0.5);
-    final uploadSpeed = _uploadSpeeds.isEmpty
-        ? 0.0
-        : _calculatePercentile(_uploadSpeeds, 0.5);
-    final ping = _latencies.isEmpty ? 0 : _latencies.reduce(min);
-    final latency = _latencies.isEmpty
-        ? 0
-        : (_latencies.reduce((a, b) => a + b) / _latencies.length).round();
+  /// Speed over the steady-state window: total bits transferred after the
+  /// warmup period, divided by the time spent in that window.
+  double _windowedSpeedMbps(List<List<double>> samples, double warmupSec) {
+    if (samples.length < 2) return 0.0;
 
-    int jitter = 0;
-    if (_latencies.length >= 2) {
-      int jitterSum = 0;
-      for (int i = 1; i < _latencies.length; i++) {
-        jitterSum += (_latencies[i] - _latencies[i - 1]).abs();
-      }
-      jitter = (jitterSum / (_latencies.length - 1)).round();
+    final endT = samples.last[0];
+    final endB = samples.last[1];
+
+    // If the whole transfer was shorter than the warmup, fall back to using it
+    // all (better an approximate number than zero on a very fast/short run).
+    if (endT <= warmupSec) {
+      final dt = endT - samples.first[0];
+      if (dt < 0.2) return 0.0;
+      return (endB - samples.first[1]) * 8 / dt / 1e6;
     }
 
+    // First sample at or after the warmup mark = window start.
+    List<double> start = samples.first;
+    for (final s in samples) {
+      if (s[0] >= warmupSec) {
+        start = s;
+        break;
+      }
+    }
+    final dt = endT - start[0];
+    final db = endB - start[1];
+    if (dt < 0.2 || db <= 0) return 0.0;
+    return db * 8 / dt / 1e6;
+  }
+
+  /// Instantaneous speed over roughly the last second, for the live gauge.
+  double _instantSpeedMbps(List<List<double>> samples) {
+    if (samples.length < 2) return 0.0;
+    final endT = samples.last[0];
+    final endB = samples.last[1];
+    List<double> start = samples.first;
+    for (int i = samples.length - 1; i >= 0; i--) {
+      if (endT - samples[i][0] >= 1.0) {
+        start = samples[i];
+        break;
+      }
+    }
+    final dt = endT - start[0];
+    final db = endB - start[1];
+    if (dt < 0.15 || db <= 0) return 0.0;
+    return db * 8 / dt / 1e6;
+  }
+
+  // ---------------------------------------------------------------------------
+  void _finalize({required double download, required double upload}) {
     _state = _state.copyWith(
       step: SpeedTestStep.ready,
       progress: 1.0,
@@ -520,41 +370,25 @@ class SpeedTestProvider with ChangeNotifier {
       hadError: false,
       clearErrorMessage: true,
       result: SpeedTestResult(
-        downloadSpeed: downloadSpeed,
-        uploadSpeed: uploadSpeed,
-        ping: ping,
-        latency: latency,
-        jitter: jitter,
+        downloadSpeed: download,
+        uploadSpeed: upload,
+        ping: _latencies.isEmpty ? 0 : _latencies.reduce(min),
+        latency: _latencies.isEmpty
+            ? 0
+            : (_latencies.reduce((a, b) => a + b) / _latencies.length).round(),
+        jitter: _jitter(),
         packetLoss: 0,
       ),
     );
     notifyListeners();
-
-    debugPrint('Complete: ↓${downloadSpeed.toStringAsFixed(1)} ↑${uploadSpeed.toStringAsFixed(1)} Mbps, ${ping}ms');
-  }
-
-  double _calculatePercentile(List<double> values, double percentile) {
-    if (values.isEmpty) return 0.0;
-    final sorted = List<double>.from(values)..sort();
-    final index = (percentile * (sorted.length - 1)).round();
-    return sorted[index.clamp(0, sorted.length - 1)];
+    debugPrint(
+        'Complete: ↓${download.toStringAsFixed(1)} ↑${upload.toStringAsFixed(1)} Mbps');
   }
 
   double _roundSpeed(double speed) {
-    if (speed < 10) {
-      return (speed / 0.1).round() * 0.1;
-    } else if (speed < 50) {
-      return (speed / 0.25).round() * 0.25;
-    } else {
-      return (speed / 0.5).round() * 0.5;
-    }
-  }
-
-  String _formatBytes(int bytes) {
-    if (bytes < 1000) return '${bytes}B';
-    if (bytes < 1000000) return '${(bytes / 1000).toStringAsFixed(0)}KB';
-    if (bytes < 1000000000) return '${(bytes / 1000000).toStringAsFixed(0)}MB';
-    return '${(bytes / 1000000000).toStringAsFixed(0)}GB';
+    if (speed < 10) return (speed / 0.1).round() * 0.1;
+    if (speed < 50) return (speed / 0.25).round() * 0.25;
+    return (speed / 0.5).round() * 0.5;
   }
 
   void resetTest() => stopTest();

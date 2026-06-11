@@ -157,15 +157,28 @@ public class V2rayVPNService extends VpnService implements V2rayServicesListener
         builder.setMtu(1500);
         builder.addAddress("26.26.26.1", 30);
 
-        if (v2rayConfig.BYPASS_SUBNETS == null || v2rayConfig.BYPASS_SUBNETS.isEmpty()) {
-            builder.addRoute("0.0.0.0", 0);
-        } else {
+        // Always route ALL traffic into the tunnel. addRoute() defines what goes
+        // INTO the VPN, so routing only the bypass subnets here would (incorrectly)
+        // tunnel ONLY those subnets and leave the rest of the internet untunneled.
+        builder.addRoute("0.0.0.0", 0);
+
+        // Exclude the bypass subnets (e.g. LAN / private ranges) from the tunnel so
+        // local devices stay reachable. excludeRoute() is available on Android 13+
+        // (API 33). On older versions the exclusion is handled by the v2ray-core
+        // routing rules (geoip:private -> direct) instead.
+        if (v2rayConfig.BYPASS_SUBNETS != null && !v2rayConfig.BYPASS_SUBNETS.isEmpty()
+                && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             for (String subnet : v2rayConfig.BYPASS_SUBNETS) {
                 String[] parts = subnet.split("/");
                 if (parts.length == 2) {
-                    String address = parts[0];
-                    int prefixLength = Integer.parseInt(parts[1]);
-                    builder.addRoute(address, prefixLength);
+                    try {
+                        String address = parts[0];
+                        int prefixLength = Integer.parseInt(parts[1]);
+                        builder.excludeRoute(new android.net.IpPrefix(
+                                java.net.InetAddress.getByName(address), prefixLength));
+                    } catch (Exception e) {
+                        Log.w("VPN_SERVICE", "Failed to exclude bypass subnet " + subnet + ": " + e.getMessage());
+                    }
                 }
             }
         }
