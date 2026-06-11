@@ -168,6 +168,7 @@
         "download": "DOWNLOAD",
         "connection_failed": "Connection failed. Check your internet.",
         "test_failed": "Speed test failed. Please try again.",
+        "unstable_connection": "Your connection was unstable. Please try again.",
         "upload": "UPLOAD",
         "ping": "PING",
         "jitter": "JITTER",
