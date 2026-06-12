@@ -6,6 +6,7 @@ import '../providers/speed_test_provider.dart';
 import '../models/speed_test_state.dart';
 import '../widgets/app_background.dart';
 import '../widgets/speed_test/modern_speed_gauge.dart';
+import '../widgets/wave_loading.dart';
 import '../utils/app_localizations.dart';
 import '../services/analytics_service.dart';
 import '../utils/responsive_helper.dart';
@@ -235,14 +236,7 @@ class _LoadingCenter extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const SizedBox(
-          width: 36,
-          height: 36,
-          child: CircularProgressIndicator(
-            strokeWidth: 2.5,
-            valueColor: AlwaysStoppedAnimation(_kWhite),
-          ),
-        ),
+        const WaveLoading(color: _kWhite),
         const SizedBox(height: 14),
         Text(
           'PING',

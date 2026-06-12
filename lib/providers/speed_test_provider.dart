@@ -23,8 +23,20 @@ class SpeedTestProvider with ChangeNotifier {
   static const Duration _downloadDuration = Duration(seconds: 12);
   static const Duration _uploadDuration = Duration(seconds: 10);
   static const double _warmupSeconds = 1.5;
-  static const int _downloadReqBytes = 25 * 1000 * 1000;
-  static const int _uploadReqBytes = 10 * 1000 * 1000;
+  // Per-request payload sizes are intentionally large so that a single request
+  // spans the whole measurement window on typical connections. This avoids the
+  // gauge "freezing" and the buffer-fill spike: with a long-lived upload the OS
+  // socket buffer fills once (inside the warmup window, so it is excluded) and
+  // afterwards `onSendProgress` advances at the real network drain rate. A small
+  // request instead finishes almost instantly into the socket buffer, reports a
+  // single big jump, then stalls — which is the bug we are fixing.
+  //
+  // NOTE: Cloudflare's __down endpoint rejects bytes >= 100,000,000 with HTTP
+  // 403, so the download payload must stay below that cap (50 MB is accepted and
+  // is plenty to span the window with 6 parallel connections). The __up endpoint
+  // takes the body we stream, so the upload payload is not subject to that cap.
+  static const int _downloadReqBytes = 50 * 1000 * 1000;
+  static const int _uploadReqBytes = 100 * 1000 * 1000;
   static const int _uploadChunkSize = 64 * 1024;
   static const int _latencyProbes = 20;
   static const Duration _sampleInterval = Duration(milliseconds: 100);
@@ -389,12 +401,28 @@ class SpeedTestProvider with ChangeNotifier {
 
     final end = samples.last;
 
-    // Find sample ~1 second ago
+    // During warmup the socket send buffer is filling, which makes upload
+    // briefly read far above the real rate (a one-time spike). Keep that out of
+    // the live gauge entirely: show nothing until warmup has passed, and never
+    // let the measurement window reach back into the warmup region.
+    if (end.time < _warmupSeconds) return 0.0;
+
+    // Trailing ~1s window, clamped so it never starts before the warmup point.
+    final windowStart = max(_warmupSeconds, end.time - 1.0);
     _Sample start = samples.first;
-    for (int i = samples.length - 1; i >= 0; i--) {
-      if (end.time - samples[i].time >= 1.0) {
-        start = samples[i];
+    for (final s in samples) {
+      if (s.time <= windowStart) {
+        start = s;
+      } else {
         break;
+      }
+    }
+    if (start.time < _warmupSeconds) {
+      for (final s in samples) {
+        if (s.time >= _warmupSeconds) {
+          start = s;
+          break;
+        }
       }
     }
 

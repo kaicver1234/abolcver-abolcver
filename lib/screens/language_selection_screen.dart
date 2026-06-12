@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/language_provider.dart';
 import '../models/app_language.dart';
+import '../widgets/wave_loading.dart';
 import 'privacy_welcome_screen.dart';
 
 class LanguageSelectionScreen extends StatefulWidget {
@@ -294,14 +295,7 @@ class _LanguageCard extends StatelessWidget {
             ),
             SizedBox(width: screenW * 0.032),
             isLoading
-                ? SizedBox(
-                    width: checkSize,
-                    height: checkSize,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
+                ? const WaveLoading.small(color: Colors.white)
                 : AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     width: checkSize,

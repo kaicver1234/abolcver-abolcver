@@ -9,6 +9,7 @@ import '../utils/app_localizations.dart';
 import '../utils/country_flags.dart';
 import '../utils/responsive_helper.dart';
 import '../widgets/app_background.dart';
+import '../widgets/wave_loading.dart';
 import '../services/analytics_service.dart';
 
 class ServerSelectionScreen extends StatefulWidget {
@@ -25,7 +26,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   final Map<String, int> _pingResults = {};
   List<V2RayConfig>? _sortedConfigs;
   late AnimationController _refreshAnimController;
-  late AnimationController _waveController;
   late TabController _tabController;
 
   String _testStatusText = '';
@@ -48,10 +48,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     );
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    )..repeat();
 
     _loadBatchSize();
 
@@ -90,7 +86,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
   void dispose() {
     _tabController.dispose();
     _refreshAnimController.dispose();
-    _waveController.dispose();
     _sortedConfigs = null;
     _pingResults.clear();
     super.dispose();
@@ -381,15 +376,8 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             if (_isTesting) ...[
-              SizedBox(
-                width: 14,
-                height: 14,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(
-                    Colors.white.withValues(alpha: 0.7),
-                  ),
-                ),
+              WaveLoading.small(
+                color: Colors.white.withValues(alpha: 0.7),
               ),
               const SizedBox(width: 8),
               Text(
@@ -577,8 +565,8 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Wave loading animation (3 bars)
-          _buildWaveLoading(),
+          // Wave loading animation (shared, matches splash)
+          const WaveLoading(),
           const SizedBox(height: 24),
           Text(
             AppLocalizations.of(context).translate('common.loading_servers'),
@@ -586,56 +574,6 @@ class _ServerSelectionScreenState extends State<ServerSelectionScreen>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildWaveLoading() {
-    return AnimatedBuilder(
-      animation: _waveController,
-      builder: (context, child) {
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(3, (index) {
-            // Calculate wave animation with delay for each bar
-            final delay = index * 0.2;
-            final progress = (_waveController.value + delay) % 1.0;
-            
-            // Calculate vertical offset (bounce up and down)
-            final offset = progress < 0.5
-                ? -20.0 * (progress * 2)
-                : -20.0 * (2 - progress * 2);
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Transform.translate(
-                offset: Offset(0, offset),
-                child: Container(
-                  width: 5,
-                  height: 35,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Color(0xFF5A5A5A),
-                        Color(0xFF3A3A3A),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(2.5),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color(0xFF4A4A4A).withValues(alpha: 0.3),
-                        blurRadius: 10,
-                        spreadRadius: 1,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          }),
-        );
-      },
     );
   }
 

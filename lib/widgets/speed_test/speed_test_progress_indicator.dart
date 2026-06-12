@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/speed_test_state.dart';
 import '../../utils/app_colors.dart';
+import '../wave_loading.dart';
 import 'semicircular_progress_painter.dart';
 import 'animated_grid_painter.dart';
 
@@ -190,16 +191,9 @@ class _SpeedTestProgressIndicatorState extends State<SpeedTestProgressIndicator>
               ),
               // Loading indicator
               if (widget.showLoadingIndicator)
-                Positioned(
+                const Positioned(
                   top: 130,
-                  child: SizedBox(
-                    width: 30,
-                    height: 30,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                    ),
-                  ),
+                  child: WaveLoading(color: Colors.white),
                 ),
               // Center content (speed value)
               if (widget.centerValue != null && widget.centerUnit != null)

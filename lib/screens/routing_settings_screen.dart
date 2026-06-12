@@ -7,6 +7,7 @@ import '../providers/language_provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/app_background.dart';
 import '../widgets/modern_glass_card.dart';
+import '../widgets/wave_loading.dart';
 import '../utils/responsive_helper.dart';
 
 // Match the home screen language: pure-black canvas with translucent
@@ -75,14 +76,7 @@ class _RoutingSettingsScreenState extends State<RoutingSettingsScreen> {
             builder: (context, routing, _) {
               if (!routing.isInitialized) {
                 return const Center(
-                  child: SizedBox(
-                    width: 28,
-                    height: 28,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: _kPrimary,
-                    ),
-                  ),
+                  child: WaveLoading(color: _kPrimary),
                 );
               }
               final r = ResponsiveHelper(context);
@@ -545,14 +539,7 @@ class _ListEditorState extends State<_ListEditor> {
                     ),
                   ),
                   child: _busy
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
+                      ? const WaveLoading.small(color: Colors.white)
                       : Text(
                           widget.addLabel,
                           style: GoogleFonts.poppins(

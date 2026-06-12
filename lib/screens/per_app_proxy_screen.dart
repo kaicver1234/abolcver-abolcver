@@ -6,6 +6,7 @@ import '../providers/language_provider.dart';
 import '../providers/per_app_proxy_provider.dart';
 import '../services/analytics_service.dart';
 import '../widgets/app_background.dart';
+import '../widgets/wave_loading.dart';
 import '../utils/responsive_helper.dart';
 
 const _kBg     = Color(0xFF0A0A0A);
@@ -297,14 +298,7 @@ class _PerAppProxyScreenState extends State<PerAppProxyScreen> {
       child: Center(
         child: Column(
           children: [
-            const SizedBox(
-              width: 28,
-              height: 28,
-              child: CircularProgressIndicator(
-                strokeWidth: 2.2,
-                valueColor: AlwaysStoppedAnimation(Colors.white),
-              ),
-            ),
+            const WaveLoading(color: Colors.white),
             const SizedBox(height: 14),
             Text(
               _t('در حال بارگذاری برنامه‌ها...', 'Loading apps...'),

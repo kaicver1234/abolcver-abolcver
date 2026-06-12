@@ -1,9 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 
 import '../providers/language_provider.dart';
@@ -11,6 +11,7 @@ import '../utils/app_localizations.dart';
 import '../utils/responsive_helper.dart';
 import '../services/analytics_service.dart';
 import '../widgets/app_background.dart';
+import '../widgets/wave_loading.dart';
 
 // ─── Design tokens (aligned with the app's main theme) ─────────────────────────
 
@@ -52,14 +53,11 @@ class HostCheckerScreen extends StatefulWidget {
   State<HostCheckerScreen> createState() => _HostCheckerScreenState();
 }
 
-class _HostCheckerScreenState extends State<HostCheckerScreen>
-    with SingleTickerProviderStateMixin {
+class _HostCheckerScreenState extends State<HostCheckerScreen> {
   final TextEditingController _hostController = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final List<HostCheckResult> _results = [];
   bool _isChecking = false;
-
-  late final AnimationController _waveController;
 
   static const _quickHosts = [
     {'name': 'Google', 'host': 'google.com', 'color': Color(0xFF4285F4)},
@@ -76,18 +74,32 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
   void initState() {
     super.initState();
     AnalyticsService().logScreenView(screenName: 'Safheh_Baresi_Host');
-    _waveController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1000),
-    );
   }
 
   @override
   void dispose() {
     _hostController.dispose();
     _focusNode.dispose();
-    _waveController.dispose();
     super.dispose();
+  }
+
+  /// Maximum time to wait for a TCP connection before giving up.
+  static const Duration _connectTimeout = Duration(seconds: 8);
+
+  /// Opens a TCP connection to [host]:[port], returns the handshake time in ms,
+  /// then closes the socket. Throws on failure (DNS error, refused, timeout).
+  ///
+  /// A reachability check must NOT download the page body — the old version did
+  /// a full `http.get`, which timed out on heavy sites like YouTube (large body
+  /// + redirects to consent pages) even though the browser opens them instantly.
+  /// A TCP handshake reflects exactly what "can I reach this host" means and is
+  /// fast and reliable through the VPN tunnel.
+  Future<int> _tcpConnect(String host, int port) async {
+    final sw = Stopwatch()..start();
+    final socket = await Socket.connect(host, port, timeout: _connectTimeout);
+    sw.stop();
+    socket.destroy();
+    return sw.elapsedMilliseconds;
   }
 
   Future<void> _checkHost(String host) async {
@@ -96,43 +108,50 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
     HapticFeedback.lightImpact();
 
     setState(() => _isChecking = true);
-    _waveController.repeat();
 
-    final startTime = DateTime.now();
+    // Extract a clean hostname + port from whatever the user typed
+    // (e.g. "youtube.com", "https://youtube.com/watch?v=x", "1.1.1.1:80").
+    final raw = host.trim();
+    final parsed = Uri.tryParse(raw.contains('://') ? raw : 'https://$raw');
+    final hostname =
+        (parsed != null && parsed.host.isNotEmpty) ? parsed.host : raw;
+    final port = (parsed != null && parsed.hasPort)
+        ? parsed.port
+        : (parsed?.scheme == 'http' ? 80 : 443);
 
     try {
-      String cleanHost = host.trim();
-      if (!cleanHost.startsWith('http://') && !cleanHost.startsWith('https://')) {
-        cleanHost = 'https://$cleanHost';
+      int ms;
+      try {
+        ms = await _tcpConnect(hostname, port);
+      } on SocketException catch (e) {
+        // If HTTPS (443) was refused, the host may only serve plain HTTP — try 80.
+        final refused =
+            (e.osError?.message ?? e.message).toLowerCase().contains('refused');
+        if (port == 443 && refused) {
+          ms = await _tcpConnect(hostname, 80);
+        } else {
+          rethrow;
+        }
       }
-
-      final uri = Uri.parse(cleanHost);
-      final response = await http.get(uri).timeout(
-        const Duration(seconds: 10),
-        onTimeout: () => throw TimeoutException('timeout'),
-      );
 
       if (!mounted) return;
 
-      final ms = DateTime.now().difference(startTime).inMilliseconds;
-      final ok = response.statusCode >= 200 && response.statusCode < 400;
-
       HapticFeedback.mediumImpact();
       AnalyticsService().logHostCheck(
-        host: uri.host,
-        isReachable: ok,
+        host: hostname,
+        isReachable: true,
         responseTimeMs: ms,
       );
       setState(() {
         _results.insert(
           0,
           HostCheckResult(
-            host: uri.host,
-            status: ok ? 'ONLINE' : 'ERROR',
-            statusCode: response.statusCode,
-            responseTime: ms,
+            host: hostname,
+            status: 'ONLINE',
+            statusCode: 0,
+            responseTime: ms <= 0 ? 1 : ms,
             timestamp: DateTime.now(),
-            isSuccess: ok,
+            isSuccess: true,
           ),
         );
         if (_results.length > 20) _results.removeLast();
@@ -143,21 +162,36 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
       HapticFeedback.heavyImpact();
 
       String err;
-      if (e is TimeoutException) {
+      if (e is SocketException) {
+        final msg = (e.osError?.message ?? e.message).toLowerCase();
+        if (e.message.toLowerCase().contains('failed host lookup') ||
+            msg.contains('lookup') ||
+            msg.contains('not known') ||
+            msg.contains('no address')) {
+          err = 'Host not found';
+        } else if (msg.contains('refused')) {
+          err = 'Connection refused';
+        } else if (msg.contains('timed out') || msg.contains('timeout')) {
+          err = 'Timeout';
+        } else {
+          err = 'Unreachable';
+        }
+      } else if (e is TimeoutException) {
         err = 'Timeout';
-      } else if (e.toString().contains('Failed host lookup')) {
-        err = 'Host not found';
-      } else if (e.toString().contains('Connection refused')) {
-        err = 'Connection refused';
       } else {
         err = 'Unreachable';
       }
 
+      AnalyticsService().logHostCheck(
+        host: hostname,
+        isReachable: false,
+        responseTimeMs: 0,
+      );
       setState(() {
         _results.insert(
           0,
           HostCheckResult(
-            host: host.trim(),
+            host: hostname,
             status: 'OFFLINE',
             statusCode: 0,
             responseTime: 0,
@@ -171,8 +205,6 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
     } finally {
       if (mounted) {
         setState(() => _isChecking = false);
-        _waveController.stop();
-        _waveController.reset();
       }
     }
   }
@@ -208,13 +240,12 @@ class _HostCheckerScreenState extends State<HostCheckerScreen>
                   ),
                   Expanded(
                     child: _isChecking && _results.isEmpty
-                        ? _ScanningState(waveCtrl: _waveController)
+                        ? const _ScanningState()
                         : _results.isEmpty
                             ? const _EmptyState()
                             : _ResultList(
                                 results: _results,
                                 isChecking: _isChecking,
-                                waveCtrl: _waveController,
                               ),
                   ),
                 ],
@@ -429,14 +460,7 @@ class _InputBar extends StatelessWidget {
                 ),
                 child: isChecking
                     ? const Center(
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            color: Colors.white54,
-                            strokeWidth: 2,
-                          ),
-                        ),
+                        child: WaveLoading.small(color: Colors.white54),
                       )
                     : const Icon(Icons.search_rounded,
                         color: Colors.black, size: 20),
@@ -502,62 +526,10 @@ class _QuickRow extends StatelessWidget {
   }
 }
 
-// ─── Wave loading (shared, matches splash aesthetic) ──────────────────────────
-
-class _WaveLoading extends StatelessWidget {
-  final AnimationController controller;
-  final double barWidth;
-  final double barHeight;
-  final double bounce;
-
-  const _WaveLoading({
-    required this.controller,
-    this.barWidth = 5,
-    this.barHeight = 34,
-    this.bounce = 18,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, child) {
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(4, (index) {
-            final delay = index * 0.18;
-            final progress = (controller.value + delay) % 1.0;
-            final offset = progress < 0.5
-                ? -bounce * (progress * 2)
-                : -bounce * (2 - progress * 2);
-            return Padding(
-              padding: EdgeInsets.symmetric(horizontal: barWidth * 0.55),
-              child: Transform.translate(
-                offset: Offset(0, offset),
-                child: Container(
-                  width: barWidth,
-                  height: barHeight,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.85),
-                    borderRadius: BorderRadius.circular(barWidth * 0.5),
-                  ),
-                ),
-              ),
-            );
-          }),
-        );
-      },
-    );
-  }
-}
-
 // ─── Scanning State ───────────────────────────────────────────────────────────
 
 class _ScanningState extends StatelessWidget {
-  final AnimationController waveCtrl;
-
-  const _ScanningState({required this.waveCtrl});
+  const _ScanningState();
 
   @override
   Widget build(BuildContext context) {
@@ -565,7 +537,7 @@ class _ScanningState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          _WaveLoading(controller: waveCtrl),
+          const WaveLoading(),
           const SizedBox(height: 28),
           Text(
             '${AppLocalizations.of(context).translate('host_checker.quick_check')}...',
@@ -642,12 +614,10 @@ class _EmptyState extends StatelessWidget {
 class _ResultList extends StatelessWidget {
   final List<HostCheckResult> results;
   final bool isChecking;
-  final AnimationController waveCtrl;
 
   const _ResultList({
     required this.results,
     required this.isChecking,
-    required this.waveCtrl,
   });
 
   @override
@@ -664,7 +634,7 @@ class _ResultList extends StatelessWidget {
       itemCount: results.length + (isChecking ? 1 : 0),
       itemBuilder: (context, index) {
         if (isChecking && index == 0) {
-          return _ScanningListTile(waveCtrl: waveCtrl);
+          return const _ScanningListTile();
         }
         final result = results[isChecking ? index - 1 : index];
         return _ResultTile(
@@ -679,9 +649,7 @@ class _ResultList extends StatelessWidget {
 // ─── Scanning List Tile ───────────────────────────────────────────────────────
 
 class _ScanningListTile extends StatelessWidget {
-  final AnimationController waveCtrl;
-
-  const _ScanningListTile({required this.waveCtrl});
+  const _ScanningListTile();
 
   @override
   Widget build(BuildContext context) {
@@ -695,12 +663,7 @@ class _ScanningListTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _WaveLoading(
-            controller: waveCtrl,
-            barWidth: 3,
-            barHeight: 20,
-            bounce: 10,
-          ),
+          const WaveLoading.small(),
           const SizedBox(width: 14),
           Text(
             '${AppLocalizations.of(context).translate('host_checker.quick_check')}...',
