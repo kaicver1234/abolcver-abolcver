@@ -87,6 +87,16 @@ class SpeedTestProvider with ChangeNotifier {
   static const Duration _latencyDelay = Duration(milliseconds: 10);
   static const Duration _phaseTransitionDelay = Duration(milliseconds: 1200);
 
+  // ── Live upload-speed display tuning ─────────────────────────────────────────
+  // `onSendProgress` counts bytes handed to the OS socket *send buffer*, not bytes
+  // that have crossed the wire. The kernel swallows the first few MB into that
+  // buffer almost instantly, so we (1) discard a warm-up period while the buffer
+  // fills and (2) report the instantaneous rate over a trailing time window —
+  // once the buffer is saturated, dio can only accept a new byte when an older
+  // one has actually left the wire, so the windowed rate tracks real throughput.
+  static const int _uploadWarmupUs = 300000; // 300 ms — skip the buffer-fill burst
+  static const int _uploadWindowUs = 500000; // 500 ms instantaneous window
+
   static const Duration _connectTimeout = Duration(seconds: 30);
   static const Duration _receiveTimeout = Duration(seconds: 90);
   static const Duration _sendTimeout = Duration(seconds: 90);
@@ -387,6 +397,15 @@ class SpeedTestProvider with ChangeNotifier {
     // per-byte random generation that throttled uploads to CPU speed.
     final payload = Uint8List(bytes);
     final sw = Stopwatch()..start();
+
+    // Live-display state (see _uploadWarmupUs / _uploadWindowUs above). We must
+    // NOT use the naive cumulative `sent/elapsed` rate here: it counts bytes
+    // buffered by the kernel, not bytes on the wire, and spikes wildly at the
+    // start of every request. Instead we ignore a warm-up burst, then publish
+    // the instantaneous rate over a trailing window.
+    bool warmedUp = false;
+    int windowStartSent = 0;
+    int windowStartUs = 0;
     DateTime? lastUpdate;
 
     await _dio!.post(
@@ -400,15 +419,34 @@ class SpeedTestProvider with ChangeNotifier {
         },
       ),
       onSendProgress: (sent, t) {
-        final elapsed = sw.elapsedMilliseconds / 1000.0;
+        if (_isCanceled) return;
+        final nowUs = sw.elapsedMicroseconds;
+
+        // Phase 1: let the socket send buffer fill before trusting any reading.
+        if (!warmedUp) {
+          if (nowUs < _uploadWarmupUs) return;
+          warmedUp = true;
+          windowStartSent = sent;
+          windowStartUs = nowUs;
+          return;
+        }
+
+        // Phase 2: accumulate a full window, then publish its instantaneous rate.
+        final windowUs = nowUs - windowStartUs;
+        if (windowUs < _uploadWindowUs) return;
+
+        final deltaBytes = sent - windowStartSent;
         final now = DateTime.now();
-        if (!_isCanceled &&
-            elapsed > 0.05 &&
+        if (deltaBytes > 0 &&
             (lastUpdate == null ||
                 now.difference(lastUpdate!).inMilliseconds > 100)) {
-          _setCurrentSpeed(_roundSpeed((sent * 8) / elapsed / 1e6));
+          final mbps = (deltaBytes * 8) / (windowUs / 1e6) / 1e6;
+          _setCurrentSpeed(_roundSpeed(mbps));
           lastUpdate = now;
         }
+        // Slide the window forward.
+        windowStartSent = sent;
+        windowStartUs = nowUs;
       },
       cancelToken: _token,
     );
